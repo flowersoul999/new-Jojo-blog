@@ -16,33 +16,13 @@ export const galleryConfig: GalleryConfig = {
 		// passwordHint: 密码提示，设置后在输入密码错误时显示（可选，需配合password使用）
 		// 每添加一个数组项就相当于添加了一个相册，记得在 public/gallery/ 目录下创建对应的子目录并放入图片
 		{
-			id: "wuthering-waves",
-			name: "Wuthering Waves",
+			id: "life-fragments",
+			name: "生活碎片",
 			description:
-				"潮声掠过索拉里斯的旷野，也把旅途中遇见的角色、城市与片刻光影留在这里。",
-			location: "Solaris-3",
-			date: "2026-07-24",
-			tags: ["Wuthering Waves", "鸣潮", "游戏摄影"],
-			cover: "/assets/images/wallpaper/wallpaper-25.webp",
-		},
-		{
-			id: "firefly-2026",
-			name: "可爱流萤",
-			description: "飞萤之火自无梦的长夜亮起，绽放在终竟的明天。",
-			location: "崩坏：星穹铁道",
-			date: "2026-01-01",
-			tags: ["崩坏星穹铁道", "流萤"],
-		},
-		{
-			id: "encrypted-test",
-			name: "加密相册示例",
-			description:
-				"这是一个加密相册的示例，设置了访问密码，只有输入正确的密码才能查看相册内容。",
-			location: "崩坏：星穹铁道",
-			date: "2026-02-01",
-			tags: ["加密相册", "示例"],
-			password: "123456",
-			passwordHint: "示例密码123456",
+				"微信头像本狗、七夕那天广州的猫猫云、抱苹果的 meimei、雨衣电动车的夜路、还有一只眨眼的橘猫——一些值得留下的小瞬间。",
+			location: "广州",
+			date: "2026-09-13",
+			tags: ["生活", "猫猫"],
 		},
 	],
 
