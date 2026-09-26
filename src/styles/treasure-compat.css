@@ -1,0 +1,52 @@
+/* ==========================================================================
+   百宝箱（React 岛）主题令牌兼容层
+   把旧博客的自定义 Tailwind 令牌映射到本站，色值取自旧博客 theme.css，
+   通过 :root 变量实现明暗两套，@theme inline 让工具类在运行时跟随暗色切换
+   ========================================================================== */
+
+@theme inline {
+	--color-brand: var(--treasure-brand);
+	--color-brand-secondary: var(--treasure-brand-secondary);
+	--color-secondary: var(--treasure-secondary);
+	--color-card: var(--treasure-card);
+	--color-bg: var(--treasure-bg);
+	--color-border: var(--treasure-default-border);
+	--font-averia: var(--treasure-font-display);
+}
+
+:root {
+	--treasure-brand: #35bfab;
+	--treasure-brand-secondary: #1fc9e7;
+	--treasure-secondary: #7b888e;
+	--treasure-card: rgba(255, 255, 255, 0.4);
+	--treasure-bg: #eeeeee;
+	--treasure-text: #334f52;
+	--treasure-font-display: "PingFang SC", -apple-system, "Microsoft YaHei", sans-serif;
+	--treasure-default-border: color-mix(in srgb, var(--treasure-secondary) 32%, transparent);
+}
+
+:root.dark {
+	--treasure-brand: #5e9a7a;
+	--treasure-brand-secondary: #9bc1a8;
+	--treasure-secondary: #8a9a8f;
+	--treasure-card: rgba(18, 32, 28, 0.55);
+	--treasure-bg: #0d1613;
+	--treasure-text: #dbe7e0;
+	--treasure-default-border: color-mix(in srgb, var(--treasure-secondary) 26%, transparent);
+}
+
+/* 百宝箱页面容器：独立全屏背景，不套用主站卡片布局 */
+.treasure-root {
+	min-height: 100vh;
+	color: var(--treasure-text);
+	background:
+		radial-gradient(52rem 30rem at 8% -8%, color-mix(in srgb, var(--treasure-brand) 14%, transparent), transparent 62%),
+		radial-gradient(46rem 28rem at 96% 12%, color-mix(in srgb, var(--treasure-brand-secondary) 10%, transparent), transparent 58%),
+		var(--treasure-bg);
+	transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* 旧博客边框默认浅灰的行为回填；zero 特异性，具体色值工具类可正常覆盖 */
+:where(.treasure-root) :where(*, *::before, *::after) {
+	border-color: var(--treasure-default-border);
+}

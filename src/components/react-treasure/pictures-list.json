@@ -1,0 +1,47 @@
+[
+	{
+		"id": "life-fragments",
+		"uploadedAt": "2026-08-28",
+		"description": "我的微信头像",
+		"image": "/gallery/life-fragments/cover.webp",
+		"images": [
+			"/gallery/life-fragments/cover.webp"
+		]
+	},
+	{
+		"id": "life-fragments",
+		"uploadedAt": "2026-08-28",
+		"description": "七夕那天广州的猫猫云",
+		"image": "/gallery/life-fragments/cat-cloud.webp",
+		"images": [
+			"/gallery/life-fragments/cat-cloud.webp"
+		]
+	},
+	{
+		"id": "life-fragments",
+		"uploadedAt": "2026-08-28",
+		"description": "meimei",
+		"image": "/gallery/life-fragments/meimei.webp",
+		"images": [
+			"/gallery/life-fragments/meimei.webp"
+		]
+	},
+	{
+		"id": "life-fragments",
+		"uploadedAt": "2026-08-28",
+		"description": "上一次穿雨衣坐在电动车上面还是小学",
+		"image": "/gallery/life-fragments/rainy-scooter.webp",
+		"images": [
+			"/gallery/life-fragments/rainy-scooter.webp"
+		]
+	},
+	{
+		"id": "life-fragments",
+		"uploadedAt": "2026-09-13",
+		"description": "眨眼的橘猫",
+		"image": "/gallery/life-fragments/wink-cat.webp",
+		"images": [
+			"/gallery/life-fragments/wink-cat.webp"
+		]
+	}
+]

@@ -1,4 +1,5 @@
 import { setMaxListeners } from "node:events";
+import react from "@astrojs/react";
 import { unified } from "@astrojs/markdown-remark";
 import sitemap from "@astrojs/sitemap";
 import svelte from "@astrojs/svelte";
@@ -120,7 +121,13 @@ export default defineConfig({
 			ignore: (targetUrl) => {
 				const targetPath = targetUrl.split(/[?#]/)[0] || "/";
 				const currentPath = window.location.pathname;
-				return targetPath === "/portfolio/" || currentPath === "/portfolio/";
+				// 百宝箱 /treasure/ 同样是独立全屏布局，跨布局边界直接走原生跳转
+				return (
+					targetPath === "/portfolio/" ||
+					currentPath === "/portfolio/" ||
+					targetPath === "/treasure/" ||
+					currentPath.startsWith("/treasure/")
+				);
 			},
 			updateHead: true,
 			updateBodyClass: false,
@@ -208,6 +215,7 @@ export default defineConfig({
 			},
 		}),
 		svelte(),
+		react(),
 		sitemap({
 			filter: (page) => {
 				// 根据页面开关配置过滤sitemap
@@ -301,14 +309,16 @@ export default defineConfig({
 	},
 	vite: {
 		plugins: [tailwindcss()],
+		// React 岛（百宝箱）：dedupe 保证全站只有一份 React 实例，避免 invalid hook call
+		resolve: {
+			dedupe: ["react", "react-dom"],
+			alias: {
+				"@rehype-callouts-theme": `rehype-callouts/theme/${siteConfig.post.rehypeCallouts.theme}`,
+			},
+		},
 		server: {
 			watch: {
 				ignored: ["**/package/**", "**/Firefly-docs/**"],
-			},
-		},
-		resolve: {
-			alias: {
-				"@rehype-callouts-theme": `rehype-callouts/theme/${siteConfig.post.rehypeCallouts.theme}`,
 			},
 		},
 		build: {

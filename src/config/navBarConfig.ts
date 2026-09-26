@@ -60,6 +60,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 			// 番组计划
 			LinkPresets.Bangumi,
 
+			// 百宝箱
+			LinkPresets.Treasure,
+
 			// 日记
 			LinkPresets.Diary,
 
@@ -199,6 +202,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		url: "/bangumi/",
 		icon: "material-symbols:movie",
 		pageKey: "bangumi",
+	},
+	Treasure: {
+		name: "百宝箱",
+		url: "/treasure/",
+		icon: "material-symbols:extension-rounded",
 	},
 	Gallery: {
 		name: "相册",
