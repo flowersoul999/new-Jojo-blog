@@ -252,7 +252,7 @@ async function initializeLottieEmojis() {
 	observeAnimations();
 }
 
-export function initLottieEmojis() {
+export function initLottieEmojis(): void {
 	if (scheduledFrame) cancelAnimationFrame(scheduledFrame);
 	scheduledFrame = requestAnimationFrame(() => {
 		scheduledFrame = 0;
@@ -260,7 +260,7 @@ export function initLottieEmojis() {
 	});
 }
 
-export function setLottiePlayback(name: string, shouldPlay: boolean) {
+export function setLottiePlayback(name: string, shouldPlay: boolean): void {
 	if (typeof document === "undefined") return;
 
 	const element = Array.from(

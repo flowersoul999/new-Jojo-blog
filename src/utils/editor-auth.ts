@@ -10,7 +10,7 @@ export const GITHUB_REPO = {
 } as const;
 
 // 是否为本地开发模式（DEV 下直接读写本地文件，无需 GitHub 认证）
-export const isLocalDev = import.meta.env.DEV;
+export const isLocalDev: boolean = import.meta.env.DEV;
 
 // 本地项目根目录（src 的父目录）
 const PROJECT_ROOT = process.cwd();
@@ -101,7 +101,13 @@ export function resolveLocalPath(relPath: string): string {
 /**
  * 列出目录内容（本地）
  */
-export function listLocalDir(relPath: string) {
+export function listLocalDir(relPath: string): Array<{
+	name: string;
+	path: string;
+	type: "dir" | "file";
+	sha: string;
+	size: number;
+}> {
 	const target = resolveLocalPath(relPath || ".");
 	if (!fs.existsSync(target)) return [];
 	const entries = fs.readdirSync(target, { withFileTypes: true });
@@ -121,7 +127,9 @@ export function listLocalDir(relPath: string) {
 /**
  * 读取文件内容（本地）
  */
-export function readLocalFile(relPath: string) {
+export function readLocalFile(relPath: string):
+	| { path: string; content: string; sha: string; name: string }
+	| { path: string; content: null; sha: string; name: string; encoding: string; base64Content: string } {
 	const target = resolveLocalPath(relPath);
 	if (!fs.existsSync(target)) throw new Error(`文件不存在：${relPath}`);
 	const stat = fs.statSync(target);
