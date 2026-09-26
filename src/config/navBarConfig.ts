@@ -36,11 +36,11 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 	// 站点统计（暂时隐藏，页面仍可通过 /analytics/ 访问）
 	// links.push(LinkPresets.Analytics);
 
-	// 友链
-	links.push(LinkPresets.Friends);
+	// 友链（暂时隐藏，页面仍可通过 /friends/ 访问）
+	// links.push(LinkPresets.Friends);
 
-	// 朋友圈
-	links.push(LinkPresets.Moments);
+	// 朋友圈（暂时隐藏，页面仍可通过 /moments/ 访问）
+	// links.push(LinkPresets.Moments);
 
 	// 留言板
 	links.push(LinkPresets.Guestbook);
