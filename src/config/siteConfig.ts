@@ -1,4 +1,4 @@
-﻿import type { SiteConfig } from "@/types/siteConfig";
+import type { SiteConfig } from "@/types/siteConfig";
 
 // 定义站点语言
 // 语言代码，例如：'zh_CN', 'zh_TW', 'en', 'ja', 'ru'。
@@ -170,8 +170,9 @@ export const siteConfig: SiteConfig = {
 
 	// bangumi配置
 	bangumi: {
-		// Bangumi用户ID
-		userId: "1143164",
+		// Bangumi用户ID：注册 bgm.tv 后，个人主页网址 bgm.tv/user/数字 里的那串数字
+		// 留空则番组计划页显示空状态；想展示自己看过的番，把 ID 填回这里即可
+		userId: "",
 		// 数据模式：static=构建时获取，dynamic=客户端实时获取
 		// static 模式在构建时获取数据并静态渲染，部署后数据不更新
 		// dynamic 模式在浏览器中实时请求 API，始终显示最新数据
