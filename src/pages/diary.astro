@@ -9,7 +9,7 @@ if (!siteConfig.pages.diary) {
 }
 
 const title = "日记";
-const description = "记录生活，碎碎念。纸片随风漂浮，点一张看看。";
+const description = "记录生活，碎碎念。往下滑进入全屏，纸片随意拖动摆放。";
 ---
 
 <MainGridLayout title={title} description={description}>
@@ -45,7 +45,43 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 					<div class="animate-pulse">纸片飞扬中...</div>
 				</div>
 			</div>
+
+			<!-- 下滑提示 -->
+			<div class="diary-scroll-hint flex items-center justify-center gap-1.5 py-3 text-xs text-neutral-400 dark:text-neutral-500">
+				<Icon is:inline name="material-symbols:keyboard-double-arrow-down-rounded" class="text-base animate-bounce" />
+				<span>继续下滑，进入全屏漂浮模式</span>
+			</div>
 		</div>
+	</div>
+
+	<!-- 全屏漂浮层：滚动进入，盖住侧边栏和导航栏 -->
+	<div id="diary-fs" class="diary-fs">
+		<div class="diary-fs-header">
+			<div class="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+				<Icon is:inline name="material-symbols:edit-note" class="text-lg text-(--primary)" />
+				<span class="font-medium text-neutral-800 dark:text-neutral-200">日记 · 全屏漂浮</span>
+				<span class="hidden sm:inline text-neutral-400 dark:text-neutral-500">· 拖动纸片随意摆放，点击查看详情</span>
+			</div>
+			<div class="flex items-center gap-2">
+				<button
+					type="button"
+					id="diary-fs-shuffle"
+					class="inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-xs text-(--btn-content) hover:bg-(--btn-regular-bg-hover) transition-colors"
+				>
+					<Icon is:inline name="material-symbols:shuffle-rounded" class="text-sm" />
+					<span>换个摆法</span>
+				</button>
+				<button
+					type="button"
+					id="diary-fs-exit"
+					class="inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-xs text-(--btn-content) hover:bg-(--btn-regular-bg-hover) transition-colors"
+				>
+					<Icon is:inline name="material-symbols:close" class="text-sm" />
+					<span>退出全屏</span>
+				</button>
+			</div>
+		</div>
+		<!-- 全屏模式下日记板会被移动到这里 -->
 	</div>
 
 	<!-- 日记详情弹窗 -->
@@ -73,7 +109,7 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 			min-height: 400px;
 		}
 
-		/* 定位层：负责位置与鼠标视差 */
+		/* 定位层：负责位置；普通模式下带鼠标视差，全屏模式下可拖动 */
 		.diary-paper-pos {
 			position: absolute;
 			transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
@@ -82,6 +118,20 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 		}
 		.diary-paper-pos:hover {
 			z-index: 30;
+		}
+		/* 全屏模式下：可拖动，禁用视差位移 */
+		.diary-board--fs .diary-paper-pos {
+			transition: none;
+			cursor: grab;
+			touch-action: none;
+			user-select: none;
+		}
+		.diary-board--fs .diary-paper-pos.dragging {
+			cursor: grabbing;
+			z-index: 40;
+		}
+		.diary-board--fs .diary-paper-pos.dragging .diary-paper {
+			animation-play-state: paused;
 		}
 
 		/* 旋转层 */
@@ -268,6 +318,49 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 			text-align: center;
 		}
 
+		/* ===================== 全屏漂浮层 ===================== */
+		.diary-fs {
+			display: none;
+			position: fixed;
+			inset: 0;
+			z-index: 90;
+			background: var(--card-bg);
+			opacity: 0;
+			transition: opacity 0.3s ease;
+		}
+		:root.dark .diary-fs {
+			background: rgb(24 24 24);
+		}
+		.diary-fs.active {
+			display: block;
+			opacity: 1;
+		}
+		.diary-fs-header {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: 56px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 0 1rem;
+			border-bottom: 1px solid var(--line-divider);
+			background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+			backdrop-filter: blur(8px);
+			z-index: 10;
+		}
+		/* 全屏模式下的日记板：铺满头部以下区域 */
+		.diary-board--fs {
+			position: absolute;
+			top: 56px;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			overflow: hidden;
+			min-height: 0;
+		}
+
 		/* ---- 详情弹窗 ---- */
 		.diary-modal {
 			animation: diary-fade-in 0.25s ease;
@@ -305,9 +398,9 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 			transform: scale(1.02);
 		}
 
-		/* ---- 移动端：流式布局，保留形状与悬浮 ---- */
+		/* ---- 移动端普通模式：流式布局，保留形状与悬浮 ---- */
 		@media (max-width: 639px) {
-			.diary-board {
+			.diary-board:not(.diary-board--fs) {
 				display: flex;
 				flex-direction: column;
 				align-items: center;
@@ -315,11 +408,11 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 				padding: 1.5rem 0 2rem;
 				min-height: 0;
 			}
-			.diary-paper-pos {
+			.diary-board:not(.diary-board--fs) .diary-paper-pos {
 				position: static;
 				transform: none !important;
 			}
-			.diary-paper {
+			.diary-board:not(.diary-board--fs) .diary-paper {
 				max-width: 320px;
 			}
 		}
@@ -337,8 +430,13 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 
 		var DIARY_PASSWORD = "2299";
 		var UNLOCK_KEY = "aemeath-diary-unlocked";
+		var DRAG_THRESHOLD = 6; // 拖动超过该像素才算拖动，否则视为点击
 
 		var board = document.getElementById("diary-board");
+		var boardHome = board.parentNode; // 普通模式下日记板所在位置
+		var fsLayer = document.getElementById("diary-fs");
+		var fsExit = document.getElementById("diary-fs-exit");
+		var fsShuffle = document.getElementById("diary-fs-shuffle");
 		var modal = document.getElementById("diary-modal");
 		var modalMask = document.getElementById("diary-modal-mask");
 		var modalBody = document.getElementById("diary-modal-body");
@@ -348,13 +446,18 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 		var lightboxClose = document.getElementById("diary-lightbox-close");
 		var shuffleBtn = document.getElementById("diary-shuffle");
 
-		// 弹窗和灯箱移到 body 下，避免父级 transform 导致 fixed 定位偏移
+		// 弹窗、灯箱、全屏层移到 body 下，避免父级 transform 让 fixed 定位失效
+		document.body.appendChild(fsLayer);
 		document.body.appendChild(modal);
 		document.body.appendChild(lightbox);
 
 		var entries = [];
 		var unlocked = false;
 		var shuffleSeed = 0;
+		var fullscreen = false;
+		var savedPos = {}; // slug -> {x,y}，全屏模式下拖动后的位置
+		var wheelAcc = 0;
+		var exitGuardUntil = 0; // 退出全屏后短时间内禁止再次触发，防止恢复滚动时误入
 
 		try {
 			unlocked = sessionStorage.getItem(UNLOCK_KEY) === "1";
@@ -441,20 +544,28 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 				return;
 			}
 
+			var isFs = fullscreen;
 			var isMobile = window.innerWidth < 640;
 			var sorted = entries.slice().sort(function (a, b) {
 				return new Date(b.date).getTime() - new Date(a.date).getTime();
 			});
 
-			var boardW = board.clientWidth || 800;
-			var cols = isMobile ? 1 : boardW >= 980 ? 3 : 2;
-			var cellH = 300;
-			var cellW = boardW / cols;
+			var w = board.clientWidth || 800;
+			var h = board.clientHeight || 500;
+			var cols, cellH;
+			if (isFs) {
+				cols = w >= 1400 ? 4 : w >= 900 ? 3 : 2;
+				cellH = Math.max(220, Math.min(280, (h - 40) / Math.ceil(sorted.length / cols)));
+			} else {
+				cols = isMobile ? 1 : w >= 980 ? 3 : 2;
+				cellH = 300;
+			}
+			var cellW = w / cols;
 			var rows = Math.ceil(sorted.length / cols);
 
-			if (!isMobile) {
+			if (!isFs && !isMobile) {
 				board.style.height = rows * cellH + 40 + "px";
-			} else {
+			} else if (!isFs) {
 				board.style.height = "";
 			}
 
@@ -466,14 +577,21 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 
 				var col = i % cols;
 				var row = Math.floor(i / cols);
-				var left = col * cellW + (cellW - prm.w) / 2 + prm.jx;
-				var top = row * cellH + (cellH - 190) / 2 + prm.jy;
+				var left, top;
+				var sp = savedPos[entry.slug];
+				if (isFs && sp) {
+					// 全屏模式下：拖动过就停在拖动后的位置
+					left = sp.x;
+					top = sp.y;
+				} else {
+					left = col * cellW + (cellW - prm.w) / 2 + prm.jx;
+					top = row * cellH + (cellH - 190) / 2 + prm.jy;
+				}
+				// 限制在板面范围内
+				left = Math.max(8, Math.min(left, w - prm.w - 8));
+				top = Math.max(8, Math.min(top, h - 160));
 
-				var posStyle = isMobile
-					? ""
-					: 'style="left:' + left.toFixed(1) + "px;top:" + top.toFixed(1) + 'px;width:' + prm.w + 'px" data-depth="' + prm.depth.toFixed(2) + '"';
-
-				html += '<div class="diary-paper-pos" ' + posStyle + ' data-slug="' + entry.slug + '">';
+				html += '<div class="diary-paper-pos" style="left:' + left.toFixed(1) + "px;top:" + top.toFixed(1) + 'px;width:' + prm.w + 'px" data-slug="' + entry.slug + '"' + (isFs ? "" : ' data-depth="' + prm.depth.toFixed(2) + '"') + ">";
 				html +=
 					'<div class="diary-paper-rot" style="transform:rotate(' + prm.rotate.toFixed(1) + 'deg)">';
 				html +=
@@ -489,7 +607,7 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 					"s;--float-amp:" +
 					prm.floatAmp +
 					"px" +
-					(isMobile ? ";width:" + Math.min(prm.w, 320) + "px" : "") +
+					(isFs || isMobile ? ";width:100%" : "") +
 					'">';
 
 				if (locked) {
@@ -516,37 +634,99 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 
 			board.innerHTML = html;
 
-			// 点击纸片 → 详情 / 解锁
+			// 绑定交互
 			board.querySelectorAll(".diary-paper-pos").forEach(function (el) {
-				el.addEventListener("click", function () {
-					var slug = el.dataset.slug;
-					var entry = entries.find(function (e) {
-						return e.slug === slug;
-					});
-					if (!entry) return;
-					if (entry.isPrivate && !unlocked) {
-						var pwd = prompt("这是一篇私密日记，请输入密码：");
-						if (pwd === DIARY_PASSWORD) {
-							try {
-								sessionStorage.setItem(UNLOCK_KEY, "1");
-							} catch (e) {}
-							unlocked = true;
-							renderBoard();
-							openModal(entry);
-						} else if (pwd !== null) {
-							alert("密码错误");
-						}
-						return;
-					}
-					openModal(entry);
+				var slug = el.dataset.slug;
+				var entry = entries.find(function (e) {
+					return e.slug === slug;
 				});
+				if (!entry) return;
+				if (isFs) {
+					bindDrag(el, entry);
+				} else {
+					el.addEventListener("click", function () {
+						handleEntryClick(entry);
+					});
+				}
 			});
 		}
 
-		/* ---------- 鼠标视差 ---------- */
+		/* ---------- 点击纸片：详情 / 解锁 ---------- */
+		function handleEntryClick(entry) {
+			if (entry.isPrivate && !unlocked) {
+				var pwd = prompt("这是一篇私密日记，请输入密码：");
+				if (pwd === DIARY_PASSWORD) {
+					try {
+						sessionStorage.setItem(UNLOCK_KEY, "1");
+					} catch (e) {}
+					unlocked = true;
+					renderBoard();
+					openModal(entry);
+				} else if (pwd !== null) {
+					alert("密码错误");
+				}
+				return;
+			}
+			openModal(entry);
+		}
+
+		/* ---------- 全屏模式下的拖动 ---------- */
+		function bindDrag(el, entry) {
+			var startX = 0,
+				startY = 0,
+				origX = 0,
+				origY = 0,
+				moved = false,
+				dragging = false;
+
+			el.addEventListener("pointerdown", function (e) {
+				if (e.pointerType === "mouse" && e.button !== 0) return;
+				dragging = true;
+				moved = false;
+				startX = e.clientX;
+				startY = e.clientY;
+				origX = parseFloat(el.style.left);
+				origY = parseFloat(el.style.top);
+				el.classList.add("dragging");
+				try {
+					el.setPointerCapture(e.pointerId);
+				} catch (err) {}
+			});
+
+			el.addEventListener("pointermove", function (e) {
+				if (!dragging) return;
+				var dx = e.clientX - startX;
+				var dy = e.clientY - startY;
+				if (!moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+				moved = true;
+				var w = board.clientWidth;
+				var pw = el.offsetWidth || 200;
+				var ph = el.offsetHeight || 160;
+				var nx = Math.max(8, Math.min(origX + dx, w - pw - 8));
+				var ny = Math.max(8, Math.min(origY + dy, board.clientHeight - ph - 8));
+				el.style.left = nx + "px";
+				el.style.top = ny + "px";
+				savedPos[entry.slug] = { x: nx, y: ny };
+			});
+
+			function endDrag(e) {
+				if (!dragging) return;
+				dragging = false;
+				el.classList.remove("dragging");
+				try {
+					el.releasePointerCapture(e.pointerId);
+				} catch (err) {}
+				// 没怎么动 → 视为点击，打开详情
+				if (!moved) handleEntryClick(entry);
+			}
+			el.addEventListener("pointerup", endDrag);
+			el.addEventListener("pointercancel", endDrag);
+		}
+
+		/* ---------- 普通模式鼠标视差 ---------- */
 		function bindParallax() {
 			board.addEventListener("mousemove", function (e) {
-				if (window.innerWidth < 640) return;
+				if (fullscreen || window.innerWidth < 640) return;
 				var r = board.getBoundingClientRect();
 				var nx = (e.clientX - r.left) / r.width - 0.5;
 				var ny = (e.clientY - r.top) / r.height - 0.5;
@@ -562,6 +742,64 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 				});
 			});
 		}
+
+		/* ---------- 全屏模式切换 ---------- */
+		function enterFullscreen() {
+			if (fullscreen) return;
+			fullscreen = true;
+			document.body.style.overflow = "hidden";
+			fsLayer.classList.add("active");
+			board.classList.add("diary-board--fs");
+			fsLayer.appendChild(board);
+			renderBoard();
+		}
+
+		function exitFullscreen() {
+			if (!fullscreen) return;
+			fullscreen = false;
+			// 退出后回到日记板块顶部，避免恢复的滚动位置再次越过触发阈值
+			exitGuardUntil = Date.now() + 500;
+			fsLayer.classList.remove("active");
+			board.classList.remove("diary-board--fs");
+			boardHome.insertBefore(board, boardHome.querySelector(".diary-scroll-hint"));
+			document.body.style.overflow = "";
+			var boardTop = boardHome.getBoundingClientRect().top + window.scrollY;
+			window.scrollTo(0, Math.max(0, boardTop - 120));
+			renderBoard();
+		}
+
+		// 滚动进入：日记板顶边滚过视口顶部即进入全屏
+		window.addEventListener("scroll", function () {
+			if (fullscreen || !entries.length) return;
+			if (Date.now() < exitGuardUntil) return;
+			var rect = board.getBoundingClientRect();
+			if (rect.top < 0) enterFullscreen();
+		});
+
+		// 上滑滚轮退出全屏
+		window.addEventListener(
+			"wheel",
+			function (e) {
+				if (!fullscreen) return;
+				if (e.deltaY < 0) {
+					wheelAcc += -e.deltaY;
+					if (wheelAcc > 300) {
+						wheelAcc = 0;
+						exitFullscreen();
+					}
+				} else {
+					wheelAcc = 0;
+				}
+			},
+			{ passive: true }
+		);
+
+		fsExit.addEventListener("click", exitFullscreen);
+		fsShuffle.addEventListener("click", function () {
+			shuffleSeed = (shuffleSeed + 1) % 997;
+			savedPos = {};
+			renderBoard();
+		});
 
 		/* ---------- 详情弹窗 ---------- */
 		function openModal(entry) {
@@ -613,7 +851,8 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 			modal.classList.add("hidden");
 			modal.classList.remove("flex");
 			if (lightbox.classList.contains("hidden")) {
-				document.body.style.overflow = "";
+				// 全屏模式下保持锁定滚动
+				document.body.style.overflow = fullscreen ? "hidden" : "";
 			}
 		}
 
@@ -621,7 +860,7 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 			lightbox.classList.add("hidden");
 			lightbox.classList.remove("flex");
 			if (modal.classList.contains("hidden")) {
-				document.body.style.overflow = "";
+				document.body.style.overflow = fullscreen ? "hidden" : "";
 			}
 		}
 
@@ -635,10 +874,12 @@ const description = "记录生活，碎碎念。纸片随风漂浮，点一张�
 			if (e.key !== "Escape") return;
 			if (!lightbox.classList.contains("hidden")) closeLightbox();
 			else if (!modal.classList.contains("hidden")) closeModal();
+			else if (fullscreen) exitFullscreen();
 		});
 
 		shuffleBtn.addEventListener("click", function () {
 			shuffleSeed = (shuffleSeed + 1) % 997;
+			savedPos = {};
 			renderBoard();
 		});
 
