@@ -2,11 +2,12 @@
 import { Icon } from "astro-icon/components";
 import EncryptedContent from "@/components/features/EncryptedContent.astro";
 import PhotoCard from "@/components/pages/gallery/PhotoCard.astro";
+import PhotoScatter from "@/components/pages/gallery/PhotoScatter.astro";
 import { galleryConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
-import { getAlbumCover, scanAlbumPhotos } from "@/utils/gallery-utils";
+import { getAlbumCover, scanAlbumPhotoItems, scanAlbumPhotos } from "@/utils/gallery-utils";
 import { getLqipProps } from "@/utils/lqip-utils";
 import { url } from "@/utils/url-utils";
 
@@ -29,6 +30,7 @@ if (!albumMeta) {
 }
 
 const photos = scanAlbumPhotos(albumMeta.id);
+const photoItems = scanAlbumPhotoItems(albumMeta.id);
 const cover = getAlbumCover(albumMeta, photos);
 const columnWidth = galleryConfig.columnWidth || 240;
 
@@ -131,35 +133,66 @@ const coverLqipProps = cover
   <!-- 瀑布流照片网格 -->
   <div class="w-full rounded-(--radius-large) overflow-hidden relative mt-4">
     <div class="card-base z-10 px-6 py-6 relative w-full">
-      {photos.length > 0 ? (
-        albumMeta.password ? (
-          <EncryptedContent password={albumMeta.password} slug={albumMeta.id} hint={albumMeta.passwordHint}>
-            <div
-              class="gallery-masonry"
-              style={`column-count: 2; column-gap: 0.75rem; --col-width: ${columnWidth}px;`}
-            >
-              {photos.map((photo) => (
-                <PhotoCard src={photo} albumId={albumMeta.id} />
-              ))}
+      {
+        photos.length > 0 ? (
+          <>
+            <div class="flex items-center justify-between gap-3 mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+              <span class="inline-flex items-center gap-1.5">
+                <Icon is:inline name="material-symbols:gesture" class="text-base text-(--primary)" />
+                点击任意照片进入散落模式，可自由拖动摆放
+              </span>
             </div>
-          </EncryptedContent>
+            {
+              albumMeta.password ? (
+                <EncryptedContent password={albumMeta.password} slug={albumMeta.id} hint={albumMeta.passwordHint}>
+                  <div
+                    data-scatter-album={albumMeta.id}
+                    data-album-date={albumMeta.date || ""}
+                    data-album-tags={JSON.stringify(albumMeta.tags || [])}
+                    class="gallery-masonry"
+                    style={`column-count: 2; column-gap: 0.75rem; --col-width: ${columnWidth}px;`}
+                  >
+                    {photoItems.map((photo) => (
+                      <PhotoCard
+                        src={photo.src}
+                        albumId={albumMeta.id}
+                        description={photo.description}
+                        date={photo.date}
+                        tags={photo.tags}
+                      />
+                    ))}
+                  </div>
+                </EncryptedContent>
+              ) : (
+                <div
+                  data-scatter-album={albumMeta.id}
+                  data-album-date={albumMeta.date || ""}
+                  data-album-tags={JSON.stringify(albumMeta.tags || [])}
+                  class="gallery-masonry"
+                  style={`column-count: 2; column-gap: 0.75rem; --col-width: ${columnWidth}px;`}
+                >
+                  {photoItems.map((photo) => (
+                    <PhotoCard
+                      src={photo.src}
+                      albumId={albumMeta.id}
+                      description={photo.description}
+                      date={photo.date}
+                      tags={photo.tags}
+                    />
+                  ))}
+                </div>
+              )
+            }
+          </>
         ) : (
-          <div
-            class="gallery-masonry"
-            style={`column-count: 2; column-gap: 0.75rem; --col-width: ${columnWidth}px;`}
-          >
-            {photos.map((photo) => (
-              <PhotoCard src={photo} albumId={albumMeta.id} />
-            ))}
+          <div class="flex flex-col items-center justify-center py-16 text-neutral-400 dark:text-neutral-500">
+            <Icon is:inline name="material-symbols:photo-library" class="text-6xl mb-4 opacity-50" />
+            <p class="text-lg">{i18n(I18nKey.galleryNoAlbums)}</p>
           </div>
         )
-      ) : (
-        <div class="flex flex-col items-center justify-center py-16 text-neutral-400 dark:text-neutral-500">
-          <Icon is:inline name="material-symbols:photo-library" class="text-6xl mb-4 opacity-50" />
-          <p class="text-lg">{i18n(I18nKey.galleryNoAlbums)}</p>
-        </div>
-      )}
+      }
     </div>
   </div>
 
+  <PhotoScatter />
 </MainGridLayout>

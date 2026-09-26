@@ -1,0 +1,640 @@
+---
+/**
+ * 全屏散落照片墙（拍立得模式）
+ *
+ * 交互（对齐 Jojo-blog 的 pictures 页）：
+ * - 点击相册网格中的任意照片进入全屏：照片以拍立得白框随机散落在屏幕上
+ * - 每张照片可自由拖动，拖动后的位置按 相册+图片 维度持久化到 localStorage
+ * - 单击照片放大到屏幕中央，旁边出现彩色便签，显示标签 / 日期 / 描述
+ * - 再次单击照片或按 ESC 还原；再按 ESC 或点击背景 / 关闭按钮退出全屏
+ *
+ * 数据全部来自网格 DOM（[data-scatter-album] 容器内的 [data-scatter-photo]），
+ * 因此对加密相册解密后渲染、swup 无刷新切页同样生效。
+ */
+---
+
+<style is:global>
+  body.ps-lock {
+    overflow: hidden;
+  }
+
+  .ps-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: none;
+  }
+
+  .ps-overlay.ps-open {
+    display: block;
+  }
+
+  .ps-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(12, 12, 18, 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    animation: ps-fade 0.35s ease both;
+  }
+
+  .ps-stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .ps-hint {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 1rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.92);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+    white-space: nowrap;
+    animation: ps-fade 0.5s ease 0.2s both;
+  }
+
+  .ps-close {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 22px;
+    line-height: 1;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      transform 0.2s ease;
+    animation: ps-fade 0.5s ease 0.25s both;
+  }
+
+  .ps-close:hover {
+    background: rgba(255, 255, 255, 0.28);
+    transform: scale(1.06);
+  }
+
+  .ps-card {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: var(--w, 200px);
+    height: var(--h, 200px);
+    transform:
+      translate(calc(-50% + var(--ox, 0px)), calc(-50% + var(--oy, 0px)))
+      rotate(var(--rot, 0deg));
+    transition:
+      transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+      width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+      height 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+    touch-action: none;
+    cursor: grab;
+    will-change: transform;
+    user-select: none;
+  }
+
+  .ps-card.is-dragging {
+    transition: none;
+    cursor: grabbing;
+  }
+
+  .ps-card.is-zoomed {
+    transform: translate(-50%, -50%) rotate(0deg);
+    z-index: 1400 !important;
+  }
+
+  .ps-frame {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 8px 0;
+    background: #fff;
+    box-shadow:
+      0 14px 42px rgba(0, 0, 0, 0.42),
+      0 2px 10px rgba(0, 0, 0, 0.25);
+    animation: ps-pop 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  }
+
+  .ps-card:not(.is-zoomed):hover .ps-frame {
+    box-shadow:
+      0 18px 52px rgba(0, 0, 0, 0.5),
+      0 2px 10px rgba(0, 0, 0, 0.25);
+  }
+
+  .ps-frame img {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    object-fit: cover;
+    -webkit-user-drag: none;
+    user-select: none;
+    background: #e9e9ee;
+  }
+
+  .ps-strip {
+    flex: 0 0 26px;
+    background: #fff;
+  }
+
+  .ps-note {
+    position: absolute;
+    z-index: 1401;
+    width: 224px;
+    min-height: 120px;
+    padding: 16px 18px;
+    color: #3a3530;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    display: none;
+  }
+
+  .ps-note.is-visible {
+    display: block;
+    animation: ps-note-in 0.4s cubic-bezier(0.22, 1.3, 0.36, 1) both;
+  }
+
+  @media (min-width: 768px) {
+    .ps-note {
+      right: 5%;
+      top: 50%;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .ps-note {
+      left: 14px;
+      right: 14px;
+      width: auto;
+      bottom: 34px;
+    }
+  }
+
+  .ps-note-date {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: rgba(58, 53, 48, 0.62);
+    margin-bottom: 8px;
+  }
+
+  .ps-note-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .ps-note-tag {
+    font-size: 0.72rem;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.12);
+    color: rgba(58, 53, 48, 0.85);
+  }
+
+  .ps-note-desc {
+    font-size: 0.9rem;
+    line-height: 1.65;
+    word-break: break-word;
+  }
+
+  @keyframes ps-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes ps-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.55) rotate(-4deg);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) rotate(0);
+    }
+  }
+
+  @keyframes ps-note-in {
+    from {
+      opacity: 0;
+      transform: scale(0.5) rotate(-3deg);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) rotate(0);
+    }
+  }
+</style>
+
+<script>
+  (() => {
+    const w = window as Window & { __photoScatterBound?: boolean };
+    if (w.__photoScatterBound) return;
+    w.__photoScatterBound = true;
+
+    const NOTE_COLORS = ["#fff3b0", "#ffd6e0", "#cdeffd", "#d8f3dc", "#f3d9fa", "#ffe5c2"];
+
+    type PhotoMeta = {
+      src: string;
+      description: string;
+      date: string;
+      tags: string[];
+    };
+
+    type Card = {
+      el: HTMLElement;
+      img: HTMLImageElement;
+      meta: PhotoMeta;
+      x: number;
+      y: number;
+      rot: number;
+      baseW: number;
+      baseH: number;
+      noteColor: string;
+    };
+
+    type DragState = {
+      card: Card;
+      pointerId: number;
+      startX: number;
+      startY: number;
+      origX: number;
+      origY: number;
+      moved: boolean;
+      downAt: number;
+    };
+
+    let overlay: HTMLElement | null = null;
+    let stage: HTMLElement | null = null;
+    let noteEl: HTMLElement | null = null;
+    let zoomed: Card | null = null;
+    let zTop = 20;
+    let drag: DragState | null = null;
+
+    function ensureOverlay() {
+      if (overlay) return;
+      overlay = document.createElement("div");
+      overlay.className = "ps-overlay";
+      overlay.setAttribute("aria-hidden", "true");
+      overlay.innerHTML = `
+        <div class="ps-scrim" data-ps-close></div>
+        <div class="ps-stage"></div>
+        <div class="ps-hint">拖动照片重新摆放 · 单击查看标签与描述 · ESC 退出</div>
+        <button type="button" class="ps-close" data-ps-close aria-label="退出散落相册">✕</button>
+        <div class="ps-note"></div>
+      `;
+      document.body.appendChild(overlay);
+      stage = overlay.querySelector(".ps-stage");
+      noteEl = overlay.querySelector(".ps-note");
+
+      overlay.addEventListener("click", (e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest("[data-ps-close]")) closeScatter();
+      });
+    }
+
+    function hashStr(s: string): number {
+      let hash = 0;
+      for (let i = 0; i < s.length; i++) {
+        hash = (hash << 5) - hash + s.charCodeAt(i);
+        hash &= hash;
+      }
+      return Math.abs(hash);
+    }
+
+    /** 基于图片地址生成稳定的黄金角螺旋落点 + 随机感旋转 */
+    function stablePosition(uniqueId: string, vw: number, vh: number, baseW: number) {
+      const seed = hashStr(uniqueId) % 10000;
+      const maxRadius = Math.max(60, Math.min(vw, vh) / 2 - baseW * 0.95);
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+      const t = (seed % 1000) / 1000;
+      const radius = Math.pow(t, 0.78) * maxRadius;
+      const angle = seed * goldenAngle;
+      const x = radius * Math.cos(angle);
+      const y = radius * Math.sin(angle) * 0.82;
+      const rot = ((seed * 13) % 36) - 18;
+      return { x, y, rot };
+    }
+
+    function offsetKey(albumId: string, src: string) {
+      return `photo-scatter-offset:${albumId}:${src}`;
+    }
+
+    function loadOffset(albumId: string, src: string): { x: number; y: number } {
+      try {
+        const raw = localStorage.getItem(offsetKey(albumId, src));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return { x: Number(parsed.x) || 0, y: Number(parsed.y) || 0 };
+        }
+      } catch {
+        /* ignore */
+      }
+      return { x: 0, y: 0 };
+    }
+
+    function saveOffset(albumId: string, src: string, x: number, y: number) {
+      try {
+        localStorage.setItem(offsetKey(albumId, src), JSON.stringify({ x, y }));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    function applyTransform(card: Card) {
+      card.el.style.setProperty("--ox", `${card.x}px`);
+      card.el.style.setProperty("--oy", `${card.y}px`);
+      card.el.style.setProperty("--rot", `${card.rot}deg`);
+    }
+
+    function bringToFront(card: Card) {
+      zTop += 1;
+      card.el.style.zIndex = String(zTop);
+    }
+
+    function parseTags(raw?: string): string[] {
+      try {
+        const v = JSON.parse(raw || "[]");
+        return Array.isArray(v) ? v.map(String) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function unzoom() {
+      if (!zoomed) return;
+      const card = zoomed;
+      zoomed = null;
+      card.el.classList.remove("is-zoomed");
+      card.el.style.setProperty("--w", `${card.baseW}px`);
+      card.el.style.setProperty("--h", `${card.baseH}px`);
+      noteEl?.classList.remove("is-visible");
+    }
+
+    function zoom(card: Card, albumEl: HTMLElement) {
+      if (zoomed === card) {
+        unzoom();
+        return;
+      }
+      if (zoomed) unzoom();
+      zoomed = card;
+      bringToFront(card);
+
+      const naturalW = card.img.naturalWidth || 4;
+      const naturalH = card.img.naturalHeight || 3;
+      const isMobile = window.innerWidth < 768;
+      const maxW = window.innerWidth - (isMobile ? 36 : 100);
+      const maxH = window.innerHeight - (isMobile ? 260 : 140);
+      const scale = Math.min(maxW / naturalW, maxH / naturalH, 1.25);
+      card.el.style.setProperty("--w", `${Math.round(naturalW * scale)}px`);
+      card.el.style.setProperty("--h", `${Math.round(naturalH * scale)}px`);
+      card.el.classList.add("is-zoomed");
+
+      if (!noteEl) return;
+      const tags =
+        card.meta.tags.length > 0 ? card.meta.tags : parseTags(albumEl.dataset.albumTags);
+      const date = card.meta.date || albumEl.dataset.albumDate || "";
+      const desc = card.meta.description;
+
+      noteEl.style.backgroundColor = card.noteColor;
+      noteEl.innerHTML = `
+        ${date ? `<div class="ps-note-date"></div>` : ""}
+        ${tags.length > 0 ? `<div class="ps-note-tags"></div>` : ""}
+        ${desc ? `<div class="ps-note-desc"></div>` : ""}
+      `;
+      const dateEl = noteEl.querySelector(".ps-note-date");
+      if (dateEl) dateEl.textContent = date;
+      const tagsWrap = noteEl.querySelector(".ps-note-tags");
+      if (tagsWrap) {
+        for (const t of tags) {
+          const chip = document.createElement("span");
+          chip.className = "ps-note-tag";
+          chip.textContent = `# ${t}`;
+          tagsWrap.appendChild(chip);
+        }
+      }
+      const descEl = noteEl.querySelector(".ps-note-desc");
+      if (descEl) descEl.textContent = desc;
+
+      if (!date && tags.length === 0 && !desc) {
+        noteEl.classList.remove("is-visible");
+      } else {
+        // 重新触发便签入场动画
+        noteEl.classList.remove("is-visible");
+        void noteEl.offsetWidth;
+        noteEl.classList.add("is-visible");
+      }
+    }
+
+    function closeScatter() {
+      if (!overlay || !overlay.classList.contains("ps-open")) return;
+      zoomed = null;
+      drag = null;
+      overlay.classList.remove("ps-open");
+      overlay.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("ps-lock");
+      if (stage) stage.innerHTML = "";
+      noteEl?.classList.remove("is-visible");
+    }
+
+    function openScatter(albumEl: HTMLElement) {
+      ensureOverlay();
+      if (!overlay || !stage) return;
+      closeScatter();
+
+      const albumId = albumEl.dataset.scatterAlbum || "default";
+      const photoEls = Array.from(
+        albumEl.querySelectorAll<HTMLElement>("[data-scatter-photo]")
+      );
+      if (photoEls.length === 0) return;
+
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const baseW = vw < 640 ? 148 : vw < 1024 ? 180 : 210;
+      zTop = 20 + photoEls.length;
+
+      photoEls.forEach((photoEl, index) => {
+        const src = photoEl.dataset.src || "";
+        const meta: PhotoMeta = {
+          src,
+          description: photoEl.dataset.description || "",
+          date: photoEl.dataset.date || "",
+          tags: parseTags(photoEl.dataset.tags),
+        };
+
+        const el = document.createElement("div");
+        el.className = "ps-card";
+        el.style.setProperty("--w", `${baseW}px`);
+        el.style.setProperty("--h", `${baseW}px`);
+
+        const frame = document.createElement("div");
+        frame.className = "ps-frame";
+        frame.style.animationDelay = `${Math.min(index * 70, 700)}ms`;
+
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = meta.description || `照片 ${index + 1}`;
+        img.draggable = false;
+
+        const strip = document.createElement("div");
+        strip.className = "ps-strip";
+
+        frame.append(img, strip);
+        el.appendChild(frame);
+        stage!.appendChild(el);
+
+        const pos = stablePosition(src, vw, vh, baseW);
+        const offset = loadOffset(albumId, src);
+        const card: Card = {
+          el,
+          img,
+          meta,
+          x: pos.x + offset.x,
+          y: pos.y + offset.y,
+          rot: pos.rot,
+          baseW,
+          baseH: baseW,
+          noteColor: NOTE_COLORS[index % NOTE_COLORS.length],
+        };
+        applyTransform(card);
+
+        const applyNaturalSize = () => {
+          const ratio = img.naturalWidth / img.naturalHeight || 1;
+          const clamped = Math.min(Math.max(ratio, 2 / 3), 3 / 2);
+          card.baseH = Math.round(baseW / clamped);
+          if (!card.el.classList.contains("is-zoomed")) {
+            card.el.style.setProperty("--w", `${card.baseW}px`);
+            card.el.style.setProperty("--h", `${card.baseH}px`);
+          }
+        };
+        if (img.complete && img.naturalWidth) applyNaturalSize();
+        img.addEventListener("load", applyNaturalSize);
+
+        let zoomClickStart = 0;
+        el.addEventListener("pointerdown", (e) => {
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          // 放大状态下不拖拽，仅记录一次点击（抬手时还原 / 切换到被点的照片）
+          if (zoomed) {
+            zoomClickStart = e.timeStamp;
+            return;
+          }
+          e.preventDefault();
+          bringToFront(card);
+          el.classList.add("is-dragging");
+          try {
+            el.setPointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+          drag = {
+            card,
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            origX: card.x,
+            origY: card.y,
+            moved: false,
+            downAt: e.timeStamp,
+          };
+        });
+
+        el.addEventListener("pointermove", (e) => {
+          if (!drag || drag.card !== card || drag.pointerId !== e.pointerId) return;
+          const dx = e.clientX - drag.startX;
+          const dy = e.clientY - drag.startY;
+          if (Math.abs(dx) + Math.abs(dy) > 6) drag.moved = true;
+          card.x = drag.origX + dx;
+          card.y = drag.origY + dy;
+          applyTransform(card);
+        });
+
+        const finish = (e: PointerEvent) => {
+          if (!drag || drag.card !== card || drag.pointerId !== e.pointerId) return;
+          el.classList.remove("is-dragging");
+          try {
+            el.releasePointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+          const state = drag;
+          drag = null;
+          if (state.moved) {
+            saveOffset(albumId, src, card.x, card.y);
+          } else if (e.timeStamp - state.downAt < 300) {
+            zoom(card, albumEl);
+          }
+        };
+        el.addEventListener("pointerup", finish);
+        el.addEventListener("pointerup", () => {
+          // 放大态下点当前照片还原，点别的照片切换放大
+          if (zoomed && zoomClickStart) {
+            zoom(card, albumEl);
+            zoomClickStart = 0;
+          }
+        });
+        el.addEventListener("pointercancel", () => {
+          el.classList.remove("is-dragging");
+          drag = null;
+        });
+      });
+
+      overlay.classList.add("ps-open");
+      overlay.setAttribute("aria-hidden", "false");
+      document.body.classList.add("ps-lock");
+    }
+
+    // 网格照片点击 / 键盘 Enter：进入散落模式（事件委托，兼容 swup 与加密解密）
+    document.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const photoEl = target.closest<HTMLElement>("[data-scatter-photo]");
+      if (!photoEl) return;
+      const albumEl = photoEl.closest<HTMLElement>("[data-scatter-album]");
+      if (!albumEl) return;
+      e.preventDefault();
+      openScatter(albumEl);
+    });
+
+    document.addEventListener("keydown", (e) => {
+      // 网格内聚焦的照片支持回车进入
+      if (e.key === "Enter" && document.activeElement) {
+        const photoEl = document.activeElement.closest?.("[data-scatter-photo]") as HTMLElement | null;
+        const albumEl = photoEl?.closest?.("[data-scatter-album]") as HTMLElement | null;
+        if (photoEl && albumEl) {
+          e.preventDefault();
+          openScatter(albumEl);
+          return;
+        }
+      }
+      if (e.key !== "Escape") return;
+      if (!overlay?.classList.contains("ps-open")) return;
+      e.preventDefault();
+      if (zoomed) unzoom();
+      else closeScatter();
+    });
+
+    // swup 离开本页时收起散落层
+    document.addEventListener("swup:visit:start", closeScatter);
+  })();
+</script>
