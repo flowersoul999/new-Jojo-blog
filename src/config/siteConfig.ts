@@ -22,7 +22,7 @@ export const siteConfig: SiteConfig = {
 		"Aemeath 是一款基于 Astro 深度定制的个人博客主题，融合了鸣潮视觉、技术记录、工具展示与私人写作，承载我的开发历程和日常思考。",
 
 	// 站点关键词
-	keywords: ["Rain", "Fuwari", "Astro", "ACGN", "博客", "技术博客", "静态博客"],
+	keywords: ["jojo", "Fuwari", "Astro", "ACGN", "博客", "技术博客", "静态博客"],
 
 	// 主题色
 	themeColor: {
