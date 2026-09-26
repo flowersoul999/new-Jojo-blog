@@ -232,13 +232,13 @@ const activeTab = tabs[0]?.id || "anime";
           {!isUserIdConfigured ? (
             <div class="text-center py-16">
               <div class="inline-flex items-center justify-center w-16 h-16 bg-(--btn-regular-bg) rounded-full mb-6 border border-(--line-divider)">
-                <Icon is:inline name="material-symbols:settings" class="text-[2rem] text-(--btn-content)" />
+                <Icon is:inline name="material-symbols:movie-edit" class="text-[2rem] text-(--btn-content)" />
               </div>
               <h2 class="text-xl font-semibold text-black/80 dark:text-white/80 mb-3">
-                未配置 Bangumi 用户ID
+                番组收藏整理中
               </h2>
               <p class="text-black/60 dark:text-white/60 mb-4 max-w-md mx-auto">
-                请在 src/config/siteConfig.ts 中配置你的 Bangumi 用户ID
+                这里还没有收录看过的番，整理好之后会一起放出来～
               </p>
             </div>
           ) : (
