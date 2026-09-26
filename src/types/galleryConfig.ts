@@ -11,6 +11,14 @@ export type GalleryAlbum = {
 	passwordHint?: string; // 密码提示
 };
 
+// 单张照片的元信息（来自相册目录下可选的 photos.json）
+export type GalleryPhoto = {
+	src: string; // 图片地址
+	description?: string; // 这张照片的描述（全屏散落模式点击放大后显示在便签上）
+	date?: string; // 拍摄日期（不填则回退到相册日期）
+	tags?: string[]; // 标签（不填则回退到相册标签）
+};
+
 // 相册配置
 export type GalleryConfig = {
 	albums: GalleryAlbum[];
