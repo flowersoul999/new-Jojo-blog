@@ -11,6 +11,7 @@ import MusicManager from "@components/features/MusicManager.astro";
 import SakuraEffect from "@components/features/SakuraEffect.astro";
 import WalineManager from "@components/features/WalineManager.astro";
 import WelcomeToast from "@components/features/WelcomeToast.astro";
+import ContentEditor from "@components/features/ContentEditor.svelte";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
 
 import {
@@ -619,6 +620,9 @@ const canonicalUrl = new URL(Astro.url.pathname, siteConfig.site_url).toString()
     <FancyboxManager />
     <ChangelogManager />
     <WalineManager />
+
+    <!-- 内容编辑器：GitHub 登录后可在网页上直接编辑文章和配置 -->
+    <ContentEditor client:load />
   </body>
 </html>
 
