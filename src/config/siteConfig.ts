@@ -15,7 +15,7 @@ export const siteConfig: SiteConfig = {
 	themeVersion: "V3.4.0",
 
 	// 站点 URL
-	site_url: "https://rainzt.cn",
+	site_url: "https://www.jojocode.cn",
 
 	// 站点描述
 	description:
