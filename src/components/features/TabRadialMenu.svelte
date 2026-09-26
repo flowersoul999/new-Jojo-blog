@@ -262,7 +262,7 @@
 						stroke-linejoin="round"
 						aria-hidden="true"
 					>
-						{#each item.d as p (p)}<path {p} />{/each}
+						{#each item.d as p (p)}<path d={p} />{/each}
 					</svg>
 				</span>
 				<span class="trm-label" class:is-current={isCurrent}>{item.label}</span>
