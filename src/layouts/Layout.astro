@@ -12,6 +12,7 @@ import SakuraEffect from "@components/features/SakuraEffect.astro";
 import WalineManager from "@components/features/WalineManager.astro";
 import WelcomeToast from "@components/features/WelcomeToast.astro";
 import ContentEditor from "@components/features/ContentEditor.svelte";
+import TabRadialMenu from "@components/features/TabRadialMenu.svelte";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
 
 import {
@@ -623,6 +624,9 @@ const canonicalUrl = new URL(Astro.url.pathname, siteConfig.site_url).toString()
 
     <!-- 内容编辑器：GitHub 登录后可在网页上直接编辑文章和配置 -->
     <ContentEditor client:load />
+
+    <!-- Tab 径向轮盘：按住 Tab 呼出快速导航 -->
+    <TabRadialMenu client:load />
   </body>
 </html>
 

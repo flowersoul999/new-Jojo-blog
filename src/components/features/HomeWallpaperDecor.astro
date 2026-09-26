@@ -132,7 +132,7 @@ const mobileStickerKeys = [
 		<div class="home-wallpaper-card__content">
 			<div class="home-wallpaper-card__avatar-wrap">
 				<ImageWrapper
-					src={profileConfig.avatar || "assets/images/rain-avatar.webp"}
+					src={profileConfig.avatar || "assets/images/joestar-avatar.webp"}
 					alt={`${profileConfig.name}头像`}
 					class="home-wallpaper-card__avatar"
 					loading="eager"
@@ -157,7 +157,7 @@ const mobileStickerKeys = [
       <span class="home-wallpaper-card__identity-mark" aria-hidden="true"></span>
       <span class="home-wallpaper-card__motion-text">{profileConfig.name}</span>
     </p>
-    <h1><span class="home-wallpaper-card__motion-text">{siteConfig.title}</span></h1>
+    <h1><span class="home-wallpaper-card__motion-text">{siteConfig.navbar.title || siteConfig.title}</span></h1>
     <p class="home-wallpaper-card__subtitle">
       <span class="home-wallpaper-card__motion-text">{siteConfig.subtitle}</span>
     </p>

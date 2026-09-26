@@ -60,6 +60,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 			// 番组计划
 			LinkPresets.Bangumi,
 
+			// 日记
+			LinkPresets.Diary,
+
 			// 工具
 			LinkPresets.Tools,
 		],
@@ -208,6 +211,12 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		url: "/anime/",
 		icon: "material-symbols:live-tv",
 		pageKey: "anime",
+	},
+	Diary: {
+		name: "日记",
+		url: "/diary/",
+		icon: "material-symbols:edit-note",
+		pageKey: "diary",
 	},
 };
 

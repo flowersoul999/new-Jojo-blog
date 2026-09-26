@@ -1,4 +1,4 @@
-import type { SiteConfig } from "@/types/siteConfig";
+﻿import type { SiteConfig } from "@/types/siteConfig";
 
 // 定义站点语言
 // 语言代码，例如：'zh_CN', 'zh_TW', 'en', 'ja', 'ru'。
@@ -6,10 +6,10 @@ const SITE_LANG = "zh_CN";
 
 export const siteConfig: SiteConfig = {
 	// 站点标题
-	title: "朝朝听雨",
+	title: "JOJO",
 
 	// 站点副标题
-	subtitle: "物物而不物于物，念念而不念于念",
+	subtitle: "人类的赞歌就是勇气的赞歌",
 
 	// Aemeath 主题版本
 	themeVersion: "V3.4.0",
@@ -50,19 +50,19 @@ export const siteConfig: SiteConfig = {
 	// Favicon 配置
 	favicon: [
 		{
-			src: "/favicon/chaoc-tingyu-avatar-512.png?v=20260823",
+			src: "/favicon/chaoc-tingyu-avatar-512.png?v=20260926",
 			sizes: "512x512",
 		},
 		{
-			src: "/favicon/chaoc-tingyu-avatar-192.png?v=20260823",
+			src: "/favicon/chaoc-tingyu-avatar-192.png?v=20260926",
 			sizes: "192x192",
 		},
 		{
-			src: "/favicon/chaoc-tingyu-avatar-180.png?v=20260823",
+			src: "/favicon/chaoc-tingyu-avatar-180.png?v=20260926",
 			sizes: "180x180",
 		},
 		{
-			src: "/favicon/chaoc-tingyu-avatar-32.png?v=20260823",
+			src: "/favicon/chaoc-tingyu-avatar-32.png?v=20260926",
 			sizes: "32x32",
 		},
 	],
@@ -78,10 +78,10 @@ export const siteConfig: SiteConfig = {
 		logo: {
 			type: "image",
 			value: "assets/images/chaoc-tingyu-avatar.webp",
-			alt: "朝朝听雨",
+			alt: "Joestar",
 		},
 		// 导航栏标题
-		title: "朝朝听雨",
+		title: "Joestar",
 		// 全宽导航栏，导航栏是否占满屏幕宽度
 		widthFull: false,
 		// 导航菜单对齐方式，left：左对齐，center：居中
@@ -113,6 +113,8 @@ export const siteConfig: SiteConfig = {
 		gallery: true,
 		// 追番页面开关
 		anime: true,
+		// 日记页面开关
+		diary: true,
 	},
 
 	// 分类导航栏开关，在首页和归档页顶部显示分类快捷导航
