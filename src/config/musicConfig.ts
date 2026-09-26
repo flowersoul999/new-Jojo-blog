@@ -47,14 +47,64 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	// lrc: "/assets/music/lrc/使一颗心免于哀伤-哼唱.lrc",
 	// 2. 或者直接填入歌词字符串内容
 	// lrc: "[00:00.00]歌词内容...",
+	// 歌单迁移自 jojoblog，音频文件位于 public/music/
 	local: {
 		playlist: [
 			{
-				name: "小小奇迹",
-				artist: "鸣潮先约电台 / jixwang / 飞行雪绒",
-				url: "/assets/music/小小奇迹 - 鸣潮先约电台.mp3",
-				cover: "/assets/music/cover/小小奇迹.webp",
-				lrc: "/assets/music/lrc/小小奇迹 - 鸣潮先约电台.lrc",
+				name: "手写的从前",
+				artist: "周杰伦",
+				url: "/music/shou-xie-de-cong-qian.mp3",
+				cover: "https://p1.music.126.net/pyRYVJ5q1gMqOv1pVJ3hRg==/109951164126475323.jpg",
+			},
+			{
+				name: "圣诞星",
+				artist: "周杰伦",
+				url: "/music/jay-christmas-star.mp3",
+			},
+			{
+				name: "我落泪情绪零碎",
+				artist: "周杰伦",
+				url: "/music/tears-liushui.mp3",
+			},
+			{
+				name: "不遗憾",
+				artist: "李荣浩",
+				url: "/music/bu-yi-han.mp3",
+			},
+			{
+				name: "恋人",
+				artist: "李荣浩",
+				url: "/music/lian-ren.mp3",
+			},
+			{
+				name: "讨厌红楼梦",
+				artist: "陶喆",
+				url: "/music/tao-yan-hong-lou-meng.mp3",
+			},
+			{
+				name: "Baby",
+				artist: "Justin Bieber / Ludacris",
+				url: "/music/baby.mp3",
+			},
+			{
+				name: "Close To You",
+				artist: "Carpenters",
+				url: "/music/close-to-you.mp3",
+			},
+			{
+				name: "flower dance",
+				artist: "DJ Okawari",
+				url: "/music/flower-dance.mp3",
+			},
+			{
+				name: "fish in the pool",
+				artist: "ヘクとパスカル",
+				url: "/music/fish-in-the-pool-hanayashiki.mp3",
+			},
+			{
+				name: "Tiny Light Relaxing Beat",
+				artist: "meowly",
+				url: "/music/tiny-light-relaxing-beat.mp3",
 			},
 		],
 	},

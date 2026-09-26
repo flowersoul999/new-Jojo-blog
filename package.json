@@ -48,6 +48,7 @@
     "astro-expressive-code": "^0.43.1",
     "astro-icon": "^1.1.5",
     "ci-info": "^4.4.0",
+    "clsx": "^2.1.1",
     "dayjs": "^1.11.21",
     "expressive-code-collapsible": "^0.1.0",
     "expressive-code-language-badge": "^1.1.0",
@@ -84,7 +85,8 @@
     "three": "^0.185.1",
     "typescript": "^5.9.2",
     "unist-util-visit": "^5.1.0",
-    "wrangler": "^4.102.0"
+    "wrangler": "^4.102.0",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@astrojs/react": "^7.0.0",
