@@ -78,10 +78,10 @@ export const siteConfig: SiteConfig = {
 		logo: {
 			type: "image",
 			value: "assets/images/chaoc-tingyu-avatar.webp",
-			alt: "Joestar",
+			alt: "jojo",
 		},
 		// 导航栏标题
-		title: "Joestar",
+		title: "jojo",
 		// 全宽导航栏，导航栏是否占满屏幕宽度
 		widthFull: false,
 		// 导航菜单对齐方式，left：左对齐，center：居中
