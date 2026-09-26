@@ -133,10 +133,10 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			showOnPostPage: true,
 		},
 		{
-			// 组件类型：站点信息组件
+			// 组件类型：站点信息组件（已隐藏）
 			type: "siteInfo",
 			// 是否启用该组件
-			enable: true,
+			enable: false,
 			// 组件位置
 			position: "top",
 			// 是否在文章详情页显示
@@ -311,10 +311,10 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			showOnPostPage: false,
 		},
 		{
-			// 组件类型：站点信息组件
+			// 组件类型：站点信息组件（已隐藏）
 			type: "siteInfo",
 			// 是否启用该组件
-			enable: true,
+			enable: false,
 			// 文章页正文后不再堆叠侧栏卡片，保留正文与页脚的阅读空间
 			showOnPostPage: false,
 			// 组件专属配置
