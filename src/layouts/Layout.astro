@@ -8,6 +8,7 @@ import ChangelogManager from "@components/features/ChangelogManager.astro";
 import FancyboxManager from "@components/features/FancyboxManager.astro";
 import FontSetup from "@components/features/FontSetup.astro";
 import MusicManager from "@components/features/MusicManager.astro";
+import MusicFloat from "@components/features/MusicFloat.astro";
 import SakuraEffect from "@components/features/SakuraEffect.astro";
 import WalineManager from "@components/features/WalineManager.astro";
 import WelcomeToast from "@components/features/WelcomeToast.astro";
@@ -607,6 +608,7 @@ const canonicalUrl = new URL(Astro.url.pathname, siteConfig.site_url).toString()
     <div id="page-background-decoration" aria-hidden="true"></div>
     <ConfigCarrier />
     <MusicManager />
+    <MusicFloat />
     <slot />
 
 

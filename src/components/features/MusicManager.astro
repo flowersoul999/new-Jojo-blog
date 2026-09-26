@@ -181,35 +181,57 @@ const managerConfigStr = JSON.stringify({
     }
 
     // ── Lyrics ───────────────────────────────────────────────
+    var lyricsVersion = 0;
     function loadLyrics(track) {
+        var ver = ++lyricsVersion;
         state.lyrics = [];
         state.currentLrcIndex = -1;
 
-        if (!track.lrc) {
-            emit('fm:lyrics', { lyrics: [], status: 'none' });
+        if (track.lrc) {
+            var isLrcUrl = /^(https?:)?\/\//.test(track.lrc)
+                || track.lrc.startsWith('/')
+                || /\.(lrc|txt)(\?|#|$)/i.test(track.lrc);
+
+            if (isLrcUrl) {
+                emit('fm:lyrics', { lyrics: [], status: 'loading' });
+                fetch(track.lrc)
+                    .then(function (r) { return r.text(); })
+                    .then(function (text) {
+                        if (ver !== lyricsVersion) return;
+                        state.lyrics = parseLRC(text);
+                        emit('fm:lyrics', { lyrics: state.lyrics, status: 'loaded' });
+                    })
+                    .catch(function () {
+                        if (ver !== lyricsVersion) return;
+                        state.lyrics = [];
+                        emit('fm:lyrics', { lyrics: [], status: 'failed' });
+                    });
+            } else {
+                state.lyrics = parseLRC(track.lrc);
+                emit('fm:lyrics', { lyrics: state.lyrics, status: state.lyrics.length > 0 ? 'loaded' : 'none' });
+            }
             return;
         }
 
-        var isLrcUrl = /^(https?:)?\/\//.test(track.lrc)
-            || track.lrc.startsWith('/')
-            || /\.(lrc|txt)(\?|#|$)/i.test(track.lrc);
-
-        if (isLrcUrl) {
-            emit('fm:lyrics', { lyrics: [], status: 'loading' });
-            fetch(track.lrc)
-                .then(function (r) { return r.text(); })
-                .then(function (text) {
-                    state.lyrics = parseLRC(text);
+        // 无内建歌词：通过站点代理按 歌名+歌手 在线获取（QQ → 网易云降级）
+        emit('fm:lyrics', { lyrics: [], status: 'loading' });
+        var api = '/api/music/lyrics.json?q=' + encodeURIComponent(track.name || '')
+            + '&artist=' + encodeURIComponent(track.artist || '');
+        fetch(api)
+            .then(function (r) { return r.ok ? r.json() : { code: 1 }; })
+            .then(function (data) {
+                if (ver !== lyricsVersion) return;
+                if (data && data.code === 0 && Array.isArray(data.lrc)) {
+                    state.lyrics = data.lrc;
                     emit('fm:lyrics', { lyrics: state.lyrics, status: 'loaded' });
-                })
-                .catch(function () {
-                    state.lyrics = [];
-                    emit('fm:lyrics', { lyrics: [], status: 'failed' });
-                });
-        } else {
-            state.lyrics = parseLRC(track.lrc);
-            emit('fm:lyrics', { lyrics: state.lyrics, status: state.lyrics.length > 0 ? 'loaded' : 'none' });
-        }
+                } else {
+                    emit('fm:lyrics', { lyrics: [], status: 'none' });
+                }
+            })
+            .catch(function () {
+                if (ver !== lyricsVersion) return;
+                emit('fm:lyrics', { lyrics: [], status: 'none' });
+            });
     }
 
     // ── Track loading ────────────────────────────────────────
