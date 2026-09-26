@@ -121,12 +121,14 @@ export default defineConfig({
 			ignore: (targetUrl) => {
 				const targetPath = targetUrl.split(/[?#]/)[0] || "/";
 				const currentPath = window.location.pathname;
-				// 百宝箱 /treasure/ 同样是独立全屏布局，跨布局边界直接走原生跳转
+				// 百宝箱 /treasure/ 与写作页 /write/ 同样是独立全屏布局，跨布局边界直接走原生跳转
 				return (
 					targetPath === "/portfolio/" ||
 					currentPath === "/portfolio/" ||
 					targetPath === "/treasure/" ||
-					currentPath.startsWith("/treasure/")
+					currentPath.startsWith("/treasure/") ||
+					targetPath === "/write/" ||
+					currentPath.startsWith("/write/")
 				);
 			},
 			updateHead: true,

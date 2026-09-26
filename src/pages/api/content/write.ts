@@ -1,5 +1,11 @@
 import type { APIRoute } from "astro";
-import { requireAuth, GITHUB_REPO, isLocalDev, writeLocalFile } from "@/utils/editor-auth";
+import {
+	requireAuth,
+	GITHUB_REPO,
+	isLocalDev,
+	writeLocalFile,
+	writeLocalFileBinary,
+} from "@/utils/editor-auth";
 
 export const prerender = false;
 
@@ -41,14 +47,16 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
 	try {
 		// 从请求体获取参数
+		// encoding 为 "base64" 时 content 视为不含 data: 前缀的 base64（用于图片等二进制文件）
 		const body = (await request.json()) as {
 			path: string;
 			content: string;
 			message?: string;
 			sha?: string;
+			encoding?: "utf8" | "base64";
 		};
 
-		const { path, content, sha } = body;
+		const { path, content, sha, encoding } = body;
 
 		if (!path || content === undefined) {
 			return new Response(
@@ -57,9 +65,13 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 			);
 		}
 
+		const isBinary = encoding === "base64";
+
 		// 本地开发模式：直接写入本地文件系统
 		if (isLocalDev) {
-			const result = writeLocalFile(path, content);
+			const result = isBinary
+				? writeLocalFileBinary(path, content)
+				: writeLocalFile(path, content);
 			return new Response(JSON.stringify(result), {
 				headers: { "Content-Type": "application/json" },
 			});
@@ -71,8 +83,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 		const filename = path.split("/").pop() || path;
 		const message = body.message || `Update ${filename}`;
 
-		// 将内容转为 base64
-		const base64Content = encodeBase64(content);
+		// 二进制内容已是 base64；文本内容需先编码
+		const base64Content = isBinary ? content : encodeBase64(content);
 
 		// 调用 GitHub Contents API PUT 写入文件
 		const requestBody: Record<string, string> = {

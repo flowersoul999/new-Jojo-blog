@@ -4,8 +4,8 @@ import path from "node:path";
 
 // GitHub 仓库配置
 export const GITHUB_REPO = {
-	owner: "Jarvis0227",
-	name: "Aemeath",
+	owner: "flowersoul999",
+	name: "Jojo-blog",
 	branch: "main",
 } as const;
 
@@ -159,6 +159,16 @@ export function writeLocalFile(relPath: string, content: string) {
 	const target = resolveLocalPath(relPath);
 	fs.mkdirSync(path.dirname(target), { recursive: true });
 	fs.writeFileSync(target, content, "utf8");
+	return { ok: true, commit: { sha: "local", message: `Update ${path.basename(target)}` } };
+}
+
+/**
+ * 写入二进制文件（本地，内容为 base64，不含 data: 前缀）
+ */
+export function writeLocalFileBinary(relPath: string, base64Content: string) {
+	const target = resolveLocalPath(relPath);
+	fs.mkdirSync(path.dirname(target), { recursive: true });
+	fs.writeFileSync(target, Buffer.from(base64Content, "base64"));
 	return { ok: true, commit: { sha: "local", message: `Update ${path.basename(target)}` } };
 }
 

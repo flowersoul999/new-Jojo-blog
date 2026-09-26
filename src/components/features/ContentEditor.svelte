@@ -286,17 +286,26 @@ onMount(() => {
 			<span>GitHub 登录</span>
 		</a>
 	{:else if user}
-		<!-- 已登录：浮动编辑按钮 -->
+		<!-- 已登录：写文章 + 内容管理 浮动按钮组 -->
 		{#if !open}
-			<button
-				class="fixed bottom-6 left-6 z-[100] flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:scale-105"
-				style="background: linear-gradient(135deg, hsl(var(--hue,250),65%,55%) 0%, hsl(calc(var(--hue,250) + 40), 70%, 55%) 100%);"
-				on:click={() => (open = true)}
-				aria-label="打开内容编辑器"
-			>
-				<Icon icon="material-symbols:edit-note" class="text-lg" />
-				<span>内容管理</span>
-			</button>
+			<div class="fixed bottom-6 left-6 z-[100] flex flex-col items-start gap-2">
+				<a
+					href="/write/"
+					class="flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:scale-105"
+					style="background: linear-gradient(135deg, hsl(var(--hue,250),65%,55%) 0%, hsl(calc(var(--hue,250) + 40), 70%, 55%) 100%);"
+				>
+					<Icon icon="material-symbols:edit-square" class="text-lg" />
+					<span>写文章</span>
+				</a>
+				<button
+					class="flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:scale-105 dark:bg-white dark:text-gray-900"
+					on:click={() => (open = true)}
+					aria-label="打开内容编辑器"
+				>
+					<Icon icon="material-symbols:edit-note" class="text-lg" />
+					<span>内容管理</span>
+				</button>
+			</div>
 		{/if}
 
 		<!-- 编辑器全屏面板 -->
