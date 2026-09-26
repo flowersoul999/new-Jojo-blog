@@ -14,7 +14,7 @@ export type BlogChangelogEntry = {
 
 /**
  * 博客本身的建设记录。
- * 自动上架工具公告留在 /changelog/，这里仅记录朝朝听雨站点的页面、内容、社区和部署变化。
+ * 自动上架工具公告留在 /changelog/，这里仅记录jojo站点的页面、内容、社区和部署变化。
  */
 export const blogChangelogEntries: BlogChangelogEntry[] = [
 	{
@@ -334,9 +334,9 @@ export const blogChangelogEntries: BlogChangelogEntry[] = [
 		displayDate: "2026 年 8 月 14 日",
 		kind: "文章与页面",
 		title: "把个人故事和页面细节一起留下",
-		summary: "发布朝朝听雨主题文章，并继续补齐关于页、友链和移动端交互。",
+		summary: "发布jojo主题文章，并继续补齐关于页、友链和移动端交互。",
 		details: [
-			"发布《朝朝听雨，岁岁有风》，补充文章封面、目录和阅读节奏。",
+			"发布《jojo，岁岁有风》，补充文章封面、目录和阅读节奏。",
 			"新增 Wang Yijun Mew、Luming Notes 等友链。",
 			"修复故事文章在移动端的封面与目录布局，并让手机端樱花开关更可靠。",
 			"同步近期博客资料，为后续关于页和朋友圈展示准备真实内容。",
@@ -447,7 +447,7 @@ export const blogChangelogEntries: BlogChangelogEntry[] = [
 		summary: "新增多组友链，并修复评论区 Emoji、站点资料和独立友链入口。",
 		details: [
 			"新增 Detached、Petrichor's Blog 等友链，并补充茗辰原、小曦的园子等站点。",
-			"增加独立友链入口，修正 Rain 友链的名称、头像和元数据。",
+			"增加独立友链入口，修正 jojo 友链的名称、头像和元数据。",
 			"修复 Waline 未解析 Emoji 的显示问题，让评论内容不再出现原始编码。",
 			"统一友链配置中的标题、标签、权重和截图字段，为推荐排序做准备。",
 		],
@@ -594,7 +594,7 @@ export const blogChangelogEntries: BlogChangelogEntry[] = [
 		details: [
 			"增加作品展示入口，并完善项目卡片和博客交互。",
 			"重新设计页脚角色、备案信息和文章封面比例。",
-			"编写 Rainzt 部署指南，记录构建、发布、回滚和目录维护方式。",
+			"编写 jojo 部署指南，记录构建、发布、回滚和目录维护方式。",
 			"保留现有视觉身份，同时减少页脚和文章卡片在不同尺寸下的变形。",
 		],
 		tags: ["部署", "页脚", "项目"],
@@ -638,11 +638,11 @@ export const blogChangelogEntries: BlogChangelogEntry[] = [
 		version: "V1.0.1",
 		displayDate: "2026 年 7 月 9 日",
 		kind: "建站起点",
-		title: "朝朝听雨博客完成首次建站提交",
+		title: "jojo博客完成首次建站提交",
 		summary:
 			"以 Astro 为底座的个人博客仓库建立，第一版页面、主题、内容和部署基础同时落地。",
 		details: [
-			"建立朝朝听雨站点的 Astro + Svelte 项目结构，确定中文优先的个人博客定位。",
+			"建立jojo站点的 Astro + Svelte 项目结构，确定中文优先的个人博客定位。",
 			"落地首页、文章、归档、分类、标签、搜索、关于、友链、留言板、工具、相册和赞助等页面。",
 			"接入主题切换、壁纸、音乐、樱花、Live2D、Spine、图片优化和多语言基础。",
 			"建立 Markdown/MDX 内容目录、RSS/OG 输出、GitHub Actions 构建和部署工作流。",
