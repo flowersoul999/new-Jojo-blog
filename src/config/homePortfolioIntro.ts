@@ -5,10 +5,10 @@
  * 都可以选择是否播放开屏动画，以及自己喜欢的角色。
  */
 export const homePortfolioIntroSettings = {
-	enabledStorageKey: "rainzt.home-portfolio-intro-enabled.v1",
-	characterStorageKey: "rainzt.home-portfolio-intro-character.v1",
-	topBannerStorageKey: "rainzt.home-portfolio-intro-top-banner.v1",
-	bottomBannerStorageKey: "rainzt.home-portfolio-intro-bottom-banner.v1",
+	enabledStorageKey: "jojo.home-portfolio-intro-enabled.v1",
+	characterStorageKey: "jojo.home-portfolio-intro-character.v1",
+	topBannerStorageKey: "jojo.home-portfolio-intro-top-banner.v1",
+	bottomBannerStorageKey: "jojo.home-portfolio-intro-bottom-banner.v1",
 	defaultEnabled: true,
 	defaultCharacterId: "character-03",
 	defaultTopBannerId: "wuthering",
