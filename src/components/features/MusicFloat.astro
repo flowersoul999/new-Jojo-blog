@@ -1,0 +1,411 @@
+---
+import { Icon } from "astro-icon/components";
+---
+
+<!-- 底部浮动歌词 -->
+<div
+	class="fm-float-lrc pointer-events-none fixed left-1/2 bottom-8 z-[131] -translate-x-1/2 max-w-[90vw] text-center opacity-0 transition-all duration-300"
+	aria-live="polite"
+>
+	<span class="fm-float-lrc-text block whitespace-nowrap overflow-hidden text-ellipsis text-2xl text-neutral-700/85 dark:text-neutral-200/90"></span>
+</div>
+
+<!-- 悬浮迷你播放器 -->
+<div
+	class="fm-mini fixed left-1/2 bottom-6 z-[130] w-[min(92vw,680px)] -translate-x-1/2 translate-y-6 scale-95 opacity-0 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+	role="dialog"
+	aria-label="悬浮播放器"
+>
+	<div class="relative rounded-[28px] border border-white/40 bg-white/70 p-3 pl-4 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-neutral-900/70">
+		<!-- 关闭 -->
+		<button class="fm-mini-close absolute right-3 top-3 rounded-full p-1 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="关闭悬浮播放器" aria-label="关闭悬浮播放器">
+			<Icon is:inline name="material-symbols:close-rounded" class="text-2xl" aria-hidden="true" />
+		</button>
+
+		<!-- 上半：封面 + 信息 + 波浪进度 -->
+		<div class="flex items-center gap-3 pr-10">
+			<button class="fm-mini-cover-btn relative h-16 w-16 shrink-0 overflow-visible rounded-full active:scale-95 transition-transform" title="播放/暂停" aria-label="播放/暂停">
+				<img class="fm-mini-cover h-full w-full rounded-full border-2 border-white object-cover shadow-lg dark:border-neutral-700" src="" alt="封面" />
+				<span class="fm-mini-cover-mask absolute inset-0 flex items-center justify-center rounded-full bg-black/25 opacity-0 transition-opacity">
+					<Icon is:inline name="material-symbols:play-arrow-rounded" class="fm-mini-icon-play text-3xl text-white ml-0.5" aria-hidden="true" />
+					<Icon is:inline name="material-symbols:pause-rounded" class="fm-mini-icon-pause text-3xl text-white hidden" aria-hidden="true" />
+				</span>
+			</button>
+
+			<div class="min-w-0 flex-1">
+				<div class="fm-mini-title truncate text-base font-bold leading-tight text-neutral-800 dark:text-neutral-100">未在播放</div>
+				<div class="fm-mini-artist truncate text-xs text-neutral-500 dark:text-neutral-400">—</div>
+				<div class="mt-1 flex items-center gap-2">
+					<span class="fm-mini-current w-9 shrink-0 text-right text-[10px] tabular-nums text-neutral-400">0:00</span>
+					<div class="fm-mini-track relative h-5 flex-1 cursor-pointer touch-none" role="slider" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+						<div class="fm-mini-fill absolute left-0 top-1/2 h-[3px] w-0 -translate-y-1/2 rounded-full bg-(--primary) pointer-events-none"></div>
+						<svg class="fm-mini-wave absolute left-0 top-0 h-full w-full overflow-visible pointer-events-none" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
+							<defs>
+								<clipPath id="fm-mini-wave-clip">
+									<rect class="fm-mini-clip" x="0" y="0" width="0" height="20"></rect>
+								</clipPath>
+							</defs>
+							<g class="fm-mini-waveflow" clip-path="url(#fm-mini-wave-clip)">
+								<path class="fm-mini-wavepath" d="" fill="none" stroke="var(--primary)" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+							</g>
+						</svg>
+						<div class="fm-mini-thumb pointer-events-none absolute left-0 top-1/2 z-10 -ml-[7px] -mt-[7px] h-3.5 w-3.5 rounded-full bg-(--primary) ring-2 ring-white shadow-sm dark:ring-neutral-800"></div>
+					</div>
+					<span class="fm-mini-total w-9 shrink-0 text-[10px] tabular-nums text-neutral-400">0:00</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- 下半：控制条 -->
+		<div class="mt-2 flex items-center justify-center gap-1 rounded-2xl bg-black/5 py-1.5 dark:bg-white/5">
+			<button class="fm-mini-mode p-2 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="播放模式" aria-label="播放模式">
+				<Icon is:inline name="material-symbols:repeat-rounded" class="fm-mini-icon-repeat text-xl" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:repeat-one-rounded" class="fm-mini-icon-repeat-one text-xl hidden" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:shuffle-rounded" class="fm-mini-icon-shuffle text-xl hidden" aria-hidden="true" />
+			</button>
+			<button class="fm-mini-prev p-2 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="上一首" aria-label="上一首">
+				<Icon is:inline name="material-symbols:skip-previous-rounded" class="text-2xl" aria-hidden="true" />
+			</button>
+			<button class="fm-mini-play mx-1 flex h-13 w-13 items-center justify-center rounded-[20px] bg-neutral-900 p-3 text-white transition active:scale-95 dark:bg-white dark:text-neutral-900" title="播放/暂停" aria-label="播放/暂停">
+				<Icon is:inline name="material-symbols:play-arrow-rounded" class="fm-mini-icon-play-big ml-0.5 text-2xl" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:pause-rounded" class="fm-mini-icon-pause-big hidden text-2xl" aria-hidden="true" />
+			</button>
+			<button class="fm-mini-next p-2 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="下一首" aria-label="下一首">
+				<Icon is:inline name="material-symbols:skip-next-rounded" class="text-2xl" aria-hidden="true" />
+			</button>
+			<button class="fm-mini-mute p-2 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="静音" aria-label="静音">
+				<Icon is:inline name="material-symbols:volume-up-rounded" class="fm-mini-icon-vol-up text-xl" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:volume-off-rounded" class="fm-mini-icon-vol-off text-xl hidden" aria-hidden="true" />
+			</button>
+		</div>
+	</div>
+</div>
+
+<script data-swup-ignore-script is:inline>
+(function () {
+    if (window.__fireflyMusicFloat) return;
+    window.__fireflyMusicFloat = true;
+
+    var root = document.currentScript ? document.currentScript.previousElementSibling : null;
+
+    function ready(fn) {
+        if (document.readyState !== 'loading') fn();
+        else document.addEventListener('DOMContentLoaded', fn);
+    }
+
+    ready(function () {
+        var mini = document.querySelector('.fm-mini');
+        var floatLrc = document.querySelector('.fm-float-lrc');
+        if (!mini || !floatLrc) return;
+
+        var els = {
+            mini: mini,
+            close: mini.querySelector('.fm-mini-close'),
+            cover: mini.querySelector('.fm-mini-cover'),
+            coverBtn: mini.querySelector('.fm-mini-cover-btn'),
+            coverMask: mini.querySelector('.fm-mini-cover-mask'),
+            iconPlay: mini.querySelector('.fm-mini-icon-play'),
+            iconPause: mini.querySelector('.fm-mini-icon-pause'),
+            iconPlayBig: mini.querySelector('.fm-mini-icon-play-big'),
+            iconPauseBig: mini.querySelector('.fm-mini-icon-pause-big'),
+            title: mini.querySelector('.fm-mini-title'),
+            artist: mini.querySelector('.fm-mini-artist'),
+            current: mini.querySelector('.fm-mini-current'),
+            total: mini.querySelector('.fm-mini-total'),
+            track: mini.querySelector('.fm-mini-track'),
+            fill: mini.querySelector('.fm-mini-fill'),
+            thumb: mini.querySelector('.fm-mini-thumb'),
+            waveFlow: mini.querySelector('.fm-mini-waveflow'),
+            wavePath: mini.querySelector('.fm-mini-wavepath'),
+            clipRect: mini.querySelector('.fm-mini-clip'),
+            btnMode: mini.querySelector('.fm-mini-mode'),
+            iconRepeat: mini.querySelector('.fm-mini-icon-repeat'),
+            iconRepeatOne: mini.querySelector('.fm-mini-icon-repeat-one'),
+            iconShuffle: mini.querySelector('.fm-mini-icon-shuffle'),
+            btnPrev: mini.querySelector('.fm-mini-prev'),
+            btnPlay: mini.querySelector('.fm-mini-play'),
+            btnNext: mini.querySelector('.fm-mini-next'),
+            btnMute: mini.querySelector('.fm-mini-mute'),
+            iconVolUp: mini.querySelector('.fm-mini-icon-vol-up'),
+            iconVolOff: mini.querySelector('.fm-mini-icon-vol-off'),
+            lrcText: floatLrc.querySelector('.fm-float-lrc-text')
+        };
+
+        // ── 开关状态（持久化）────────────────────────────────
+        var uiState = {
+            mini: localStorage.getItem('music-float-mini') === '1',
+            lrc: localStorage.getItem('music-float-lrc') === '1'
+        };
+        var currentLyrics = [];
+        var currentLrcIndex = -1;
+        var isSeeking = false;
+
+        function emitState() {
+            window.dispatchEvent(new CustomEvent('fm:float-state', {
+                detail: { mini: uiState.mini, lrc: uiState.lrc }
+            }));
+        }
+
+        function applyMini() {
+            if (uiState.mini) {
+                els.mini.classList.remove('translate-y-6', 'scale-95', 'opacity-0', 'pointer-events-none');
+            } else {
+                els.mini.classList.add('translate-y-6', 'scale-95', 'opacity-0', 'pointer-events-none');
+            }
+            applyLrcPosition();
+        }
+
+        function applyLrcPosition() {
+            // 悬浮播放器打开时，浮动歌词上移到播放器上方
+            if (uiState.mini) {
+                floatLrc.classList.remove('bottom-8');
+                floatLrc.classList.add('bottom-[150px]');
+            } else {
+                floatLrc.classList.add('bottom-8');
+                floatLrc.classList.remove('bottom-[150px]');
+            }
+        }
+
+        function refreshLrc() {
+            var visible = uiState.lrc
+                && currentLyrics.length > 0
+                && currentLrcIndex >= 0
+                && !!currentLyrics[currentLrcIndex];
+            if (visible) {
+                els.lrcText.textContent = currentLyrics[currentLrcIndex].text;
+                floatLrc.classList.remove('opacity-0');
+            } else {
+                floatLrc.classList.add('opacity-0');
+            }
+        }
+
+        // ── 波浪路径（与卡片同款）──────────────────────────────
+        (function buildWave() {
+            var d = '';
+            for (var x = -25; x < 125; x += 25) {
+                d += ' M' + x + ',10 Q' + (x + 6.25) + ',4 ' + (x + 12.5) + ',10'
+                    + ' Q' + (x + 18.75) + ',16 ' + (x + 25) + ',10';
+            }
+            els.wavePath.setAttribute('d', d);
+        })();
+
+        var mgr = window.__fireflyMusic;
+
+        function setProgress(pct) {
+            pct = Math.max(0, Math.min(100, pct));
+            els.fill.style.width = pct + '%';
+            els.thumb.style.left = pct + '%';
+            els.clipRect.setAttribute('width', pct.toString());
+            els.track.setAttribute('aria-valuenow', Math.round(pct).toString());
+        }
+
+        function refreshWave() {
+            var playing = mgr ? mgr.getState().isPlaying : false;
+            var active = isSeeking || playing;
+            els.waveFlow.classList.toggle('is-active', active);
+            els.fill.style.opacity = active ? '0' : '1';
+        }
+
+        function setPlayingUI(playing) {
+            els.iconPlay.classList.toggle('hidden', playing);
+            els.iconPause.classList.toggle('hidden', !playing);
+            els.iconPlayBig.classList.toggle('hidden', playing);
+            els.iconPauseBig.classList.toggle('hidden', !playing);
+            els.coverMask.style.opacity = playing ? '0' : '1';
+            els.cover.classList.toggle('fm-spin', playing);
+            refreshWave();
+        }
+
+        function setModeUI(mode) {
+            els.iconRepeat.classList.toggle('hidden', mode !== 0);
+            els.iconRepeatOne.classList.toggle('hidden', mode !== 1);
+            els.iconShuffle.classList.toggle('hidden', mode !== 2);
+            els.btnMode.classList.toggle('text-(--primary)', mode !== 0);
+            els.btnMode.classList.toggle('text-neutral-400', mode === 0);
+        }
+
+        function setTrackUI(track) {
+            if (!track) return;
+            els.title.textContent = track.name || '';
+            els.title.title = track.name || '';
+            els.artist.textContent = track.artist || '';
+            if (track.pic) {
+                els.cover.src = track.pic;
+                els.cover.alt = (track.name || '封面') + ' - ' + (track.artist || '');
+            } else {
+                els.cover.removeAttribute('src');
+            }
+            setProgress(0);
+        }
+
+        // ── 控制 ─────────────────────────────────────────────
+        function withMgr(fn) {
+            return function () { if (mgr) fn(); };
+        }
+        els.close.addEventListener('click', function () {
+            uiState.mini = false;
+            localStorage.setItem('music-float-mini', '0');
+            applyMini();
+            emitState();
+        });
+        els.btnPlay.addEventListener('click', withMgr(function () { mgr.togglePlay(); }));
+        els.coverBtn.addEventListener('click', withMgr(function () { mgr.togglePlay(); }));
+        els.btnPrev.addEventListener('click', withMgr(function () { mgr.playPrev(); }));
+        els.btnNext.addEventListener('click', withMgr(function () { mgr.playNext(); }));
+        els.btnMode.addEventListener('click', withMgr(function () { mgr.cyclePlayMode(); }));
+        els.btnMute.addEventListener('click', withMgr(function () { mgr.toggleMute(); }));
+
+        // 拖拽 / 点击 seek
+        function pctFromClientX(clientX) {
+            var rect = els.track.getBoundingClientRect();
+            return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
+        }
+        els.track.addEventListener('pointerdown', function (e) {
+            if (!mgr) return;
+            isSeeking = true;
+            try { els.track.setPointerCapture(e.pointerId); } catch (_) {}
+            var p = pctFromClientX(e.clientX);
+            mgr.seek(p / 100);
+            setProgress(p);
+            refreshWave();
+        });
+        els.track.addEventListener('pointermove', function (e) {
+            if (!isSeeking || !mgr) return;
+            var p = pctFromClientX(e.clientX);
+            mgr.seek(p / 100);
+            setProgress(p);
+        });
+        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (evt) {
+            els.track.addEventListener(evt, function () {
+                if (!isSeeking) return;
+                isSeeking = false;
+                refreshWave();
+            });
+        });
+
+        // ── 接收卡片按钮的开关事件 ─────────────────────────────
+        window.addEventListener('fm:float-toggle', function (e) {
+            var target = e.detail && e.detail.target;
+            if (target === 'mini') {
+                uiState.mini = !uiState.mini;
+                localStorage.setItem('music-float-mini', uiState.mini ? '1' : '0');
+                applyMini();
+                emitState();
+            } else if (target === 'lrc') {
+                uiState.lrc = !uiState.lrc;
+                localStorage.setItem('music-float-lrc', uiState.lrc ? '1' : '0');
+                refreshLrc();
+                emitState();
+            }
+        });
+
+        // ── 订阅播放引擎事件 ─────────────────────────────────
+        window.addEventListener('fm:init', function () {
+            mgr = window.__fireflyMusic;
+            emitState();
+            var s = mgr.getState();
+            setModeUI(s.playMode);
+            if (s.track) setTrackUI(s.track);
+            setPlayingUI(s.isPlaying);
+        });
+        window.addEventListener('fm:track', function (e) {
+            setTrackUI(e.detail.track);
+            currentLyrics = [];
+            currentLrcIndex = -1;
+            refreshLrc();
+        });
+        window.addEventListener('fm:play-state', function (e) {
+            setPlayingUI(e.detail.isPlaying);
+        });
+        window.addEventListener('fm:time', function (e) {
+            var d = e.detail;
+            if (!isSeeking) setProgress(d.progress);
+            els.current.textContent = d.currentTimeStr;
+            els.total.textContent = d.durationStr;
+        });
+        window.addEventListener('fm:mode', function (e) {
+            setModeUI(e.detail.playMode);
+        });
+        window.addEventListener('fm:volume', function (e) {
+            var muted = e.detail.isMuted || e.detail.volume === 0;
+            els.iconVolUp.classList.toggle('hidden', muted);
+            els.iconVolOff.classList.toggle('hidden', !muted);
+        });
+        window.addEventListener('fm:lyrics', function (e) {
+            currentLyrics = (e.detail && e.detail.lyrics) || [];
+            currentLrcIndex = -1;
+            refreshLrc();
+        });
+        window.addEventListener('fm:lrc-index', function (e) {
+            currentLrcIndex = e.detail.index;
+            refreshLrc();
+        });
+
+        // ── 初始化：同步已有状态 ─────────────────────────────
+        applyMini();
+        applyLrcPosition();
+        emitState();
+        if (mgr && mgr.getState().initialized) {
+            var s0 = mgr.getState();
+            setModeUI(s0.playMode);
+            if (s0.track) setTrackUI(s0.track);
+            setPlayingUI(s0.isPlaying);
+            currentLyrics = s0.lyrics || [];
+            currentLrcIndex = s0.currentLrcIndex;
+            if (s0.duration > 0) {
+                setProgress(s0.progress);
+                els.current.textContent = s0.currentTimeStr;
+                els.total.textContent = s0.durationStr;
+            }
+            refreshLrc();
+        }
+        // 卡片按钮可能晚于本组件挂载，初始化/首帧后再广播一次
+        setTimeout(emitState, 300);
+        setTimeout(emitState, 1500);
+    });
+})();
+</script>
+
+<style>
+    .fm-float-lrc-text {
+		font-family: "STKaiti", "KaiTi", "Kaiti SC", "Yu Mincho", "Yu Gothic", serif;
+		text-shadow:
+			0 1px 12px rgba(255, 255, 255, 0.9),
+			0 0 4px rgba(255, 255, 255, 0.7);
+	}
+	:global(.dark) .fm-float-lrc-text {
+		text-shadow:
+			0 1px 12px rgba(0, 0, 0, 0.9),
+			0 0 4px rgba(0, 0, 0, 0.7);
+	}
+
+    .fm-mini-waveflow {
+		opacity: 0;
+		transition: opacity 0.2s ease;
+	}
+	.fm-mini-waveflow.is-active {
+		opacity: 1;
+	}
+	.fm-mini-waveflow .fm-mini-wavepath {
+		transform-box: view-box;
+	}
+	.fm-mini-waveflow.is-active .fm-mini-wavepath {
+		animation: fm-mini-wave-flow 1.3s linear infinite;
+	}
+	@keyframes fm-mini-wave-flow {
+		from { transform: translateX(0); }
+		to { transform: translateX(-25%); }
+	}
+
+    .fm-mini-cover {
+		animation: fm-spin 10s linear infinite;
+		animation-play-state: paused;
+	}
+	.fm-mini-cover.fm-spin {
+		animation-play-state: running;
+	}
+	@keyframes fm-spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+</style>
