@@ -1,5 +1,4 @@
-import type { ReactElement } from 'react'
-import type { SVGProps } from "react";
+import type { ReactElement, SVGProps } from "react";
 
 // lucide-react 新版移除了品牌图标，这里内联 GitHub 图标（原 lucide github 路径）
 export function Github(props: SVGProps<SVGSVGElement>): ReactElement {

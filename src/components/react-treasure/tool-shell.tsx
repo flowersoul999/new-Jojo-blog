@@ -1,9 +1,8 @@
 'use client'
 
 // 百宝箱工具页通用骨架：统一标题区 + 毛玻璃内容卡片，各工具只管自己的内容
-import type { ReactElement } from 'react'
 import { motion } from 'motion/react'
-import type { ComponentType, ReactNode } from 'react'
+import type { ComponentType, ReactElement, ReactNode } from 'react'
 
 interface Props {
 	// 宽松为通用组件类型，兼容 lucide 图标与本地内联 SVG 图标（如 Github）
