@@ -28,7 +28,7 @@ export const announcementConfig: AnnouncementConfig = {
 			// 链接文本
 			text: "开源地址",
 			// 链接 URL
-			url: "https://github.com/Jarvis0227/Aemeath",
+			url: "https://github.com/flowersoul999/Jojo-blog",
 			// 外部链接
 			external: true,
 		},
