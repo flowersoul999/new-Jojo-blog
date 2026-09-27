@@ -77,17 +77,11 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		url: "#",
 		icon: "material-symbols:info",
 		children: [
-			// 打赏
-			LinkPresets.Sponsor,
-
 			// 关于页面
 			LinkPresets.About,
 
 			// 动态表情
 			LinkPresets.Lottie,
-
-			// 项目更新日志
-			LinkPresets.Changelog,
 
 			// 博客更新日志
 			LinkPresets.BlogChangelog,
@@ -149,11 +143,6 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		url: "/tools/",
 		icon: "material-symbols:construction-rounded",
 	},
-	Changelog: {
-		name: "项目更新日志",
-		url: "/changelog/",
-		icon: "material-symbols:history-edu-rounded",
-	},
 	Friends: {
 		name: "友链",
 		url: "/friends/",
@@ -164,12 +153,6 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		name: "朋友圈",
 		url: "/moments/",
 		icon: "material-symbols:rss-feed-rounded",
-	},
-	Sponsor: {
-		name: "打赏",
-		url: "/sponsor/",
-		icon: "material-symbols:favorite",
-		pageKey: "sponsor",
 	},
 	Guestbook: {
 		name: "留言",
