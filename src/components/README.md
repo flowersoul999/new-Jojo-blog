@@ -113,7 +113,7 @@ Aemeath 项目中所有可复用组件的集中管理。组件按照功能和职
 
 **pages/gallery/** - 相册页面组件
 - `AlbumCard.astro` - 相册卡片组件
-- `PhotoCard.astro` - 照片卡片组件
+- `PhotoScatter.astro` - 全屏散落照片墙（拍立得模式）
 
 ### 💬 comment/ - 评论系统组件
 
