@@ -1,7 +1,10 @@
 ---
+// 日记页：独立全屏布局（不套 MainGridLayout，无左右侧边栏）
+// 一进来就是全屏漂浮板：纸片随机散布、可拖动、带图日记显示缩略图
 import { Icon } from "astro-icon/components";
 import { siteConfig } from "@/config";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import "@/styles/main.css";
+import MusicManager from "@/components/features/MusicManager.astro";
 
 // 检查页面是否启用
 if (!siteConfig.pages.diary) {
@@ -9,900 +12,1163 @@ if (!siteConfig.pages.diary) {
 }
 
 const title = "日记";
-const description = "记录生活，碎碎念。往下滑进入全屏，纸片随意拖动摆放。";
+const description = "记录生活，碎碎念。纸片随意拖动摆放，点击查看详情。";
+const pageTitle = `${title} | ${siteConfig.title}`;
+const hue = siteConfig.themeColor.hue;
+const defaultMode = siteConfig.themeColor.defaultMode;
 ---
 
-<MainGridLayout title={title} description={description}>
-	<div class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32">
-		<div class="card-base z-10 px-4 sm:px-6 md:px-9 py-4 sm:py-6 relative w-full overflow-hidden">
-			<!-- 页面标题 -->
-			<div class="mb-2 relative z-20">
-				<div class="flex items-center gap-3 mb-3">
-					<div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
-						<Icon is:inline name="material-symbols:edit-note" class="text-[1.5rem]" />
+<!doctype html>
+<html lang="zh-CN" class="is-diary-page">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta name="generator" content={Astro.generator} />
+		<link rel="icon" href="/favicon.ico" />
+		<title>{pageTitle}</title>
+		<meta name="description" content={description} />
+		<script is:inline define:vars={{ hue, defaultMode }}>
+			// 与主站 setting-utils 保持一致的主题初始化（localStorage key: theme / hue）
+			const LIGHT_MODE = "light";
+			const DARK_MODE = "dark";
+			const SYSTEM_MODE = "system";
+
+			function getSystemTheme() {
+				return window.matchMedia("(prefers-color-scheme: dark)").matches ? DARK_MODE : LIGHT_MODE;
+			}
+			function resolveTheme(themeValue) {
+				return themeValue === SYSTEM_MODE ? getSystemTheme() : themeValue;
+			}
+
+			const theme = localStorage.getItem("theme") || defaultMode;
+			const resolvedTheme = resolveTheme(theme);
+			if (resolvedTheme === DARK_MODE) {
+				document.documentElement.classList.add("dark");
+			} else {
+				document.documentElement.classList.remove("dark");
+			}
+			const storedHue = localStorage.getItem("hue") || hue;
+			document.documentElement.style.setProperty("--hue", storedHue);
+		</script>
+	</head>
+	<body class="diary-root">
+		<!-- 顶栏：返回主页 + 标题 + 换个摆法 -->
+		<header class="diary-topbar">
+			<div class="diary-topbar-left">
+				<a href="/" class="diary-back" aria-label="返回主页">
+					<Icon is:inline name="material-symbols:arrow-back-rounded" class="diary-back-icon" />
+					<span>主页</span>
+				</a>
+				<div class="diary-topbar-title">
+					<div class="diary-topbar-icon">
+						<Icon is:inline name="material-symbols:edit-note" class="text-[1.4rem]" />
 					</div>
-					<div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-						{title}
+					<div class="diary-topbar-text">
+						<div class="diary-topbar-name">日记</div>
+						<div class="diary-topbar-sub">{description}</div>
 					</div>
-					<button
-						type="button"
-						id="diary-shuffle"
-						class="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-sm text-(--btn-content) hover:bg-(--btn-regular-bg-hover) transition-colors"
-						aria-label="换个摆法"
-					>
-						<Icon is:inline name="material-symbols:shuffle-rounded" class="text-base" />
-						<span>换个摆法</span>
-					</button>
-				</div>
-				<p class="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed">
-					{description}
-				</p>
-			</div>
-
-			<!-- 漂浮板 -->
-			<div id="diary-board" class="diary-board relative w-full">
-				<div class="flex items-center justify-center py-20 text-neutral-400">
-					<div class="animate-pulse">纸片飞扬中...</div>
 				</div>
 			</div>
-
-			<!-- 下滑提示 -->
-			<div class="diary-scroll-hint flex items-center justify-center gap-1.5 py-3 text-xs text-neutral-400 dark:text-neutral-500">
-				<Icon is:inline name="material-symbols:keyboard-double-arrow-down-rounded" class="text-base animate-bounce" />
-				<span>继续下滑，进入全屏漂浮模式</span>
-			</div>
-		</div>
-	</div>
-
-	<!-- 全屏漂浮层：滚动进入，盖住侧边栏和导航栏 -->
-	<div id="diary-fs" class="diary-fs">
-		<div class="diary-fs-header">
-			<div class="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
-				<Icon is:inline name="material-symbols:edit-note" class="text-lg text-(--primary)" />
-				<span class="font-medium text-neutral-800 dark:text-neutral-200">日记 · 全屏漂浮</span>
-				<span class="hidden sm:inline text-neutral-400 dark:text-neutral-500">· 拖动纸片随意摆放，点击查看详情</span>
-			</div>
-			<div class="flex items-center gap-2">
-				<button
-					type="button"
-					id="diary-fs-shuffle"
-					class="inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-xs text-(--btn-content) hover:bg-(--btn-regular-bg-hover) transition-colors"
-				>
-					<Icon is:inline name="material-symbols:shuffle-rounded" class="text-sm" />
-					<span>换个摆法</span>
-				</button>
-				<button
-					type="button"
-					id="diary-fs-exit"
-					class="inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-xs text-(--btn-content) hover:bg-(--btn-regular-bg-hover) transition-colors"
-				>
-					<Icon is:inline name="material-symbols:close" class="text-sm" />
-					<span>退出全屏</span>
-				</button>
-			</div>
-		</div>
-		<!-- 全屏模式下日记板会被移动到这里 -->
-	</div>
-
-	<!-- 日记详情弹窗 -->
-	<div id="diary-modal" class="diary-modal fixed inset-0 z-[9998] hidden items-center justify-center p-4 sm:p-8">
-		<div id="diary-modal-mask" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-		<div id="diary-modal-panel" class="diary-modal-panel relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-(--line-divider) bg-(--card-bg) shadow-2xl">
-			<button type="button" id="diary-modal-close" class="absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-(--btn-regular-bg) text-(--btn-content) hover:bg-(--btn-regular-bg-hover) transition-colors" aria-label="关闭">
-				<Icon is:inline name="material-symbols:close" class="text-xl" />
+			<button type="button" id="diary-shuffle" class="diary-shuffle-btn" aria-label="换个摆法">
+				<Icon is:inline name="material-symbols:shuffle-rounded" class="text-base" />
+				<span>换个摆法</span>
 			</button>
-			<div id="diary-modal-body" class="p-6 sm:p-8 pt-12"></div>
+		</header>
+
+		<!-- 全屏漂浮板 -->
+		<main id="diary-board" class="diary-board">
+			<div class="diary-board-tip">
+				<div class="animate-pulse">纸片飞扬中...</div>
+			</div>
+		</main>
+
+		<!-- 日记详情弹窗 -->
+		<div id="diary-modal" class="diary-modal" hidden>
+			<div id="diary-modal-mask" class="diary-modal-mask"></div>
+			<div class="diary-modal-panel" role="dialog" aria-modal="true">
+				<button type="button" id="diary-modal-close" class="diary-modal-close" aria-label="关闭">
+					<Icon is:inline name="material-symbols:close" class="text-lg" />
+				</button>
+				<div id="diary-modal-body" class="diary-modal-body"></div>
+			</div>
 		</div>
-	</div>
 
-	<!-- 图片灯箱 -->
-	<div id="diary-lightbox" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/80 backdrop-blur-sm">
-		<button type="button" id="diary-lightbox-close" class="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors" aria-label="关闭">
-			<Icon is:inline name="material-symbols:close" class="text-2xl" />
-		</button>
-		<img id="diary-lightbox-img" src="" alt="" class="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" />
-	</div>
+		<!-- 图片灯箱 -->
+		<div id="diary-lightbox" class="diary-lightbox" hidden>
+			<button type="button" id="diary-lightbox-close" class="diary-lightbox-close" aria-label="关闭">
+				<Icon is:inline name="material-symbols:close" class="text-2xl" />
+			</button>
+			<img id="diary-lightbox-img" src="" alt="" class="diary-lightbox-img" />
+		</div>
 
-	<style is:global>
-		/* ===================== 漂浮板 ===================== */
-		.diary-board {
-			min-height: 400px;
-		}
+		<MusicManager />
 
-		/* 定位层：负责位置；普通模式下带鼠标视差，全屏模式下可拖动 */
-		.diary-paper-pos {
-			position: absolute;
-			transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-			will-change: transform;
-			z-index: 1;
-		}
-		.diary-paper-pos:hover {
-			z-index: 30;
-		}
-		/* 全屏模式下：可拖动，禁用视差位移 */
-		.diary-board--fs .diary-paper-pos {
-			transition: none;
-			cursor: grab;
-			touch-action: none;
-			user-select: none;
-		}
-		.diary-board--fs .diary-paper-pos.dragging {
-			cursor: grabbing;
-			z-index: 40;
-		}
-		.diary-board--fs .diary-paper-pos.dragging .diary-paper {
-			animation-play-state: paused;
-		}
-
-		/* 旋转层 */
-		.diary-paper-rot {
-			transition: transform 0.3s ease;
-		}
-
-		/* 纸片本体：负责上下悬浮动画 */
-		.diary-paper {
-			--paper: 255 255 255;
-			--paper-border: 200 200 200;
-			position: relative;
-			padding: 1.1rem 1.25rem;
-			border: 1px solid rgb(var(--paper-border) / 0.45);
-			background: rgb(var(--paper) / 0.78);
-			backdrop-filter: blur(6px);
-			box-shadow:
-				0 6px 18px rgb(0 0 0 / 0.07),
-				0 1px 4px rgb(0 0 0 / 0.05);
-			cursor: pointer;
-			animation: diary-float var(--float-dur, 6s) ease-in-out var(--float-delay, 0s) infinite;
-			transition:
-				box-shadow 0.3s ease,
-				border-color 0.3s ease;
-		}
-		.diary-paper:hover {
-			animation-play-state: paused;
-			border-color: rgb(var(--paper-border) / 0.9);
-			box-shadow:
-				0 18px 40px rgb(0 0 0 / 0.16),
-				0 3px 10px rgb(0 0 0 / 0.1);
-		}
-		.diary-paper-rot:has(.diary-paper:hover) {
-			transform: rotate(0deg) scale(1.05) !important;
-		}
-
-		@keyframes diary-float {
-			0%, 100% { transform: translateY(0); }
-			50% { transform: translateY(calc(var(--float-amp, 8px) * -1)); }
-		}
-
-		/* ---- 三种变体 ---- */
-		/* 便签卡片 */
-		.diary-paper--card {
-			border-radius: 14px;
-		}
-		/* 便签顶部的"胶带" */
-		.diary-paper--card::before {
-			content: "";
-			position: absolute;
-			top: -9px;
-			left: 50%;
-			width: 64px;
-			height: 18px;
-			transform: translateX(-50%) rotate(-2deg);
-			border-radius: 3px;
-			background: rgb(var(--paper-border) / 0.35);
-			box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
-		}
-
-		/* 泡泡 */
-		.diary-paper--bubble {
-			border-radius: 48% 52% 51% 49% / 54% 47% 53% 46%;
-			text-align: center;
-			padding: 1.5rem 1.4rem;
-		}
-		/* 泡泡的小卫星泡 */
-		.diary-paper--bubble::before {
-			content: "";
-			position: absolute;
-			top: 8%;
-			right: 6%;
-			width: 14px;
-			height: 14px;
-			border-radius: 50%;
-			background: rgb(var(--paper-border) / 0.35);
-		}
-		.diary-paper--bubble::after {
-			content: "";
-			position: absolute;
-			bottom: 12%;
-			left: 8%;
-			width: 9px;
-			height: 9px;
-			border-radius: 50%;
-			background: rgb(var(--paper-border) / 0.3);
-		}
-
-		/* 云朵 */
-		.diary-paper--cloud {
-			border-radius: 52px 58px 48px 56px / 46px 50px 54px 48px;
-			padding: 1.4rem 1.6rem;
-		}
-		/* 云朵顶部隆起 */
-		.diary-paper--cloud::before {
-			content: "";
-			position: absolute;
-			top: -14px;
-			left: 18%;
-			width: 46px;
-			height: 34px;
-			border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-			background: rgb(var(--paper) / 0.78);
-			border: 1px solid rgb(var(--paper-border) / 0.45);
-			border-bottom: none;
-		}
-		.diary-paper--cloud::after {
-			content: "";
-			position: absolute;
-			top: -9px;
-			right: 20%;
-			width: 30px;
-			height: 22px;
-			border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-			background: rgb(var(--paper) / 0.78);
-			border: 1px solid rgb(var(--paper-border) / 0.45);
-			border-bottom: none;
-		}
-
-		/* ---- 糖果色调 ---- */
-		.diary-paper[data-tone="0"] { --paper: 255 228 236; --paper-border: 244 114 182; }
-		.diary-paper[data-tone="1"] { --paper: 219 234 254; --paper-border: 96 165 250; }
-		.diary-paper[data-tone="2"] { --paper: 209 250 229; --paper-border: 52 211 153; }
-		.diary-paper[data-tone="3"] { --paper: 254 249 195; --paper-border: 234 179 8; }
-		.diary-paper[data-tone="4"] { --paper: 243 232 255; --paper-border: 192 132 252; }
-
-		:root.dark .diary-paper {
-			background: rgb(var(--paper) / 0.13);
-			box-shadow:
-				0 6px 18px rgb(0 0 0 / 0.3),
-				0 1px 4px rgb(0 0 0 / 0.2);
-		}
-		:root.dark .diary-paper--cloud::before,
-		:root.dark .diary-paper--cloud::after {
-			background: rgb(var(--paper) / 0.13);
-		}
-
-		/* ---- 纸片内部排版 ---- */
-		.diary-paper-title {
-			font-weight: 700;
-			font-size: 0.95rem;
-			line-height: 1.35;
-			color: rgb(38 38 38);
-			display: -webkit-box;
-			-webkit-line-clamp: 2;
-			-webkit-box-orient: vertical;
-			overflow: hidden;
-			word-break: break-all;
-		}
-		:root.dark .diary-paper-title { color: rgb(245 245 245); }
-
-		.diary-paper-excerpt {
-			margin-top: 0.45rem;
-			font-size: 0.78rem;
-			line-height: 1.6;
-			color: rgb(82 82 82);
-			display: -webkit-box;
-			-webkit-line-clamp: 3;
-			-webkit-box-orient: vertical;
-			overflow: hidden;
-			word-break: break-all;
-			white-space: pre-wrap;
-		}
-		:root.dark .diary-paper-excerpt { color: rgb(212 212 212); }
-
-		.diary-paper-meta {
-			margin-top: 0.6rem;
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			gap: 0.5rem;
-			font-size: 0.7rem;
-			color: rgb(115 115 115);
-		}
-		:root.dark .diary-paper-meta { color: rgb(163 163 163); }
-
-		.diary-paper-mood {
-			font-size: 1.05rem;
-			line-height: 1;
-		}
-
-		/* 私密锁定 */
-		.diary-paper--locked {
-			text-align: center;
-		}
-
-		/* ===================== 全屏漂浮层 ===================== */
-		.diary-fs {
-			display: none;
-			position: fixed;
-			inset: 0;
-			z-index: 90;
-			background: var(--card-bg);
-			opacity: 0;
-			transition: opacity 0.3s ease;
-		}
-		:root.dark .diary-fs {
-			background: rgb(24 24 24);
-		}
-		.diary-fs.active {
-			display: block;
-			opacity: 1;
-		}
-		.diary-fs-header {
-			position: absolute;
-			top: 0;
-			left: 0;
-			right: 0;
-			height: 56px;
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			padding: 0 1rem;
-			border-bottom: 1px solid var(--line-divider);
-			background: color-mix(in srgb, var(--card-bg) 70%, transparent);
-			backdrop-filter: blur(8px);
-			z-index: 10;
-		}
-		/* 全屏模式下的日记板：铺满头部以下区域 */
-		.diary-board--fs {
-			position: absolute;
-			top: 56px;
-			left: 0;
-			right: 0;
-			bottom: 0;
-			overflow: hidden;
-			min-height: 0;
-		}
-
-		/* ---- 详情弹窗 ---- */
-		.diary-modal {
-			animation: diary-fade-in 0.25s ease;
-		}
-		.diary-modal-panel {
-			animation: diary-pop-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-		}
-		@keyframes diary-fade-in {
-			from { opacity: 0; }
-			to { opacity: 1; }
-		}
-		@keyframes diary-pop-in {
-			from { opacity: 0; transform: translateY(24px) scale(0.96); }
-			to { opacity: 1; transform: translateY(0) scale(1); }
-		}
-
-		.diary-detail-content {
-			white-space: pre-wrap;
-			word-break: break-word;
-			line-height: 1.85;
-			font-size: 0.925rem;
-		}
-
-		/* 详情内图片：统一尺寸裁剪 */
-		.diary-detail-img {
-			width: 100%;
-			aspect-ratio: 16 / 9;
-			object-fit: cover;
-			border-radius: 10px;
-			border: 1px solid var(--line-divider);
-			cursor: zoom-in;
-			transition: transform 0.25s ease;
-		}
-		.diary-detail-img:hover {
-			transform: scale(1.02);
-		}
-
-		/* ---- 移动端普通模式：流式布局，保留形状与悬浮 ---- */
-		@media (max-width: 639px) {
-			.diary-board:not(.diary-board--fs) {
+		<style is:global>
+			/* ===================== 页面骨架 ===================== */
+			html.is-diary-page,
+			html.is-diary-page body.diary-root {
+				height: 100%;
+				overflow: hidden;
+				background: var(--card-bg);
+			}
+			html.dark.is-diary-page,
+			html.dark.is-diary-page body.diary-root {
+				background: #181818;
+			}
+			html.is-diary-page {
+				scrollbar-width: none;
+			}
+			html.is-diary-page::-webkit-scrollbar,
+			body.diary-root::-webkit-scrollbar {
+				display: none;
+			}
+			body.diary-root {
 				display: flex;
 				flex-direction: column;
+				margin: 0;
+			}
+
+			/* ===================== 顶栏 ===================== */
+			.diary-topbar {
+				flex: none;
+				height: 60px;
+				display: flex;
 				align-items: center;
-				gap: 1.5rem;
-				padding: 1.5rem 0 2rem;
+				justify-content: space-between;
+				gap: 0.75rem;
+				padding: 0 1rem;
+				border-bottom: 1px solid var(--line-divider);
+				background: color-mix(in srgb, var(--card-bg) 72%, transparent);
+				backdrop-filter: blur(12px) saturate(1.15);
+				-webkit-backdrop-filter: blur(12px) saturate(1.15);
+				position: relative;
+				z-index: 20;
+			}
+			.diary-topbar-left {
+				display: flex;
+				align-items: center;
+				gap: 0.875rem;
+				min-width: 0;
+			}
+			.diary-back {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.3rem;
+				padding: 0.42rem 0.8rem;
+				border-radius: 999px;
+				font-size: 0.8rem;
+				font-weight: 500;
+				color: var(--deep-text);
+				text-decoration: none;
+				box-shadow: 0 0 0 1px color-mix(in srgb, var(--deep-text) 12%, transparent);
+				transition:
+					box-shadow 200ms ease,
+					transform 200ms ease;
+			}
+			.diary-back:hover {
+				box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent);
+				transform: translateY(-1px);
+			}
+			.diary-back-icon {
+				width: 0.95rem;
+				height: 0.95rem;
+			}
+			.diary-topbar-title {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
+				min-width: 0;
+			}
+			.diary-topbar-icon {
+				flex: none;
+				height: 2rem;
+				width: 2rem;
+				border-radius: 0.6rem;
+				background: var(--primary);
+				color: #fff;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			:root.dark .diary-topbar-icon {
+				color: rgba(0, 0, 0, 0.7);
+			}
+			.diary-topbar-text {
+				min-width: 0;
+			}
+			.diary-topbar-name {
+				font-size: 1.05rem;
+				font-weight: 700;
+				line-height: 1.25;
+				color: var(--deep-text);
+			}
+			.diary-topbar-sub {
+				font-size: 0.72rem;
+				color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.diary-shuffle-btn {
+				flex: none;
+				display: inline-flex;
+				align-items: center;
+				gap: 0.375rem;
+				border: none;
+				border-radius: 0.6rem;
+				background: var(--btn-regular-bg);
+				color: var(--btn-content);
+				padding: 0.5rem 0.8rem;
+				font-size: 0.8rem;
+				cursor: pointer;
+				transition: background 200ms ease;
+			}
+			.diary-shuffle-btn:hover {
+				background: var(--btn-regular-bg-hover);
+			}
+
+			/* ===================== 漂浮板 ===================== */
+			.diary-board {
+				position: relative;
+				flex: 1 1 auto;
+				min-height: 0;
+				overflow: hidden;
+			}
+			/* 淡淡圆点底纹，像软木桌面 */
+			.diary-board::before {
+				content: "";
+				position: absolute;
+				inset: 0;
+				pointer-events: none;
+				opacity: 0.55;
+				background-image: radial-gradient(
+					color-mix(in srgb, var(--deep-text) 9%, transparent) 1.1px,
+					transparent 1.1px
+				);
+				background-size: 26px 26px;
+			}
+			.diary-board-tip {
+				height: 100%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: color-mix(in srgb, var(--deep-text) 45%, transparent);
+			}
+
+			/* 定位层：负责位置，全程可拖动 */
+			.diary-paper-pos {
+				position: absolute;
+				will-change: transform;
+				z-index: 1;
+				cursor: grab;
+				touch-action: none;
+				user-select: none;
+			}
+			.diary-paper-pos:hover {
+				z-index: 30;
+			}
+			.diary-paper-pos.dragging {
+				cursor: grabbing;
+				z-index: 40;
+			}
+			.diary-paper-pos.dragging .diary-paper {
+				animation-play-state: paused;
+			}
+
+			/* 旋转层 */
+			.diary-paper-rot {
+				transition: transform 0.3s ease;
+			}
+
+			/* 纸片本体：负责上下悬浮动画 */
+			.diary-paper {
+				--paper: 255 255 255;
+				--paper-border: 200 200 200;
+				position: relative;
+				padding: 1.1rem 1.25rem;
+				border: 1px solid rgb(var(--paper-border) / 0.45);
+				background: rgb(var(--paper) / 0.82);
+				backdrop-filter: blur(6px);
+				box-shadow:
+					0 6px 18px rgb(0 0 0 / 0.07),
+					0 1px 4px rgb(0 0 0 / 0.05);
+				cursor: pointer;
+				animation: diary-float var(--float-dur, 6s) ease-in-out var(--float-delay, 0s) infinite;
+				transition:
+					box-shadow 0.3s ease,
+					border-color 0.3s ease;
+			}
+			.diary-paper:hover {
+				animation-play-state: paused;
+				border-color: rgb(var(--paper-border) / 0.9);
+				box-shadow:
+					0 18px 40px rgb(0 0 0 / 0.16),
+					0 3px 10px rgb(0 0 0 / 0.1);
+			}
+			.diary-paper-rot:has(.diary-paper:hover) {
+				transform: rotate(0deg) scale(1.05) !important;
+			}
+
+			@keyframes diary-float {
+				0%, 100% { transform: translateY(0); }
+				50% { transform: translateY(calc(var(--float-amp, 8px) * -1)); }
+			}
+
+			/* ---- 三种变体 ---- */
+			/* 便签卡片 */
+			.diary-paper--card {
+				border-radius: 14px;
+			}
+			/* 便签顶部的"胶带" */
+			.diary-paper--card::before {
+				content: "";
+				position: absolute;
+				top: -9px;
+				left: 50%;
+				width: 64px;
+				height: 18px;
+				transform: translateX(-50%) rotate(-2deg);
+				border-radius: 3px;
+				background: rgb(var(--paper-border) / 0.35);
+				box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+			}
+
+			/* 泡泡 */
+			.diary-paper--bubble {
+				border-radius: 48% 52% 51% 49% / 54% 47% 53% 46%;
+				text-align: center;
+				padding: 1.5rem 1.4rem;
+			}
+			/* 泡泡的小卫星泡 */
+			.diary-paper--bubble::before {
+				content: "";
+				position: absolute;
+				top: 8%;
+				right: 6%;
+				width: 14px;
+				height: 14px;
+				border-radius: 50%;
+				background: rgb(var(--paper-border) / 0.35);
+			}
+			.diary-paper--bubble::after {
+				content: "";
+				position: absolute;
+				bottom: 12%;
+				left: 8%;
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				background: rgb(var(--paper-border) / 0.3);
+			}
+
+			/* 云朵 */
+			.diary-paper--cloud {
+				border-radius: 52px 58px 48px 56px / 46px 50px 54px 48px;
+				padding: 1.4rem 1.6rem;
+			}
+			/* 云朵顶部隆起 */
+			.diary-paper--cloud::before {
+				content: "";
+				position: absolute;
+				top: -14px;
+				left: 18%;
+				width: 46px;
+				height: 34px;
+				border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+				background: rgb(var(--paper) / 0.82);
+				border: 1px solid rgb(var(--paper-border) / 0.45);
+				border-bottom: none;
+			}
+			.diary-paper--cloud::after {
+				content: "";
+				position: absolute;
+				top: -9px;
+				right: 20%;
+				width: 30px;
+				height: 22px;
+				border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+				background: rgb(var(--paper) / 0.82);
+				border: 1px solid rgb(var(--paper-border) / 0.45);
+				border-bottom: none;
+			}
+
+			/* ---- 糖果色调 ---- */
+			.diary-paper[data-tone="0"] { --paper: 255 228 236; --paper-border: 244 114 182; }
+			.diary-paper[data-tone="1"] { --paper: 219 234 254; --paper-border: 96 165 250; }
+			.diary-paper[data-tone="2"] { --paper: 209 250 229; --paper-border: 52 211 153; }
+			.diary-paper[data-tone="3"] { --paper: 254 249 195; --paper-border: 234 179 8; }
+			.diary-paper[data-tone="4"] { --paper: 243 232 255; --paper-border: 192 132 252; }
+
+			:root.dark .diary-paper {
+				background: rgb(var(--paper) / 0.14);
+				box-shadow:
+					0 6px 18px rgb(0 0 0 / 0.3),
+					0 1px 4px rgb(0 0 0 / 0.2);
+			}
+			:root.dark .diary-paper--cloud::before,
+			:root.dark .diary-paper--cloud::after {
+				background: rgb(var(--paper) / 0.14);
+			}
+
+			/* ---- 纸片上的图片缩略图（统一尺寸裁剪） ---- */
+			.diary-paper-thumb {
+				margin: -0.35rem -0.5rem 0.6rem;
+				border-radius: 10px;
+				overflow: hidden;
+				border: 1px solid rgb(var(--paper-border) / 0.35);
+			}
+			.diary-paper-thumb img {
+				display: block;
+				width: 100%;
+				aspect-ratio: 16 / 10;
+				object-fit: cover;
+				pointer-events: none;
+			}
+
+			/* ---- 纸片内部排版 ---- */
+			.diary-paper-title {
+				font-weight: 700;
+				font-size: 0.95rem;
+				line-height: 1.35;
+				color: rgb(38 38 38);
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+				word-break: break-all;
+			}
+			:root.dark .diary-paper-title { color: rgb(245 245 245); }
+
+			.diary-paper-excerpt {
+				margin-top: 0.45rem;
+				font-size: 0.78rem;
+				line-height: 1.6;
+				color: rgb(82 82 82);
+				display: -webkit-box;
+				-webkit-line-clamp: 3;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+				word-break: break-all;
+				white-space: pre-wrap;
+			}
+			:root.dark .diary-paper-excerpt { color: rgb(212 212 212); }
+
+			.diary-paper-meta {
+				margin-top: 0.6rem;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.5rem;
+				font-size: 0.7rem;
+				color: rgb(115 115 115);
+			}
+			:root.dark .diary-paper-meta { color: rgb(163 163 163); }
+
+			.diary-paper-mood {
+				font-size: 1.05rem;
+				line-height: 1;
+			}
+
+			/* 私密锁定 */
+			.diary-paper--locked {
+				text-align: center;
+			}
+
+			/* ===================== 详情弹窗 ===================== */
+			.diary-modal {
+				position: fixed;
+				inset: 0;
+				z-index: 9998;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 1rem;
+				animation: diary-fade-in 0.25s ease;
+			}
+			.diary-modal[hidden] {
+				display: none;
+			}
+			.diary-modal-mask {
+				position: absolute;
+				inset: 0;
+				background: rgb(0 0 0 / 0.55);
+				backdrop-filter: blur(6px);
+				-webkit-backdrop-filter: blur(6px);
+			}
+			.diary-modal-panel {
+				position: relative;
+				width: 100%;
+				max-width: 620px;
+				max-height: min(86vh, 760px);
+				display: flex;
+				flex-direction: column;
+				overflow: hidden;
+				border-radius: 20px;
+				border: 1px solid var(--line-divider);
+				background: var(--card-bg);
+				box-shadow:
+					0 30px 80px rgb(0 0 0 / 0.35),
+					0 6px 24px rgb(0 0 0 / 0.16);
+				animation: diary-pop-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+			}
+			.diary-modal-close {
+				position: absolute;
+				top: 0.7rem;
+				right: 0.7rem;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				height: 2.1rem;
+				width: 2.1rem;
+				border: none;
+				border-radius: 999px;
+				cursor: pointer;
+				background: color-mix(in srgb, var(--card-bg) 65%, transparent);
+				color: var(--deep-text);
+				box-shadow: 0 0 0 1px color-mix(in srgb, var(--deep-text) 12%, transparent);
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				transition: transform 200ms ease, box-shadow 200ms ease;
+			}
+			.diary-modal-close:hover {
+				transform: scale(1.06);
+				box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent);
+			}
+			.diary-modal-body {
+				display: flex;
+				flex-direction: column;
+				flex: 1 1 auto;
 				min-height: 0;
 			}
-			.diary-board:not(.diary-board--fs) .diary-paper-pos {
-				position: static;
-				transform: none !important;
+			.diary-modal-scroll {
+				flex: 1 1 auto;
+				min-height: 0;
+				overflow-y: auto;
+				padding: 1.5rem 1.6rem 1.6rem;
 			}
-			.diary-board:not(.diary-board--fs) .diary-paper {
-				max-width: 320px;
+
+			/* 封面图（有图日记）：标题与信息压在封面上 */
+			.diary-modal-cover {
+				position: relative;
+				flex: none;
+				aspect-ratio: 21 / 10;
+				min-height: 170px;
+				overflow: hidden;
 			}
-		}
-	</style>
-
-	<script is:inline>
-	(function () {
-		var MOOD_MAP = {
-			"super-happy": { label: "炒鸡开心", emoji: "🤩" },
-			happy: { label: "开心", emoji: "😊" },
-			neutral: { label: "平平淡淡", emoji: "😐" },
-			unhappy: { label: "不开心", emoji: "😔" },
-			sad: { label: "伤心难过", emoji: "😭" },
-		};
-
-		var DIARY_PASSWORD = "2299";
-		var UNLOCK_KEY = "aemeath-diary-unlocked";
-		var DRAG_THRESHOLD = 6; // 拖动超过该像素才算拖动，否则视为点击
-
-		var board = document.getElementById("diary-board");
-		var boardHome = board.parentNode; // 普通模式下日记板所在位置
-		var fsLayer = document.getElementById("diary-fs");
-		var fsExit = document.getElementById("diary-fs-exit");
-		var fsShuffle = document.getElementById("diary-fs-shuffle");
-		var modal = document.getElementById("diary-modal");
-		var modalMask = document.getElementById("diary-modal-mask");
-		var modalBody = document.getElementById("diary-modal-body");
-		var modalClose = document.getElementById("diary-modal-close");
-		var lightbox = document.getElementById("diary-lightbox");
-		var lightboxImg = document.getElementById("diary-lightbox-img");
-		var lightboxClose = document.getElementById("diary-lightbox-close");
-		var shuffleBtn = document.getElementById("diary-shuffle");
-
-		// 弹窗、灯箱、全屏层移到 body 下，避免父级 transform 让 fixed 定位失效
-		document.body.appendChild(fsLayer);
-		document.body.appendChild(modal);
-		document.body.appendChild(lightbox);
-
-		var entries = [];
-		var unlocked = false;
-		var shuffleSeed = 0;
-		var fullscreen = false;
-		var savedPos = {}; // slug -> {x,y}，全屏模式下拖动后的位置
-		var wheelAcc = 0;
-		var exitGuardUntil = 0; // 退出全屏后短时间内禁止再次触发，防止恢复滚动时误入
-
-		try {
-			unlocked = sessionStorage.getItem(UNLOCK_KEY) === "1";
-		} catch (e) {}
-
-		/* ---------- 工具 ---------- */
-		function hashStr(s) {
-			var h = 7;
-			for (var i = 0; i < s.length; i++) {
-				h = (h * 31 + s.charCodeAt(i)) >>> 0;
+			.diary-modal-cover > img {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
 			}
-			return h;
-		}
+			.diary-modal-cover-fade {
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					180deg,
+					rgb(0 0 0 / 0.18) 0%,
+					rgb(0 0 0 / 0) 32%,
+					rgb(0 0 0 / 0.62) 100%
+				);
+			}
+			.diary-modal-cover-head {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				padding: 1rem 1.5rem 1.05rem;
+				color: #fff;
+			}
+			.diary-modal-cover-head h2 {
+				margin: 0 0 0.45rem;
+				font-size: 1.35rem;
+				font-weight: 700;
+				line-height: 1.35;
+				text-shadow: 0 2px 10px rgb(0 0 0 / 0.45);
+				word-break: break-all;
+			}
+			.diary-modal-cover .diary-modal-meta {
+				color: rgb(255 255 255 / 0.88);
+			}
+			.diary-modal-cover .diary-modal-pill,
+			.diary-modal-cover .diary-modal-tag {
+				background: rgb(255 255 255 / 0.16);
+				color: #fff;
+				border-color: rgb(255 255 255 / 0.28);
+			}
 
-		function escapeHtml(str) {
-			var div = document.createElement("div");
-			div.textContent = str == null ? "" : String(str);
-			return div.innerHTML;
-		}
+			/* 无封面时的标题区 */
+			.diary-modal-title {
+				margin: 0 2.2rem 0.55rem 0;
+				font-size: 1.35rem;
+				font-weight: 700;
+				line-height: 1.4;
+				color: var(--deep-text);
+				word-break: break-all;
+			}
+			.diary-modal-mood {
+				font-size: 1.2rem;
+			}
+			.diary-modal-meta {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 0.45rem;
+				font-size: 0.75rem;
+				color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+				margin-bottom: 1rem;
+			}
+			.diary-modal-pill,
+			.diary-modal-tag {
+				display: inline-flex;
+				align-items: center;
+				border-radius: 999px;
+				padding: 0.14rem 0.55rem;
+				border: 1px solid var(--line-divider);
+				background: var(--btn-regular-bg);
+				color: var(--btn-content);
+			}
 
-		function formatChineseTime(dateStr) {
-			var d = new Date(dateStr);
-			if (isNaN(d.getTime())) return "";
-			var h = d.getHours();
-			var m = String(d.getMinutes()).padStart(2, "0");
-			var period = "凌晨";
-			if (h >= 5 && h < 8) period = "早上";
-			else if (h >= 8 && h < 11) period = "上午";
-			else if (h >= 11 && h < 13) period = "中午";
-			else if (h >= 13 && h < 17) period = "下午";
-			else if (h >= 17 && h < 19) period = "傍晚";
-			else if (h >= 19 && h < 23) period = "晚上";
-			else if (h >= 23) period = "深夜";
-			var h12 = h % 12 || 12;
-			return period + " " + h12 + ":" + m;
-		}
+			.diary-detail-content {
+				white-space: pre-wrap;
+				word-break: break-word;
+				line-height: 1.9;
+				font-size: 0.94rem;
+				color: var(--deep-text);
+			}
 
-		function formatDate(dateStr) {
-			var d = new Date(dateStr);
-			if (isNaN(d.getTime())) return dateStr;
-			return (
-				d.getFullYear() +
-				"年" +
-				String(d.getMonth() + 1).padStart(2, "0") +
-				"月" +
-				String(d.getDate()).padStart(2, "0") +
-				"日"
-			);
-		}
+			/* 详情内其余图片：统一尺寸裁剪，点击看大图 */
+			.diary-modal-imgs {
+				margin-top: 1.2rem;
+				display: grid;
+				grid-template-columns: repeat(2, 1fr);
+				gap: 0.6rem;
+			}
+			.diary-modal-imgs.is-single {
+				grid-template-columns: 1fr;
+			}
+			.diary-detail-img {
+				display: block;
+				width: 100%;
+				aspect-ratio: 16 / 9;
+				object-fit: cover;
+				border-radius: 10px;
+				border: 1px solid var(--line-divider);
+				cursor: zoom-in;
+				transition: transform 0.25s ease;
+			}
+			.diary-detail-img:hover {
+				transform: scale(1.02);
+			}
 
-		/* 基于 slug 的确定性"随机"漂浮参数 */
-		function floatParams(slug, seed) {
-			var h = (hashStr(slug) + seed * 2654435761) >>> 0;
-			var variants = ["card", "bubble", "cloud"];
-			var variant = variants[h % 3];
-			var tone = (h >>> 3) % 5;
-			var w =
-				variant === "cloud"
-					? 250 + ((h >>> 5) % 60)
-					: variant === "bubble"
-						? 185 + ((h >>> 5) % 45)
-						: 210 + ((h >>> 5) % 60);
-			var rotate = -7 + ((h >>> 9) % 140) / 10;
-			return {
-				variant: variant,
-				tone: tone,
-				w: w,
-				rotate: rotate,
-				floatDur: 5 + ((h >>> 13) % 30) / 10,
-				floatDelay: -(((h >>> 17) % 40) / 10),
-				floatAmp: 6 + ((h >>> 21) % 6),
-				depth: 0.5 + ((h >>> 25) % 90) / 100,
-				jx: (((h >>> 7) % 100) / 100 - 0.5) * 36,
-				jy: (((h >>> 11) % 100) / 100 - 0.5) * 30,
-				h: h,
+			@keyframes diary-fade-in {
+				from { opacity: 0; }
+				to { opacity: 1; }
+			}
+			@keyframes diary-pop-in {
+				from { opacity: 0; transform: translateY(24px) scale(0.96); }
+				to { opacity: 1; transform: translateY(0) scale(1); }
+			}
+
+			/* ===================== 图片灯箱 ===================== */
+			.diary-lightbox {
+				position: fixed;
+				inset: 0;
+				z-index: 9999;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: rgb(0 0 0 / 0.82);
+				backdrop-filter: blur(6px);
+				-webkit-backdrop-filter: blur(6px);
+			}
+			.diary-lightbox[hidden] {
+				display: none;
+			}
+			.diary-lightbox-close {
+				position: absolute;
+				top: 1rem;
+				right: 1rem;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				height: 2.5rem;
+				width: 2.5rem;
+				border: none;
+				border-radius: 999px;
+				cursor: pointer;
+				background: rgb(255 255 255 / 0.1);
+				color: #fff;
+				transition: background 200ms ease;
+			}
+			.diary-lightbox-close:hover {
+				background: rgb(255 255 255 / 0.2);
+			}
+			.diary-lightbox-img {
+				max-height: 90vh;
+				max-width: 90vw;
+				border-radius: 10px;
+				object-fit: contain;
+				box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+			}
+
+			/* ===================== 移动端微调 ===================== */
+			@media (max-width: 640px) {
+				.diary-topbar-sub {
+					display: none;
+				}
+				.diary-topbar-name {
+					font-size: 0.95rem;
+				}
+				.diary-modal-scroll {
+					padding: 1.2rem 1.15rem 1.3rem;
+				}
+			}
+		</style>
+
+		<script is:inline>
+		(function () {
+			var MOOD_MAP = {
+				"super-happy": { label: "炒鸡开心", emoji: "🤩" },
+				happy: { label: "开心", emoji: "😊" },
+				neutral: { label: "平平淡淡", emoji: "😐" },
+				unhappy: { label: "不开心", emoji: "😔" },
+				sad: { label: "伤心难过", emoji: "😭" },
 			};
-		}
 
-		/* ---------- 渲染漂浮板 ---------- */
-		function renderBoard() {
-			if (!entries.length) {
-				board.innerHTML =
-					'<div class="flex flex-col items-center justify-center py-16 text-neutral-400 dark:text-neutral-500"><span class="text-4xl mb-3">📝</span><p>暂无日记</p></div>';
-				return;
-			}
+			var DIARY_PASSWORD = "2299";
+			var UNLOCK_KEY = "aemeath-diary-unlocked";
+			var DRAG_THRESHOLD = 6; // 拖动超过该像素才算拖动，否则视为点击
 
-			var isFs = fullscreen;
-			var isMobile = window.innerWidth < 640;
-			var sorted = entries.slice().sort(function (a, b) {
-				return new Date(b.date).getTime() - new Date(a.date).getTime();
-			});
+			var board = document.getElementById("diary-board");
+			var modal = document.getElementById("diary-modal");
+			var modalMask = document.getElementById("diary-modal-mask");
+			var modalBody = document.getElementById("diary-modal-body");
+			var modalClose = document.getElementById("diary-modal-close");
+			var lightbox = document.getElementById("diary-lightbox");
+			var lightboxImg = document.getElementById("diary-lightbox-img");
+			var lightboxClose = document.getElementById("diary-lightbox-close");
+			var shuffleBtn = document.getElementById("diary-shuffle");
 
-			var w = board.clientWidth || 800;
-			var h = board.clientHeight || 500;
-			var cols, cellH;
-			if (isFs) {
-				cols = w >= 1400 ? 4 : w >= 900 ? 3 : 2;
-				cellH = Math.max(220, Math.min(280, (h - 40) / Math.ceil(sorted.length / cols)));
-			} else {
-				cols = isMobile ? 1 : w >= 980 ? 3 : 2;
-				cellH = 300;
-			}
-			var cellW = w / cols;
-			var rows = Math.ceil(sorted.length / cols);
+			var entries = [];
+			var unlocked = false;
+			var shuffleSeed = 0;
+			var savedPos = {}; // slug -> {x,y}，拖动后的位置
+			var zTop = 10; // 拖动/触摸时递增，让纸片叠到最上
 
-			if (!isFs && !isMobile) {
-				board.style.height = rows * cellH + 40 + "px";
-			} else if (!isFs) {
-				board.style.height = "";
-			}
+			try {
+				unlocked = sessionStorage.getItem(UNLOCK_KEY) === "1";
+			} catch (e) {}
 
-			var html = "";
-			sorted.forEach(function (entry, i) {
-				var prm = floatParams(entry.slug, shuffleSeed);
-				var locked = entry.isPrivate && !unlocked;
-				var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
-
-				var col = i % cols;
-				var row = Math.floor(i / cols);
-				var left, top;
-				var sp = savedPos[entry.slug];
-				if (isFs && sp) {
-					// 全屏模式下：拖动过就停在拖动后的位置
-					left = sp.x;
-					top = sp.y;
-				} else {
-					left = col * cellW + (cellW - prm.w) / 2 + prm.jx;
-					top = row * cellH + (cellH - 190) / 2 + prm.jy;
+			/* ---------- 工具 ---------- */
+			function hashStr(s) {
+				var h = 7;
+				for (var i = 0; i < s.length; i++) {
+					h = (h * 31 + s.charCodeAt(i)) >>> 0;
 				}
-				// 限制在板面范围内
-				left = Math.max(8, Math.min(left, w - prm.w - 8));
-				top = Math.max(8, Math.min(top, h - 160));
+				return h;
+			}
 
-				html += '<div class="diary-paper-pos" style="left:' + left.toFixed(1) + "px;top:" + top.toFixed(1) + 'px;width:' + prm.w + 'px" data-slug="' + entry.slug + '"' + (isFs ? "" : ' data-depth="' + prm.depth.toFixed(2) + '"') + ">";
-				html +=
-					'<div class="diary-paper-rot" style="transform:rotate(' + prm.rotate.toFixed(1) + 'deg)">';
-				html +=
-					'<div class="diary-paper diary-paper--' +
-					prm.variant +
-					(locked ? " diary-paper--locked" : "") +
-					'" data-tone="' +
-					prm.tone +
-					'" style="--float-dur:' +
-					prm.floatDur.toFixed(1) +
-					"s;--float-delay:" +
-					prm.floatDelay.toFixed(1) +
-					"s;--float-amp:" +
-					prm.floatAmp +
-					"px" +
-					(isFs || isMobile ? ";width:100%" : "") +
-					'">';
+			/* 确定性伪随机数生成器：同一 slug + seed 结果固定 */
+			function mulberry32(a) {
+				return function () {
+					a |= 0;
+					a = (a + 0x6d2b79f5) | 0;
+					var t = Math.imul(a ^ (a >>> 15), 1 | a);
+					t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+					return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+				};
+			}
 
-				if (locked) {
-					html += '<div class="text-2xl mb-1">🔒</div>';
-					html += '<div class="diary-paper-title" style="text-align:center">私密日记</div>';
-					html += '<div class="diary-paper-meta" style="justify-content:center"><span>' + formatDate(entry.date) + "</span></div>";
-				} else {
-					html += '<div class="diary-paper-title">' + escapeHtml(entry.title || "无题") + "</div>";
-					html += '<div class="diary-paper-excerpt">' + escapeHtml((entry.content || "").slice(0, 90)) + "</div>";
-					html += '<div class="diary-paper-meta">';
-					html += "<span>" + formatDate(entry.date) + "</span>";
-					html += '<span class="flex items-center gap-1">';
-					if (entry.images && entry.images.length) {
-						html += "<span>🖼" + entry.images.length + "</span>";
+			function escapeHtml(str) {
+				var div = document.createElement("div");
+				div.textContent = str == null ? "" : String(str);
+				return div.innerHTML;
+			}
+
+			function formatChineseTime(dateStr) {
+				var d = new Date(dateStr);
+				if (isNaN(d.getTime())) return "";
+				var h = d.getHours();
+				var m = String(d.getMinutes()).padStart(2, "0");
+				var period = "凌晨";
+				if (h >= 5 && h < 8) period = "早上";
+				else if (h >= 8 && h < 11) period = "上午";
+				else if (h >= 11 && h < 13) period = "中午";
+				else if (h >= 13 && h < 17) period = "下午";
+				else if (h >= 17 && h < 19) period = "傍晚";
+				else if (h >= 19 && h < 23) period = "晚上";
+				else if (h >= 23) period = "深夜";
+				var h12 = h % 12 || 12;
+				return period + " " + h12 + ":" + m;
+			}
+
+			function formatDate(dateStr) {
+				var d = new Date(dateStr);
+				if (isNaN(d.getTime())) return dateStr;
+				return (
+					d.getFullYear() +
+					"年" +
+					String(d.getMonth() + 1).padStart(2, "0") +
+					"月" +
+					String(d.getDate()).padStart(2, "0") +
+					"日"
+				);
+			}
+
+			function isLocked(entry) {
+				return entry.isPrivate && !unlocked;
+			}
+
+			/* 未锁定的带图日记取首图做纸片缩略图 */
+			function paperImage(entry) {
+				if (isLocked(entry)) return null;
+				return entry.images && entry.images.length ? entry.images[0].url : null;
+			}
+
+			/* 基于 slug 的确定性"随机"漂浮参数 */
+			function floatParams(slug, seed) {
+				var h = (hashStr(slug) + seed * 2654435761) >>> 0;
+				var variants = ["card", "bubble", "cloud"];
+				var variant = variants[h % 3];
+				var tone = (h >>> 3) % 5;
+				var w =
+					variant === "cloud"
+						? 250 + ((h >>> 5) % 60)
+						: variant === "bubble"
+							? 185 + ((h >>> 5) % 45)
+							: 210 + ((h >>> 5) % 60);
+				var rotate = -7 + ((h >>> 9) % 140) / 10;
+				return {
+					variant: variant,
+					tone: tone,
+					w: w,
+					rotate: rotate,
+					floatDur: 5 + ((h >>> 13) % 30) / 10,
+					floatDelay: -(((h >>> 17) % 40) / 10),
+					floatAmp: 6 + ((h >>> 21) % 6),
+					h: h,
+				};
+			}
+
+			/* ---------- 随机散布：多次取点，尽量降低互相遮挡 ---------- */
+			function overlapArea(a, b) {
+				var ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+				var iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+				return ix * iy;
+			}
+
+			function scatterPlace(pw, ph, w, h, placed, rnd) {
+				var maxX = Math.max(10, w - pw - 10);
+				var maxY = Math.max(10, h - ph - 10);
+				var best = null;
+				var bestScore = Infinity;
+				for (var t = 0; t < 10; t++) {
+					var cand = {
+						x: 10 + rnd() * (maxX - 10),
+						y: 10 + rnd() * (maxY - 10),
+						w: pw,
+						h: ph,
+					};
+					var score = 0;
+					for (var k = 0; k < placed.length; k++) {
+						score += overlapArea(cand, placed[k]);
 					}
-					if (mood) {
-						html += '<span class="diary-paper-mood" title="' + mood.label + '">' + mood.emoji + "</span>";
+					if (score === 0) {
+						best = cand;
+						break;
 					}
-					html += "</span></div>";
+					if (score < bestScore) {
+						bestScore = score;
+						best = cand;
+					}
+				}
+				placed.push(best);
+				return best;
+			}
+
+			/* ---------- 渲染漂浮板 ---------- */
+			function renderBoard() {
+				if (!entries.length) {
+					board.innerHTML =
+						'<div class="diary-board-tip"><div style="text-align:center"><div style="font-size:2.2rem;margin-bottom:.6rem">📝</div><p>暂无日记</p></div></div>';
+					return;
 				}
 
-				html += "</div></div></div>";
-			});
-
-			board.innerHTML = html;
-
-			// 绑定交互
-			board.querySelectorAll(".diary-paper-pos").forEach(function (el) {
-				var slug = el.dataset.slug;
-				var entry = entries.find(function (e) {
-					return e.slug === slug;
+				var w = board.clientWidth || window.innerWidth;
+				var h = board.clientHeight || window.innerHeight - 60;
+				var sorted = entries.slice().sort(function (a, b) {
+					return new Date(b.date).getTime() - new Date(a.date).getTime();
 				});
-				if (!entry) return;
-				if (isFs) {
-					bindDrag(el, entry);
-				} else {
-					el.addEventListener("click", function () {
-						handleEntryClick(entry);
+
+				var placed = [];
+				var html = "";
+				sorted.forEach(function (entry) {
+					var prm = floatParams(entry.slug, shuffleSeed);
+					var locked = isLocked(entry);
+					var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
+					var img = paperImage(entry);
+
+					// 带图的纸片固定用便签卡片样式（拍立得感），略宽一点
+					var variant = img ? "card" : prm.variant;
+					var pw = img ? 250 + ((prm.h >>> 2) % 50) : prm.w;
+					pw = Math.min(pw, w * 0.66, w - 20);
+					pw = Math.max(pw, 160);
+					var ph = img ? 300 : variant === "bubble" ? 205 : 185;
+
+					var left, top;
+					var sp = savedPos[entry.slug];
+					if (sp) {
+						// 拖动过就停在拖动后的位置
+						left = sp.x;
+						top = sp.y;
+					} else {
+						var rnd = mulberry32((hashStr(entry.slug) + shuffleSeed * 1013904223) >>> 0);
+						var rect = scatterPlace(pw, ph, w, h, placed, rnd);
+						left = rect.x;
+						top = rect.y;
+					}
+					// 限制在板面范围内
+					left = Math.max(8, Math.min(left, w - pw - 8));
+					top = Math.max(8, Math.min(top, h - 140));
+
+					html += '<div class="diary-paper-pos" style="left:' + left.toFixed(1) + "px;top:" + top.toFixed(1) + 'px;width:' + pw.toFixed(0) + 'px" data-slug="' + entry.slug + '">';
+					html +=
+						'<div class="diary-paper-rot" style="transform:rotate(' + prm.rotate.toFixed(1) + 'deg)">';
+					html +=
+						'<div class="diary-paper diary-paper--' +
+						variant +
+						(locked ? " diary-paper--locked" : "") +
+						'" data-tone="' +
+						prm.tone +
+						'" style="--float-dur:' +
+						prm.floatDur.toFixed(1) +
+						"s;--float-delay:" +
+						prm.floatDelay.toFixed(1) +
+						"s;--float-amp:" +
+						prm.floatAmp +
+						'px;width:100%">';
+
+					if (locked) {
+						html += '<div class="text-2xl mb-1">🔒</div>';
+						html += '<div class="diary-paper-title" style="text-align:center">私密日记</div>';
+						html += '<div class="diary-paper-meta" style="justify-content:center"><span>' + formatDate(entry.date) + "</span></div>";
+					} else {
+						if (img) {
+							html += '<div class="diary-paper-thumb"><img src="' + img + '" alt="" loading="lazy" draggable="false"></div>';
+						}
+						html += '<div class="diary-paper-title">' + escapeHtml(entry.title || "无题") + "</div>";
+						html += '<div class="diary-paper-excerpt">' + escapeHtml((entry.content || "").slice(0, 90)) + "</div>";
+						html += '<div class="diary-paper-meta">';
+						html += "<span>" + formatDate(entry.date) + "</span>";
+						html += '<span class="flex items-center gap-1">';
+						if (entry.images && entry.images.length > 1) {
+							html += "<span>🖼" + entry.images.length + "</span>";
+						}
+						if (mood) {
+							html += '<span class="diary-paper-mood" title="' + mood.label + '">' + mood.emoji + "</span>";
+						}
+						html += "</span></div>";
+					}
+
+					html += "</div></div></div>";
+				});
+
+				board.innerHTML = html;
+
+				// 绑定拖拽与点击
+				board.querySelectorAll(".diary-paper-pos").forEach(function (el) {
+					var slug = el.dataset.slug;
+					var entry = entries.find(function (e) {
+						return e.slug === slug;
 					});
-				}
-			});
-		}
-
-		/* ---------- 点击纸片：详情 / 解锁 ---------- */
-		function handleEntryClick(entry) {
-			if (entry.isPrivate && !unlocked) {
-				var pwd = prompt("这是一篇私密日记，请输入密码：");
-				if (pwd === DIARY_PASSWORD) {
-					try {
-						sessionStorage.setItem(UNLOCK_KEY, "1");
-					} catch (e) {}
-					unlocked = true;
-					renderBoard();
-					openModal(entry);
-				} else if (pwd !== null) {
-					alert("密码错误");
-				}
-				return;
-			}
-			openModal(entry);
-		}
-
-		/* ---------- 全屏模式下的拖动 ---------- */
-		function bindDrag(el, entry) {
-			var startX = 0,
-				startY = 0,
-				origX = 0,
-				origY = 0,
-				moved = false,
-				dragging = false;
-
-			el.addEventListener("pointerdown", function (e) {
-				if (e.pointerType === "mouse" && e.button !== 0) return;
-				dragging = true;
-				moved = false;
-				startX = e.clientX;
-				startY = e.clientY;
-				origX = parseFloat(el.style.left);
-				origY = parseFloat(el.style.top);
-				el.classList.add("dragging");
-				try {
-					el.setPointerCapture(e.pointerId);
-				} catch (err) {}
-			});
-
-			el.addEventListener("pointermove", function (e) {
-				if (!dragging) return;
-				var dx = e.clientX - startX;
-				var dy = e.clientY - startY;
-				if (!moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-				moved = true;
-				var w = board.clientWidth;
-				var pw = el.offsetWidth || 200;
-				var ph = el.offsetHeight || 160;
-				var nx = Math.max(8, Math.min(origX + dx, w - pw - 8));
-				var ny = Math.max(8, Math.min(origY + dy, board.clientHeight - ph - 8));
-				el.style.left = nx + "px";
-				el.style.top = ny + "px";
-				savedPos[entry.slug] = { x: nx, y: ny };
-			});
-
-			function endDrag(e) {
-				if (!dragging) return;
-				dragging = false;
-				el.classList.remove("dragging");
-				try {
-					el.releasePointerCapture(e.pointerId);
-				} catch (err) {}
-				// 没怎么动 → 视为点击，打开详情
-				if (!moved) handleEntryClick(entry);
-			}
-			el.addEventListener("pointerup", endDrag);
-			el.addEventListener("pointercancel", endDrag);
-		}
-
-		/* ---------- 普通模式鼠标视差 ---------- */
-		function bindParallax() {
-			board.addEventListener("mousemove", function (e) {
-				if (fullscreen || window.innerWidth < 640) return;
-				var r = board.getBoundingClientRect();
-				var nx = (e.clientX - r.left) / r.width - 0.5;
-				var ny = (e.clientY - r.top) / r.height - 0.5;
-				board.querySelectorAll(".diary-paper-pos").forEach(function (p) {
-					var d = parseFloat(p.dataset.depth || "1");
-					p.style.transform =
-						"translate(" + (nx * 26 * d).toFixed(1) + "px," + (ny * 20 * d).toFixed(1) + "px)";
+					if (!entry) return;
+					bindDrag(el, entry);
 				});
-			});
-			board.addEventListener("mouseleave", function () {
-				board.querySelectorAll(".diary-paper-pos").forEach(function (p) {
-					p.style.transform = "";
-				});
-			});
-		}
+			}
 
-		/* ---------- 全屏模式切换 ---------- */
-		function enterFullscreen() {
-			if (fullscreen) return;
-			fullscreen = true;
-			document.body.style.overflow = "hidden";
-			fsLayer.classList.add("active");
-			board.classList.add("diary-board--fs");
-			fsLayer.appendChild(board);
-			renderBoard();
-		}
-
-		function exitFullscreen() {
-			if (!fullscreen) return;
-			fullscreen = false;
-			// 退出后回到日记板块顶部，避免恢复的滚动位置再次越过触发阈值
-			exitGuardUntil = Date.now() + 500;
-			fsLayer.classList.remove("active");
-			board.classList.remove("diary-board--fs");
-			boardHome.insertBefore(board, boardHome.querySelector(".diary-scroll-hint"));
-			document.body.style.overflow = "";
-			var boardTop = boardHome.getBoundingClientRect().top + window.scrollY;
-			window.scrollTo(0, Math.max(0, boardTop - 120));
-			renderBoard();
-		}
-
-		// 滚动进入：日记板顶边滚过视口顶部即进入全屏
-		window.addEventListener("scroll", function () {
-			if (fullscreen || !entries.length) return;
-			if (Date.now() < exitGuardUntil) return;
-			var rect = board.getBoundingClientRect();
-			if (rect.top < 0) enterFullscreen();
-		});
-
-		// 上滑滚轮退出全屏
-		window.addEventListener(
-			"wheel",
-			function (e) {
-				if (!fullscreen) return;
-				if (e.deltaY < 0) {
-					wheelAcc += -e.deltaY;
-					if (wheelAcc > 300) {
-						wheelAcc = 0;
-						exitFullscreen();
+			/* ---------- 点击纸片：详情 / 解锁 ---------- */
+			function handleEntryClick(entry) {
+				if (isLocked(entry)) {
+					var pwd = prompt("这是一篇私密日记，请输入密码：");
+					if (pwd === DIARY_PASSWORD) {
+						try {
+							sessionStorage.setItem(UNLOCK_KEY, "1");
+						} catch (e) {}
+						unlocked = true;
+						renderBoard();
+						openModal(entry);
+					} else if (pwd !== null) {
+						alert("密码错误");
 					}
-				} else {
-					wheelAcc = 0;
+					return;
 				}
-			},
-			{ passive: true }
-		);
-
-		fsExit.addEventListener("click", exitFullscreen);
-		fsShuffle.addEventListener("click", function () {
-			shuffleSeed = (shuffleSeed + 1) % 997;
-			savedPos = {};
-			renderBoard();
-		});
-
-		/* ---------- 详情弹窗 ---------- */
-		function openModal(entry) {
-			var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
-			var html = "";
-
-			html += '<div class="flex items-start gap-3 mb-2 pr-8">';
-			html += '<h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-snug">' + escapeHtml(entry.title || "无题") + "</h2>";
-			if (mood) {
-				html += '<span class="shrink-0 mt-1" title="' + mood.label + '" style="font-size:1.4rem">' + mood.emoji + "</span>";
+				openModal(entry);
 			}
-			html += "</div>";
 
-			html += '<div class="flex flex-wrap items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500 mb-5">';
-			html += "<span>" + formatDate(entry.date) + " · " + formatChineseTime(entry.date) + "</span>";
-			if (mood) {
-				html += '<span class="rounded-full border border-(--line-divider) px-2 py-0.5">' + mood.label + "</span>";
-			}
-			(entry.tags || []).forEach(function (tag) {
-				html += '<span class="rounded bg-(--btn-regular-bg) px-2 py-0.5 text-(--btn-content)">' + escapeHtml(tag) + "</span>";
-			});
-			html += "</div>";
+			/* ---------- 纸片拖动（全程可拖） ---------- */
+			function bindDrag(el, entry) {
+				var startX = 0,
+					startY = 0,
+					origX = 0,
+					origY = 0,
+					moved = false,
+					dragging = false;
 
-			html += '<div class="diary-detail-content text-neutral-700 dark:text-neutral-300">' + escapeHtml(entry.content || "") + "</div>";
-
-			if (entry.images && entry.images.length) {
-				html += '<div class="mt-6 grid gap-3 ' + (entry.images.length === 1 ? "grid-cols-1" : "grid-cols-2") + '">';
-				entry.images.forEach(function (img) {
-					html += '<img src="' + img.url + '" alt="" class="diary-detail-img" data-src="' + img.url + '" loading="lazy" />';
+				el.addEventListener("pointerdown", function (e) {
+					if (e.pointerType === "mouse" && e.button !== 0) return;
+					dragging = true;
+					moved = false;
+					startX = e.clientX;
+					startY = e.clientY;
+					origX = parseFloat(el.style.left);
+					origY = parseFloat(el.style.top);
+					el.classList.add("dragging");
+					el.style.zIndex = ++zTop; // 摸到谁，谁到最上面
+					try {
+						el.setPointerCapture(e.pointerId);
+					} catch (err) {}
 				});
+
+				el.addEventListener("pointermove", function (e) {
+					if (!dragging) return;
+					var dx = e.clientX - startX;
+					var dy = e.clientY - startY;
+					if (!moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+					moved = true;
+					var w = board.clientWidth;
+					var h = board.clientHeight;
+					var pw = el.offsetWidth || 200;
+					var ph = el.offsetHeight || 160;
+					var nx = Math.max(8, Math.min(origX + dx, w - pw - 8));
+					var ny = Math.max(8, Math.min(origY + dy, h - ph - 8));
+					el.style.left = nx + "px";
+					el.style.top = ny + "px";
+					savedPos[entry.slug] = { x: nx, y: ny };
+				});
+
+				function endDrag(e) {
+					if (!dragging) return;
+					dragging = false;
+					el.classList.remove("dragging");
+					try {
+						el.releasePointerCapture(e.pointerId);
+					} catch (err) {}
+					// 没怎么动 → 视为点击，打开详情
+					if (!moved) handleEntryClick(entry);
+				}
+				el.addEventListener("pointerup", endDrag);
+				el.addEventListener("pointercancel", endDrag);
+			}
+
+			/* ---------- 详情弹窗 ---------- */
+			function openModal(entry) {
+				var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
+				var imgs = entry.images || [];
+				var cover = imgs.length ? imgs[0].url : null;
+				var rest = imgs.length ? imgs.slice(1) : [];
+
+				var metaHtml =
+					'<div class="diary-modal-meta">' +
+					"<span>" + formatDate(entry.date) + " · " + formatChineseTime(entry.date) + "</span>" +
+					(mood ? '<span class="diary-modal-pill">' + mood.emoji + " " + mood.label + "</span>" : "") +
+					(entry.tags || [])
+						.map(function (tag) {
+							return '<span class="diary-modal-tag">' + escapeHtml(tag) + "</span>";
+						})
+						.join("") +
+					"</div>";
+
+				var html = "";
+				if (cover) {
+					// 有图日记：首图做封面横幅，标题与信息压在封面底部
+					html +=
+						'<div class="diary-modal-cover">' +
+						'<img src="' + cover + '" alt="" draggable="false">' +
+						'<div class="diary-modal-cover-fade"></div>' +
+						'<div class="diary-modal-cover-head"><h2>' + escapeHtml(entry.title || "无题") + "</h2>" + metaHtml + "</div>" +
+						"</div>";
+				}
+
+				html += '<div class="diary-modal-scroll">';
+				if (!cover) {
+					html +=
+						'<h2 class="diary-modal-title">' +
+						escapeHtml(entry.title || "无题") +
+						(mood ? ' <span class="diary-modal-mood">' + mood.emoji + "</span>" : "") +
+						"</h2>" +
+						metaHtml;
+				}
+				html += '<div class="diary-detail-content">' + escapeHtml(entry.content || "") + "</div>";
+				if (rest.length) {
+					html += '<div class="diary-modal-imgs' + (rest.length === 1 ? " is-single" : "") + '">';
+					rest.forEach(function (img) {
+						html += '<img src="' + img.url + '" alt="" class="diary-detail-img" data-src="' + img.url + '" loading="lazy" draggable="false">';
+					});
+					html += "</div>";
+				}
 				html += "</div>";
-			}
 
-			modalBody.innerHTML = html;
-			modal.classList.remove("hidden");
-			modal.classList.add("flex");
-			document.body.style.overflow = "hidden";
+				modalBody.innerHTML = html;
+				modal.hidden = false;
 
-			modalBody.querySelectorAll(".diary-detail-img").forEach(function (img) {
-				img.addEventListener("click", function () {
-					lightboxImg.src = img.dataset.src;
-					lightbox.classList.remove("hidden");
-					lightbox.classList.add("flex");
+				modalBody.querySelectorAll(".diary-detail-img").forEach(function (img) {
+					img.addEventListener("click", function () {
+						lightboxImg.src = img.dataset.src;
+						lightbox.hidden = false;
+					});
 				});
+			}
+
+			function closeModal() {
+				modal.hidden = true;
+			}
+
+			function closeLightbox() {
+				lightbox.hidden = true;
+			}
+
+			modalClose.addEventListener("click", closeModal);
+			modalMask.addEventListener("click", closeModal);
+			lightboxClose.addEventListener("click", closeLightbox);
+			lightbox.addEventListener("click", function (e) {
+				if (e.target === lightbox) closeLightbox();
 			});
-		}
+			document.addEventListener("keydown", function (e) {
+				if (e.key !== "Escape") return;
+				if (!lightbox.hidden) closeLightbox();
+				else if (!modal.hidden) closeModal();
+			});
 
-		function closeModal() {
-			modal.classList.add("hidden");
-			modal.classList.remove("flex");
-			if (lightbox.classList.contains("hidden")) {
-				// 全屏模式下保持锁定滚动
-				document.body.style.overflow = fullscreen ? "hidden" : "";
-			}
-		}
-
-		function closeLightbox() {
-			lightbox.classList.add("hidden");
-			lightbox.classList.remove("flex");
-			if (modal.classList.contains("hidden")) {
-				document.body.style.overflow = fullscreen ? "hidden" : "";
-			}
-		}
-
-		modalClose.addEventListener("click", closeModal);
-		modalMask.addEventListener("click", closeModal);
-		lightboxClose.addEventListener("click", closeLightbox);
-		lightbox.addEventListener("click", function (e) {
-			if (e.target === lightbox) closeLightbox();
-		});
-		document.addEventListener("keydown", function (e) {
-			if (e.key !== "Escape") return;
-			if (!lightbox.classList.contains("hidden")) closeLightbox();
-			else if (!modal.classList.contains("hidden")) closeModal();
-			else if (fullscreen) exitFullscreen();
-		});
-
-		shuffleBtn.addEventListener("click", function () {
-			shuffleSeed = (shuffleSeed + 1) % 997;
-			savedPos = {};
-			renderBoard();
-		});
-
-		var resizeTimer = null;
-		window.addEventListener("resize", function () {
-			clearTimeout(resizeTimer);
-			resizeTimer = setTimeout(renderBoard, 200);
-		});
-
-		/* ---------- 加载数据 ---------- */
-		fetch("/diary/index.json")
-			.then(function (r) {
-				return r.json();
-			})
-			.then(function (data) {
-				entries = data;
+			shuffleBtn.addEventListener("click", function () {
+				shuffleSeed = (shuffleSeed + 1) % 997;
+				savedPos = {};
 				renderBoard();
-				bindParallax();
-			})
-			.catch(function (err) {
-				console.error("Failed to load diary:", err);
-				board.innerHTML = '<div class="text-center py-16 text-neutral-400">日记加载失败</div>';
 			});
-	})();
-	</script>
-</MainGridLayout>
+
+			var resizeTimer = null;
+			window.addEventListener("resize", function () {
+				clearTimeout(resizeTimer);
+				resizeTimer = setTimeout(renderBoard, 200);
+			});
+
+			/* ---------- 加载数据 ---------- */
+			fetch("/diary/index.json")
+				.then(function (r) {
+					return r.json();
+				})
+				.then(function (data) {
+					entries = data;
+					renderBoard();
+				})
+				.catch(function (err) {
+					console.error("Failed to load diary:", err);
+					board.innerHTML = '<div class="diary-board-tip">日记加载失败</div>';
+				});
+		})();
+		</script>
+	</body>
+</html>
