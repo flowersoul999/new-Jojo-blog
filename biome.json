@@ -60,6 +60,23 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "**/src/components/react-treasure/**",
+        "**/src/components/react-write/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noArrayIndexKey": "off"
+          },
+          "a11y": {
+            "useKeyWithClickEvents": "off",
+            "noStaticElementInteractions": "off"
+          }
+        }
+      }
     }
   ]
 }
