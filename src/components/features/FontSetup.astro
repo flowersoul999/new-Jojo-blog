@@ -28,25 +28,7 @@ const bodyFontFamily =
 			)
 		: SYSTEM_FONT_STACK;
 
-const bannerTitleFontVar = fontConfig.enable
-	? fontConfig.bannerTitleFont || ""
-	: "";
-const bannerSubtitleFontVar = fontConfig.enable
-	? fontConfig.bannerSubtitleFont || ""
-	: "";
-const navbarTitleFontVar = fontConfig.enable
-	? fontConfig.navbarTitleFont || ""
-	: "";
 ---
-
-<script is:inline>
-	(() => {
-		const storageKey = "firefly-font-mode";
-		const savedMode = localStorage.getItem(storageKey);
-		const mode = savedMode === "original" ? "original" : "wenkai";
-		document.documentElement.dataset.fontMode = mode;
-	})();
-</script>
 
 {Array.from(allCssVars).map((cssVar) => (
 	<Font cssVariable={cssVar as any} preload={selectedFontVars.includes(cssVar)} />
@@ -58,22 +40,11 @@ const navbarTitleFontVar = fontConfig.enable
 		:root {
 			--font-lxgw-wenkai: ${WENKAI_FONT_STACK};
 			--font-blog-original: ${bodyFontFamily};
-			--font-original-banner-title: ${bannerTitleFontVar ? `var(${bannerTitleFontVar}, var(--font-blog-original))` : "var(--font-blog-original)"};
-			--font-original-banner-subtitle: ${bannerSubtitleFontVar ? `var(${bannerSubtitleFontVar}, var(--font-blog-original))` : "var(--font-blog-original)"};
-			--font-original-navbar-title: ${navbarTitleFontVar ? `var(${navbarTitleFontVar}, var(--font-blog-original))` : "var(--font-blog-original)"};
 			--font-active-sans: var(--font-lxgw-wenkai);
 			--font-banner-title: var(--font-lxgw-wenkai);
 			--font-banner-subtitle: var(--font-lxgw-wenkai);
 			--font-navbar-title: var(--font-lxgw-wenkai);
 			--font-sans: var(--font-lxgw-wenkai);
-		}
-
-		:root[data-font-mode="original"] {
-			--font-active-sans: var(--font-blog-original);
-			--font-banner-title: var(--font-original-banner-title);
-			--font-banner-subtitle: var(--font-original-banner-subtitle);
-			--font-navbar-title: var(--font-original-navbar-title);
-			--font-sans: var(--font-blog-original);
 		}
 
 		body,
