@@ -1,6 +1,7 @@
 ---
 import type { NavBarLink } from "@/types/config";
 import { Icon } from "astro-icon/components";
+import NavAccount from "@/components/features/NavAccount.svelte";
 import { siteConfig } from "@/config";
 import { url } from "@/utils/url-utils";
 
@@ -138,6 +139,10 @@ const getLinkIcon = (item: NavBarLink, fallback: string) =>
 				)
 			)}
 		</nav>
+		<!-- 账号：未登录显示 GitHub 登录，已登录显示写文章 / 内容管理 / 退出登录 -->
+		<div class="mobile-account">
+			<NavAccount client:load variant="mobile" />
+		</div>
 		<div class="mobile-footer">
 			<span class="mobile-prompt">jojocode.cn · 开发、写作与记录</span>
 		</div>
