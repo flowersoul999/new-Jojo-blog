@@ -54,7 +54,8 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 				name: "手写的从前",
 				artist: "周杰伦",
 				url: "/music/shou-xie-de-cong-qian.mp3",
-				cover: "https://p1.music.126.net/pyRYVJ5q1gMqOv1pVJ3hRg==/109951164126475323.jpg",
+				cover:
+					"https://p1.music.126.net/pyRYVJ5q1gMqOv1pVJ3hRg==/109951164126475323.jpg",
 			},
 			{
 				name: "圣诞星",

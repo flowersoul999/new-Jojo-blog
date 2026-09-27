@@ -31,7 +31,9 @@ const GITHUB_PATH =
 // 检查认证状态
 async function checkAuth() {
 	try {
-		const res = await fetch("/api/auth/status/", { credentials: "same-origin" });
+		const res = await fetch("/api/auth/status/", {
+			credentials: "same-origin",
+		});
 		const data = await res.json();
 		authenticated = data.authenticated === true;
 		user = data.user ?? null;
@@ -62,7 +64,10 @@ function openManager() {
 // 退出登录
 async function logout() {
 	open = false;
-	await fetch("/api/auth/logout/", { method: "POST", credentials: "same-origin" });
+	await fetch("/api/auth/logout/", {
+		method: "POST",
+		credentials: "same-origin",
+	});
 	location.reload();
 }
 

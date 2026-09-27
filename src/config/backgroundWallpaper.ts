@@ -83,9 +83,7 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 支持单个视频路径（字符串）或多个视频循环（数组）
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
 		// 540p 压缩版（11.9MB），页面加载时后台预加载，点击播放按钮即可秒开
-		playerUrl: [
-			"/assets/videos/bg.mp4",
-		],
+		playerUrl: ["/assets/videos/bg.mp4"],
 	},
 	// 横幅壁纸和全屏壁纸共享配置
 	common: {

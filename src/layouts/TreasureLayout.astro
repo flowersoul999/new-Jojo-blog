@@ -1,9 +1,9 @@
 ---
+import TreasureToaster from "@/components/react-treasure/toaster";
 // 百宝箱布局：并入主站 MainGridLayout，保留导航栏 / 背景 / 页脚，并纳入 Swup 容器
 // 这样点击「百宝箱」与站内其他页面一样走平滑过渡，而不是整页跳转
 // 工具组件为 React 岛，样式依赖旧博客主题令牌（见 styles/treasure-compat.css）
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
-import TreasureToaster from "@/components/react-treasure/toaster";
 
 interface Props {
 	title: string;

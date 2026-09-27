@@ -122,6 +122,13 @@ const postUrlPrefix = url("/posts/");
 </WidgetLayout>
 
 <script is:inline data-swup-ignore-script define:vars={{ monthNames, weekDays, yearText, currentLang, calendarDataUrl, postUrlPrefix, heatmapWeekTemplate }}>
+  // 日历挂在 swup 容器之外的静态右侧栏，导航后 DOM 不会被替换，
+  // 把自己标记为忽略可省掉每次导航重复解析脚本并重建日历 DOM 的开销。
+  // （Astro 的 define:vars 会丢弃写在 script 标签上的属性，只能在运行时补上。）
+  if (document.currentScript) {
+    document.currentScript.setAttribute("data-swup-ignore-script", "");
+  }
+
   // State variables
   let displayYear = new Date().getFullYear();
   let displayMonth = new Date().getMonth();

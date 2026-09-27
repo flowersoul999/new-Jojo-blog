@@ -58,6 +58,12 @@ const managerConfigStr = JSON.stringify({
 
 <script is:inline data-swup-ignore-script define:vars={{ managerConfigStr }}>
 (function () {
+    // 全局单例，位于 swup 容器之外的静态区域；define:vars 会丢掉标签上的
+    // data-swup-ignore-script，这里运行时补上，避免每次导航重复解析约 20KB 脚本。
+    if (document.currentScript) {
+        document.currentScript.setAttribute("data-swup-ignore-script", "");
+    }
+
     // Singleton guard – only create once
     if (window.__fireflyMusic) return;
 

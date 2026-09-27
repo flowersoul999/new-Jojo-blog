@@ -1,6 +1,6 @@
-import type { AstroCookies } from "astro";
 import fs from "node:fs";
 import path from "node:path";
+import type { AstroCookies } from "astro";
 
 // GitHub 仓库配置
 export const GITHUB_REPO = {
@@ -129,7 +129,14 @@ export function listLocalDir(relPath: string): Array<{
  */
 export function readLocalFile(relPath: string):
 	| { path: string; content: string; sha: string; name: string }
-	| { path: string; content: null; sha: string; name: string; encoding: string; base64Content: string } {
+	| {
+			path: string;
+			content: null;
+			sha: string;
+			name: string;
+			encoding: string;
+			base64Content: string;
+	  } {
 	const target = resolveLocalPath(relPath);
 	if (!fs.existsSync(target)) throw new Error(`文件不存在：${relPath}`);
 	const stat = fs.statSync(target);
@@ -139,7 +146,12 @@ export function readLocalFile(relPath: string):
 	// 尝试用 UTF-8 解码，失败则视为二进制
 	try {
 		const content = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
-		return { path: relPath, content, sha: "local", name: path.basename(target) };
+		return {
+			path: relPath,
+			content,
+			sha: "local",
+			name: path.basename(target),
+		};
 	} catch {
 		return {
 			path: relPath,
@@ -159,7 +171,10 @@ export function writeLocalFile(relPath: string, content: string) {
 	const target = resolveLocalPath(relPath);
 	fs.mkdirSync(path.dirname(target), { recursive: true });
 	fs.writeFileSync(target, content, "utf8");
-	return { ok: true, commit: { sha: "local", message: `Update ${path.basename(target)}` } };
+	return {
+		ok: true,
+		commit: { sha: "local", message: `Update ${path.basename(target)}` },
+	};
 }
 
 /**
@@ -169,7 +184,10 @@ export function writeLocalFileBinary(relPath: string, base64Content: string) {
 	const target = resolveLocalPath(relPath);
 	fs.mkdirSync(path.dirname(target), { recursive: true });
 	fs.writeFileSync(target, Buffer.from(base64Content, "base64"));
-	return { ok: true, commit: { sha: "local", message: `Update ${path.basename(target)}` } };
+	return {
+		ok: true,
+		commit: { sha: "local", message: `Update ${path.basename(target)}` },
+	};
 }
 
 /**

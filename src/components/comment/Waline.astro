@@ -25,7 +25,10 @@ const config = {
 	)
 		? { pageview: true }
 		: {}),
-	...(import.meta.env.DEV || ["localhost", "127.0.0.1", "::1", "0.0.0.0"].includes(Astro.url.hostname.toLowerCase())
+	...(import.meta.env.DEV ||
+	["localhost", "127.0.0.1", "::1", "0.0.0.0"].includes(
+		Astro.url.hostname.toLowerCase(),
+	)
 		? { pageview: false }
 		: {}),
 };

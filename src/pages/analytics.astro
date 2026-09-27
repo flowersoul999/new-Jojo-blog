@@ -1,7 +1,7 @@
 ---
 import { Icon } from "astro-icon/components";
-import { analyticsConfig, commentConfig } from "@/config";
 import AnalyticsSnapshot from "@/components/widget/AnalyticsSnapshot.astro";
+import { analyticsConfig, commentConfig } from "@/config";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
 
 const umamiAnalytics = analyticsConfig.umamiAnalytics;
@@ -9,9 +9,16 @@ const shareId = umamiAnalytics?.shareId ?? "";
 const shareApiBase = umamiAnalytics?.shareApiBase ?? "";
 const historicalVisitors = umamiAnalytics?.historicalStats?.visitors ?? 0;
 const historicalPageviews = umamiAnalytics?.historicalStats?.pageviews ?? 0;
-const hasPublicStats = Boolean(umamiAnalytics?.websiteId && shareId && shareApiBase);
-const sourceLabel = shareApiBase.includes("cloud.umami.is") ? "Umami Cloud" : "Umami";
-const walineServerUrl = commentConfig.type === "waline" ? commentConfig.waline?.serverURL ?? "" : "";
+const hasPublicStats = Boolean(
+	umamiAnalytics?.websiteId && shareId && shareApiBase,
+);
+const sourceLabel = shareApiBase.includes("cloud.umami.is")
+	? "Umami Cloud"
+	: "Umami";
+const walineServerUrl =
+	commentConfig.type === "waline"
+		? (commentConfig.waline?.serverURL ?? "")
+		: "";
 ---
 
 <MainGridLayout title="站点统计" description="基于 Umami 的公开站点访问统计">

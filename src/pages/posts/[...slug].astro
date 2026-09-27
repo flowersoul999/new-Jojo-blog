@@ -26,10 +26,10 @@ import RecommendedPost from "@/components/misc/RecommendedPost.astro";
 import SharePoster from "@/components/misc/SharePoster.svelte";
 import { getEnabledFriends } from "@/config";
 import { coverImageConfig } from "@/config/coverImageConfig";
-import friendsFeedSnapshot from "@/data/friends-feed-snapshot.json";
 import { licenseConfig } from "@/config/licenseConfig";
 import { profileConfig } from "@/config/profileConfig";
 import { siteConfig } from "@/config/siteConfig";
+import friendsFeedSnapshot from "@/data/friends-feed-snapshot.json";
 import { formatDateToYYYYMMDD } from "@/utils/date-utils";
 import { getApiUrlList, processCoverImageSync } from "@/utils/image-utils";
 import { url } from "@/utils/url-utils";
@@ -66,13 +66,14 @@ const preservePostCoverRatio = [
 	"others/youth-most-expensive/youth-most-expensive",
 	"in-grandmas-white-hair-i-saw-time",
 ].includes(entry.id);
-const forcePostTitleBreak = entry.id === "others/youth-most-expensive/youth-most-expensive";
+const forcePostTitleBreak =
+	entry.id === "others/youth-most-expensive/youth-most-expensive";
 const postMarkdownClass = [
-  preservePostCoverRatio ? "story-post-layout" : "",
-  entry.id === "monthly-2026-08" ? "monthly-post-layout" : "",
+	preservePostCoverRatio ? "story-post-layout" : "",
+	entry.id === "monthly-2026-08" ? "monthly-post-layout" : "",
 ]
-  .filter(Boolean)
-  .join(" ");
+	.filter(Boolean)
+	.join(" ");
 const apiUrls = getApiUrlList(entry.data.image, entry.id);
 
 let posterCoverUrl = processedImage;
@@ -168,10 +169,15 @@ if (entry.id === "monthly-2026-08") {
 	const friends = getEnabledFriends();
 	const ownSiteUrl = normalizeFriendUrl(siteConfig.site_url);
 	const friendsByUrl = new Map(
-		friends.map((friend) => [normalizeFriendUrl(friend.siteurl), friend] as const),
+		friends.map(
+			(friend) => [normalizeFriendUrl(friend.siteurl), friend] as const,
+		),
 	);
 	const stripFeedMarkup = (value: string) =>
-		value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+		value
+			.replace(/<[^>]*>/g, " ")
+			.replace(/\s+/g, " ")
+			.trim();
 
 	monthlyMomentItems = friendsFeedSnapshot.sources
 		.flatMap((source) => {

@@ -15,16 +15,19 @@ const blogChangelogMilestoneVersions = [
 	blogChangelogEntries[0].version,
 ];
 
-const blogChangelogMilestones = blogChangelogMilestoneVersions.map((version) => {
-	const entry = blogChangelogEntries.find((item) => item.version === version) ?? blogChangelogEntries[0];
-	return {
-		version: entry.version,
-		label: entry.kind,
-		date: entry.date.replaceAll("-", "."),
-		current: version === blogChangelogEntries[0].version,
-	};
-});
-
+const blogChangelogMilestones = blogChangelogMilestoneVersions.map(
+	(version) => {
+		const entry =
+			blogChangelogEntries.find((item) => item.version === version) ??
+			blogChangelogEntries[0];
+		return {
+			version: entry.version,
+			label: entry.kind,
+			date: entry.date.replaceAll("-", "."),
+			current: version === blogChangelogEntries[0].version,
+		};
+	},
+);
 ---
 
 <MainGridLayout title="博客更新日志" description="jojo 博客从旧站迁移到新主题以来的更新记录">

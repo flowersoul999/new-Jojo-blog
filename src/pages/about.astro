@@ -1,7 +1,7 @@
 ---
 import { getEntry, render } from "astro:content";
-import { Icon } from "astro-icon/components";
 import Markdown from "@components/common/Markdown.astro";
+import { Icon } from "astro-icon/components";
 import ImageWrapper from "@/components/common/ImageWrapper.astro";
 import { getEnabledFriends, profileConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
@@ -20,7 +20,8 @@ const friendCount = getEnabledFriends().length;
 const changelogEntries = [
 	{
 		title: "博客视觉与友链体验",
-		description: "把友链、朋友圈、开屏动画和评论区的视觉连接重新梳理成一套更完整的体验。",
+		description:
+			"把友链、朋友圈、开屏动画和评论区的视觉连接重新梳理成一套更完整的体验。",
 		href: "/blog-changelog/",
 		tags: ["jojo V1.1.0", "UI"],
 		tone: "blue",
@@ -28,7 +29,8 @@ const changelogEntries = [
 	},
 	{
 		title: "站点版本整理",
-		description: "统一关于我、导航和站点信息中的博客版本展示，让每个入口都说同一种语言。",
+		description:
+			"统一关于我、导航和站点信息中的博客版本展示，让每个入口都说同一种语言。",
 		href: "/blog-changelog/",
 		tags: ["jojo V1.1.0", "维护"],
 		tone: "mint",
@@ -55,21 +57,24 @@ const changelogEntries = [
 const personalProjects = [
 	{
 		title: "jojo 的博客",
-		description: "基于 Astro 的个人小站，文章、音乐、相册、友链和评论都在这里。",
+		description:
+			"基于 Astro 的个人小站，文章、音乐、相册、友链和评论都在这里。",
 		tags: ["Astro", "写作", "持续更新"],
 		tone: "blue",
 		icon: "material-symbols:auto-awesome-rounded",
 	},
 	{
 		title: "在线写作台",
-		description: "登录后直接在网页上写文章，内容通过 GitHub API 提交到仓库，纯静态无后端。",
+		description:
+			"登录后直接在网页上写文章，内容通过 GitHub API 提交到仓库，纯静态无后端。",
 		tags: ["在线编辑", "GitHub", "无后端"],
 		tone: "mint",
 		icon: "material-symbols:edit-note-rounded",
 	},
 	{
 		title: "百宝箱",
-		description: "一堆有趣的小工具集合：热榜、天气、抽签、番茄钟等等，还在不断增加。",
+		description:
+			"一堆有趣的小工具集合：热榜、天气、抽签、番茄钟等等，还在不断增加。",
 		tags: ["工具箱", "React", "趣味"],
 		tone: "gold",
 		icon: "material-symbols:extension-rounded",
@@ -109,7 +114,14 @@ const recentActivity = [
 ];
 
 const interests = ["前端开发", "Astro", "React", "开源", "音乐", "折腾小工具"];
-const stack = ["Astro", "Svelte", "React", "TypeScript", "Tailwind CSS", "Node.js"];
+const stack = [
+	"Astro",
+	"Svelte",
+	"React",
+	"TypeScript",
+	"Tailwind CSS",
+	"Node.js",
+];
 ---
 
 <MainGridLayout title={i18n(I18nKey.about)} description={i18n(I18nKey.about)}>

@@ -7,7 +7,11 @@ interface LinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
 	children: ReactNode;
 }
 
-export default function Link({ href, children, ...rest }: LinkProps): ReactElement {
+export default function Link({
+	href,
+	children,
+	...rest
+}: LinkProps): ReactElement {
 	return (
 		<a href={href} {...rest}>
 			{children}
