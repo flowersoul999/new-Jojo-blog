@@ -9,11 +9,9 @@ const blogChangelogNoteCount = blogChangelogEntries.reduce(
 );
 
 const blogChangelogMilestoneVersions = [
+	"V0.1.0",
+	"V0.9.0",
 	"V1.0.0",
-	"V1.5.0",
-	"V2.0.0",
-	"V2.3.0",
-	"V3.0.0",
 	blogChangelogEntries[0].version,
 ];
 
@@ -29,7 +27,7 @@ const blogChangelogMilestones = blogChangelogMilestoneVersions.map((version) => 
 
 ---
 
-<MainGridLayout title="博客更新日志" description="朝朝听雨博客建站以来的每日更新记录">
+<MainGridLayout title="博客更新日志" description="jojo 博客从旧站迁移到新主题以来的更新记录">
 	<section class="blog-changelog-page" aria-labelledby="blog-changelog-title">
 		<header class="blog-changelog-hero card-base">
 			<div class="blog-changelog-hero__topline">
@@ -38,7 +36,7 @@ const blogChangelogMilestones = blogChangelogMilestoneVersions.map((version) => 
 			<div class="blog-changelog-hero__main">
 				<div class="blog-changelog-hero__copy">
 					<h1 id="blog-changelog-title">博客更新日志</h1>
-					<p class="blog-changelog-hero__lead">这里记录朝朝听雨从上线、写作到页面迭代的每一个重要节点。每一天都按真实建设过程整理，展开即可查看完整变更说明。</p>
+					<p class="blog-changelog-hero__lead">这里记录 jojo 博客从旧站迁移、内容搬迁到页面迭代的每一个重要节点。每天按真实建设过程整理，展开即可查看完整变更说明。</p>
 					<p class="blog-changelog-hero__rule">版本规则：Major 代表结构级升级 · Minor 代表新功能 · Patch 代表修复、内容与维护</p>
 				</div>
 			</div>
@@ -48,7 +46,7 @@ const blogChangelogMilestones = blogChangelogMilestoneVersions.map((version) => 
 			<span><Icon is:inline name="material-symbols:workspace-premium-rounded" aria-hidden="true" /><strong>{blogChangelogEntries[0].version}</strong><small>当前版本</small></span>
 			<span><Icon is:inline name="material-symbols:calendar-month-rounded" aria-hidden="true" /><strong>{blogChangelogEntries.length}</strong><small>个更新日</small></span>
 			<span><Icon is:inline name="material-symbols:description-rounded" aria-hidden="true" /><strong>{blogChangelogNoteCount}</strong><small>条详细记录</small></span>
-			<span><Icon is:inline name="material-symbols:date-range-rounded" aria-hidden="true" /><strong>2026.07—09</strong><small>时间跨度</small></span>
+			<span><Icon is:inline name="material-symbols:date-range-rounded" aria-hidden="true" /><strong>2026.09</strong><small>时间跨度</small></span>
 		</section>
 
 		<nav class="blog-changelog-nav card-base" aria-label="日志页面导航">
