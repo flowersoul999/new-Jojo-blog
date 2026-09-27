@@ -19,6 +19,25 @@
     inset: 0;
     z-index: 1300;
     display: none;
+    overflow: hidden;
+    /* 淡黄色布料：底色 + 经纬织纹 + 布面起伏明暗 */
+    background-color: #f6e8c1;
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        rgba(150, 118, 52, 0.06) 0 1px,
+        rgba(150, 118, 52, 0) 1px 4px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(150, 118, 52, 0.06) 0 1px,
+        rgba(150, 118, 52, 0) 1px 4px
+      ),
+      radial-gradient(120% 90% at 18% 12%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%),
+      radial-gradient(130% 110% at 88% 92%, rgba(168, 132, 54, 0.28), rgba(168, 132, 54, 0) 62%),
+      linear-gradient(160deg, #fdf5da 0%, #f7e9c2 48%, #eedcac 100%);
+    background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
+    background-size: 4px 4px, 4px 4px, 100% 100%, 100% 100%, 100% 100%;
   }
 
   .ps-overlay.ps-open {
@@ -29,6 +48,9 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
+    /* 细颗粒噪点，让布料更有真实质感 */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+    background-repeat: repeat;
   }
 
   /* 画布模式：进入相册后隐藏左右侧边栏、分类栏与底部组件，让照片墙独占整个画布 */
@@ -41,9 +63,14 @@
     display: none !important;
   }
 
+  /* 导航栏浮在布料之上，保留站内导航能力 */
+  body.ps-canvas-open #top-row {
+    z-index: 1400 !important;
+  }
+
   .ps-hint {
     position: absolute;
-    top: 18px;
+    top: calc(var(--ps-nav-bottom, 10px) + 14px);
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -53,26 +80,20 @@
     border-radius: 999px;
     font-size: 0.8rem;
     letter-spacing: 0.04em;
-    color: rgba(0, 0, 0, 0.62);
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: rgba(92, 68, 24, 0.88);
+    background: rgba(255, 253, 244, 0.82);
+    border: 1px solid rgba(150, 118, 52, 0.22);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 6px 20px rgba(120, 92, 34, 0.16);
     pointer-events: none;
     white-space: nowrap;
     animation: ps-fade 0.5s ease 0.2s both;
   }
 
-  :root[data-theme="dark"] .ps-hint {
-    color: rgba(255, 255, 255, 0.9);
-    background: rgba(30, 30, 36, 0.6);
-    border-color: rgba(255, 255, 255, 0.14);
-  }
-
   .ps-back {
     position: absolute;
-    top: 14px;
+    top: calc(var(--ps-nav-bottom, 10px) + 10px);
     right: 20px;
     height: 42px;
     padding: 0 16px;
@@ -81,10 +102,10 @@
     gap: 6px;
     border-radius: 999px;
     font-size: 0.85rem;
-    color: rgba(0, 0, 0, 0.72);
-    background: rgba(255, 255, 255, 0.75);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+    color: rgba(92, 68, 24, 0.9);
+    background: rgba(255, 253, 244, 0.85);
+    border: 1px solid rgba(150, 118, 52, 0.22);
+    box-shadow: 0 6px 20px rgba(120, 92, 34, 0.16);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     cursor: pointer;
@@ -92,12 +113,6 @@
       background 0.2s ease,
       transform 0.2s ease;
     animation: ps-fade 0.5s ease 0.25s both;
-  }
-
-  :root[data-theme="dark"] .ps-back {
-    color: rgba(255, 255, 255, 0.92);
-    background: rgba(30, 30, 36, 0.6);
-    border-color: rgba(255, 255, 255, 0.14);
   }
 
   .ps-back:hover {
@@ -362,16 +377,20 @@
       vh: number;
     };
 
-    /** 画布范围：铺满整个视口，但顶部避开导航栏、四周留少量边距 */
+    /** 导航栏底部位置（画布顶部与工具条需要避开它） */
+    function navBottom(): number {
+      const nav = document.getElementById("top-row");
+      return nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
+    }
+
+    /** 画布范围：铺满整个视口，但顶部避开导航栏与提示条、四周留少量边距 */
     function canvasRect(): CanvasRect {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const pad = vw < 768 ? 10 : 20;
-      const nav = document.getElementById("top-row");
-      const navBottom = nav ? nav.getBoundingClientRect().bottom : 0;
       return {
         left: pad,
-        top: Math.min(vh / 2, Math.max(pad, navBottom + pad)),
+        top: Math.min(vh / 2, navBottom() + 62),
         right: vw - pad,
         bottom: vh - pad,
         vw,
@@ -410,6 +429,12 @@
           : Math.min(Math.max(cy, minCy), maxCy);
       card.x = nextCx - rect.vw / 2;
       card.y = nextCy - rect.vh / 2;
+    }
+
+    /** 让提示条 / 返回按钮贴在导航栏下方 */
+    function syncToolbarOffset() {
+      if (!overlay) return;
+      overlay.style.setProperty("--ps-nav-bottom", `${Math.round(navBottom())}px`);
     }
 
     /** 基于图片地址生成稳定的黄金角螺旋落点，铺满整个画布 + 随机感旋转 */
@@ -554,6 +579,7 @@
       if (photos.length === 0) return;
 
       const rect = canvasRect();
+      syncToolbarOffset();
       const baseW = rect.vw < 640 ? 148 : rect.vw < 1024 ? 180 : 210;
       zTop = 20 + photos.length;
       cards = [];
@@ -711,6 +737,7 @@
     // 视口变化时把照片重新拉回画布内
     window.addEventListener("resize", () => {
       if (!overlay?.classList.contains("ps-open") || zoomed) return;
+      syncToolbarOffset();
       for (const card of cards) {
         clampCard(card);
         applyTransform(card);
