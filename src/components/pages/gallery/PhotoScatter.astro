@@ -1,23 +1,19 @@
 ---
 /**
- * 全屏散落照片墙（拍立得模式）
+ * 全屏散落照片墙（拍立得模式，相册页本体）
  *
- * 交互（对齐 Jojo-blog 的 pictures 页）：
- * - 点击相册网格中的任意照片进入全屏：照片以拍立得白框随机散落在屏幕上
+ * 进入相册页即直接展开，无需点击任何东西：
+ * - 照片以拍立得白框随机散落在页面上（站点自身背景，无黑色遮罩）
  * - 每张照片可自由拖动，拖动后的位置按 相册+图片 维度持久化到 localStorage
- * - 单击照片放大到屏幕中央，旁边出现彩色便签，显示标签 / 日期 / 描述
- * - 再次单击照片或按 ESC 还原；再按 ESC 或点击背景 / 关闭按钮退出全屏
+ * - 单击照片放大居中，旁边出现彩色便签，显示标签 / 日期 / 描述
+ * - 再次单击照片或 ESC 还原；再按 ESC 或点击右上角返回按钮回到相册列表
  *
- * 数据全部来自网格 DOM（[data-scatter-album] 容器内的 [data-scatter-photo]），
- * 因此对加密相册解密后渲染、swup 无刷新切页同样生效。
+ * 页面数据：相册页在模板中埋 <script type="application/json" data-scatter-data>，
+ * 加密相册解密后通过 password:decrypted 事件启动。
  */
 ---
 
 <style is:global>
-  body.ps-lock {
-    overflow: hidden;
-  }
-
   .ps-overlay {
     position: fixed;
     inset: 0;
@@ -27,15 +23,6 @@
 
   .ps-overlay.ps-open {
     display: block;
-  }
-
-  .ps-scrim {
-    position: absolute;
-    inset: 0;
-    background: rgba(12, 12, 18, 0.72);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    animation: ps-fade 0.35s ease both;
   }
 
   .ps-stage {
@@ -56,31 +43,40 @@
     border-radius: 999px;
     font-size: 0.8rem;
     letter-spacing: 0.04em;
-    color: rgba(255, 255, 255, 0.92);
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    color: rgba(0, 0, 0, 0.62);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
     pointer-events: none;
     white-space: nowrap;
     animation: ps-fade 0.5s ease 0.2s both;
   }
 
-  .ps-close {
+  :root[data-theme="dark"] .ps-hint {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(30, 30, 36, 0.6);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .ps-back {
     position: absolute;
-    top: 16px;
+    top: 14px;
     right: 20px;
-    width: 42px;
     height: 42px;
+    padding: 0 16px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 6px;
     border-radius: 999px;
-    font-size: 22px;
-    line-height: 1;
-    color: #fff;
-    background: rgba(255, 255, 255, 0.14);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.72);
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     cursor: pointer;
     transition:
       background 0.2s ease,
@@ -88,9 +84,14 @@
     animation: ps-fade 0.5s ease 0.25s both;
   }
 
-  .ps-close:hover {
-    background: rgba(255, 255, 255, 0.28);
-    transform: scale(1.06);
+  :root[data-theme="dark"] .ps-back {
+    color: rgba(255, 255, 255, 0.92);
+    background: rgba(30, 30, 36, 0.6);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .ps-back:hover {
+    transform: scale(1.05);
   }
 
   .ps-card {
@@ -130,15 +131,15 @@
     padding: 8px 8px 0;
     background: #fff;
     box-shadow:
-      0 14px 42px rgba(0, 0, 0, 0.42),
-      0 2px 10px rgba(0, 0, 0, 0.25);
+      0 14px 42px rgba(0, 0, 0, 0.26),
+      0 2px 10px rgba(0, 0, 0, 0.14);
     animation: ps-pop 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) both;
   }
 
   .ps-card:not(.is-zoomed):hover .ps-frame {
     box-shadow:
-      0 18px 52px rgba(0, 0, 0, 0.5),
-      0 2px 10px rgba(0, 0, 0, 0.25);
+      0 18px 52px rgba(0, 0, 0, 0.32),
+      0 2px 10px rgba(0, 0, 0, 0.16);
   }
 
   .ps-frame img {
@@ -163,7 +164,7 @@
     min-height: 120px;
     padding: 16px 18px;
     color: #3a3530;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
     display: none;
   }
 
@@ -263,6 +264,15 @@
       tags: string[];
     };
 
+    type ScatterPayload = {
+      album: string;
+      name?: string;
+      backHref?: string;
+      date?: string;
+      tags?: string[];
+      photos: PhotoMeta[];
+    };
+
     type Card = {
       el: HTMLElement;
       img: HTMLImageElement;
@@ -289,6 +299,7 @@
     let overlay: HTMLElement | null = null;
     let stage: HTMLElement | null = null;
     let noteEl: HTMLElement | null = null;
+    let payload: ScatterPayload | null = null;
     let zoomed: Card | null = null;
     let zTop = 20;
     let drag: DragState | null = null;
@@ -299,20 +310,27 @@
       overlay.className = "ps-overlay";
       overlay.setAttribute("aria-hidden", "true");
       overlay.innerHTML = `
-        <div class="ps-scrim" data-ps-close></div>
         <div class="ps-stage"></div>
-        <div class="ps-hint">拖动照片重新摆放 · 单击查看标签与描述 · ESC 退出</div>
-        <button type="button" class="ps-close" data-ps-close aria-label="退出散落相册">✕</button>
+        <div class="ps-hint">拖动照片重新摆放 · 单击查看标签与描述 · ESC 返回相册</div>
+        <button type="button" class="ps-back" aria-label="返回相册列表">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+          返回相册
+        </button>
         <div class="ps-note"></div>
       `;
       document.body.appendChild(overlay);
       stage = overlay.querySelector(".ps-stage");
       noteEl = overlay.querySelector(".ps-note");
 
-      overlay.addEventListener("click", (e) => {
-        const target = e.target as HTMLElement;
-        if (target.closest("[data-ps-close]")) closeScatter();
-      });
+      overlay.querySelector(".ps-back")?.addEventListener("click", goBack);
+    }
+
+    function goBack() {
+      if (payload?.backHref) {
+        window.location.href = payload.backHref;
+      } else {
+        window.history.back();
+      }
     }
 
     function hashStr(s: string): number {
@@ -327,7 +345,7 @@
     /** 基于图片地址生成稳定的黄金角螺旋落点 + 随机感旋转 */
     function stablePosition(uniqueId: string, vw: number, vh: number, baseW: number) {
       const seed = hashStr(uniqueId) % 10000;
-      const maxRadius = Math.max(60, Math.min(vw, vh) / 2 - baseW * 0.95);
+      const maxRadius = Math.max(60, Math.min(vw, vh) / 2 - baseW * 1.05);
       const goldenAngle = Math.PI * (3 - Math.sqrt(5));
       const t = (seed % 1000) / 1000;
       const radius = Math.pow(t, 0.78) * maxRadius;
@@ -374,13 +392,8 @@
       card.el.style.zIndex = String(zTop);
     }
 
-    function parseTags(raw?: string): string[] {
-      try {
-        const v = JSON.parse(raw || "[]");
-        return Array.isArray(v) ? v.map(String) : [];
-      } catch {
-        return [];
-      }
+    function albumTags(): string[] {
+      return Array.isArray(payload?.tags) ? payload!.tags.map(String) : [];
     }
 
     function unzoom() {
@@ -393,7 +406,8 @@
       noteEl?.classList.remove("is-visible");
     }
 
-    function zoom(card: Card, albumEl: HTMLElement) {
+    function zoom(card: Card) {
+      if (!payload) return;
       if (zoomed === card) {
         unzoom();
         return;
@@ -405,7 +419,7 @@
       const naturalW = card.img.naturalWidth || 4;
       const naturalH = card.img.naturalHeight || 3;
       const isMobile = window.innerWidth < 768;
-      const maxW = window.innerWidth - (isMobile ? 36 : 100);
+      const maxW = window.innerWidth - (isMobile ? 36 : 120);
       const maxH = window.innerHeight - (isMobile ? 260 : 140);
       const scale = Math.min(maxW / naturalW, maxH / naturalH, 1.25);
       card.el.style.setProperty("--w", `${Math.round(naturalW * scale)}px`);
@@ -413,9 +427,8 @@
       card.el.classList.add("is-zoomed");
 
       if (!noteEl) return;
-      const tags =
-        card.meta.tags.length > 0 ? card.meta.tags : parseTags(albumEl.dataset.albumTags);
-      const date = card.meta.date || albumEl.dataset.albumDate || "";
+      const tags = card.meta.tags.length > 0 ? card.meta.tags : albumTags();
+      const date = card.meta.date || payload.date || "";
       const desc = card.meta.description;
 
       noteEl.style.backgroundColor = card.noteColor;
@@ -441,7 +454,6 @@
       if (!date && tags.length === 0 && !desc) {
         noteEl.classList.remove("is-visible");
       } else {
-        // 重新触发便签入场动画
         noteEl.classList.remove("is-visible");
         void noteEl.offsetWidth;
         noteEl.classList.add("is-visible");
@@ -454,36 +466,25 @@
       drag = null;
       overlay.classList.remove("ps-open");
       overlay.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("ps-lock");
       if (stage) stage.innerHTML = "";
       noteEl?.classList.remove("is-visible");
     }
 
-    function openScatter(albumEl: HTMLElement) {
+    function renderScatter(data: ScatterPayload) {
       ensureOverlay();
       if (!overlay || !stage) return;
       closeScatter();
 
-      const albumId = albumEl.dataset.scatterAlbum || "default";
-      const photoEls = Array.from(
-        albumEl.querySelectorAll<HTMLElement>("[data-scatter-photo]")
-      );
-      if (photoEls.length === 0) return;
+      payload = data;
+      const photos = data.photos || [];
+      if (photos.length === 0) return;
 
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const baseW = vw < 640 ? 148 : vw < 1024 ? 180 : 210;
-      zTop = 20 + photoEls.length;
+      zTop = 20 + photos.length;
 
-      photoEls.forEach((photoEl, index) => {
-        const src = photoEl.dataset.src || "";
-        const meta: PhotoMeta = {
-          src,
-          description: photoEl.dataset.description || "",
-          date: photoEl.dataset.date || "",
-          tags: parseTags(photoEl.dataset.tags),
-        };
-
+      photos.forEach((meta, index) => {
         const el = document.createElement("div");
         el.className = "ps-card";
         el.style.setProperty("--w", `${baseW}px`);
@@ -494,7 +495,7 @@
         frame.style.animationDelay = `${Math.min(index * 70, 700)}ms`;
 
         const img = document.createElement("img");
-        img.src = src;
+        img.src = meta.src;
         img.alt = meta.description || `照片 ${index + 1}`;
         img.draggable = false;
 
@@ -505,8 +506,8 @@
         el.appendChild(frame);
         stage!.appendChild(el);
 
-        const pos = stablePosition(src, vw, vh, baseW);
-        const offset = loadOffset(albumId, src);
+        const pos = stablePosition(meta.src, vw, vh, baseW);
+        const offset = loadOffset(data.album, meta.src);
         const card: Card = {
           el,
           img,
@@ -535,7 +536,6 @@
         let zoomClickStart = 0;
         el.addEventListener("pointerdown", (e) => {
           if (e.pointerType === "mouse" && e.button !== 0) return;
-          // 放大状态下不拖拽，仅记录一次点击（抬手时还原 / 切换到被点的照片）
           if (zoomed) {
             zoomClickStart = e.timeStamp;
             return;
@@ -570,7 +570,13 @@
           applyTransform(card);
         });
 
-        const finish = (e: PointerEvent) => {
+        el.addEventListener("pointerup", (e) => {
+          // 放大态下点当前照片还原，点别的照片切换放大
+          if (zoomed && zoomClickStart) {
+            zoom(card);
+            zoomClickStart = 0;
+            return;
+          }
           if (!drag || drag.card !== card || drag.pointerId !== e.pointerId) return;
           el.classList.remove("is-dragging");
           try {
@@ -581,17 +587,9 @@
           const state = drag;
           drag = null;
           if (state.moved) {
-            saveOffset(albumId, src, card.x, card.y);
+            saveOffset(data.album, meta.src, card.x, card.y);
           } else if (e.timeStamp - state.downAt < 300) {
-            zoom(card, albumEl);
-          }
-        };
-        el.addEventListener("pointerup", finish);
-        el.addEventListener("pointerup", () => {
-          // 放大态下点当前照片还原，点别的照片切换放大
-          if (zoomed && zoomClickStart) {
-            zoom(card, albumEl);
-            zoomClickStart = 0;
+            zoom(card);
           }
         });
         el.addEventListener("pointercancel", () => {
@@ -602,39 +600,39 @@
 
       overlay.classList.add("ps-open");
       overlay.setAttribute("aria-hidden", "false");
-      document.body.classList.add("ps-lock");
     }
 
-    // 网格照片点击 / 键盘 Enter：进入散落模式（事件委托，兼容 swup 与加密解密）
-    document.addEventListener("click", (e) => {
-      const target = e.target as HTMLElement;
-      const photoEl = target.closest<HTMLElement>("[data-scatter-photo]");
-      if (!photoEl) return;
-      const albumEl = photoEl.closest<HTMLElement>("[data-scatter-album]");
-      if (!albumEl) return;
-      e.preventDefault();
-      openScatter(albumEl);
-    });
+    function readPayload(): ScatterPayload | null {
+      const el = document.querySelector<HTMLScriptElement>("script[data-scatter-data]");
+      if (!el?.textContent) return null;
+      try {
+        const data = JSON.parse(el.textContent) as ScatterPayload;
+        if (!data || !Array.isArray(data.photos) || data.photos.length === 0) return null;
+        return data;
+      } catch {
+        return null;
+      }
+    }
+
+    /** 页面里存在散落相册数据就立即展开 */
+    function boot() {
+      const data = readPayload();
+      if (data && !overlay?.classList.contains("ps-open")) renderScatter(data);
+    }
+
+    // Astro 的脚本在 DOM 解析后执行；加密相册解密后再启动一次
+    boot();
+    document.addEventListener("password:decrypted", () => setTimeout(boot, 150));
+    // swup 无刷新进入相册页
+    document.addEventListener("swup:contentReplaced", boot);
+    // 离开相册页时收起
+    document.addEventListener("swup:visit:start", closeScatter);
 
     document.addEventListener("keydown", (e) => {
-      // 网格内聚焦的照片支持回车进入
-      if (e.key === "Enter" && document.activeElement) {
-        const photoEl = document.activeElement.closest?.("[data-scatter-photo]") as HTMLElement | null;
-        const albumEl = photoEl?.closest?.("[data-scatter-album]") as HTMLElement | null;
-        if (photoEl && albumEl) {
-          e.preventDefault();
-          openScatter(albumEl);
-          return;
-        }
-      }
-      if (e.key !== "Escape") return;
-      if (!overlay?.classList.contains("ps-open")) return;
+      if (e.key !== "Escape" || !overlay?.classList.contains("ps-open")) return;
       e.preventDefault();
       if (zoomed) unzoom();
-      else closeScatter();
+      else goBack();
     });
-
-    // swup 离开本页时收起散落层
-    document.addEventListener("swup:visit:start", closeScatter);
   })();
 </script>
