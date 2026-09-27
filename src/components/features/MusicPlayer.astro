@@ -54,6 +54,19 @@ const widgetId =
                     {i18n(I18nKey.music)}
                 </h3>
             </div>
+
+            <!-- Extras: 歌词面板 / 浮动歌词 / 悬浮播放器 -->
+            <div class="music-extras flex items-center gap-0.5 shrink-0">
+                <button class={`btn-lrc-panel hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400 ${!config.showLyrics ? "hidden" : ""}`} title={i18n(I18nKey.musicLyrics)} aria-label={i18n(I18nKey.musicLyrics)}>
+                    <Icon is:inline name="mdi:equalizer" class="text-lg" aria-hidden="true" />
+                </button>
+                <button class="btn-float-lrc hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400" title="浮动歌词" aria-label="浮动歌词">
+                    <Icon is:inline name="mdi:picture-in-picture-bottom-right-outline" class="text-lg" aria-hidden="true" />
+                </button>
+                <button class="btn-mini hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400" title="悬浮播放器" aria-label="悬浮播放器">
+                    <Icon is:inline name="mdi:record-circle-outline" class="text-lg" aria-hidden="true" />
+                </button>
+            </div>
         </div>
 
         <div class="min-w-0 overflow-hidden">
@@ -81,19 +94,6 @@ const widgetId =
                         <div class="vol-bar absolute left-0 top-0 h-full bg-(--primary) rounded-full w-[70%]"></div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Extras: 歌词面板 / 浮动歌词 / 悬浮播放器 -->
-            <div class="music-extras flex items-center gap-0.5 shrink-0 h-full">
-                <button class={`btn-lrc-panel hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400 ${!config.showLyrics ? "hidden" : ""}`} title={i18n(I18nKey.musicLyrics)} aria-label={i18n(I18nKey.musicLyrics)}>
-                    <Icon is:inline name="mdi:equalizer" class="text-lg" aria-hidden="true" />
-                </button>
-                <button class="btn-float-lrc hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400" title="浮动歌词" aria-label="浮动歌词">
-                    <Icon is:inline name="mdi:picture-in-picture-bottom-right-outline" class="text-lg" aria-hidden="true" />
-                </button>
-                <button class="btn-mini hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400" title="悬浮播放器" aria-label="悬浮播放器">
-                    <Icon is:inline name="mdi:record-circle-outline" class="text-lg" aria-hidden="true" />
-                </button>
             </div>
         </div>
     </div>
