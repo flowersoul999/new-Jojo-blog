@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 800" width="1600" height="800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="room" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1119"/>
+      <stop offset="100%" stop-color="#1b2836"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f4152"/>
+      <stop offset="55%" stop-color="#1d2c3b"/>
+      <stop offset="100%" stop-color="#16222e"/>
+    </linearGradient>
+    <radialGradient id="lampA" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#f2a44e" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#f2a44e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lampB" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#e2613f" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#e2613f" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blurA"><feGaussianBlur stdDeviation="26"/></filter>
+    <filter id="blurB"><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="800" fill="url(#room)"/>
+
+  <rect x="150" y="70" width="1300" height="660" fill="url(#glass)"/>
+
+  <g filter="url(#blurA)">
+    <circle cx="430" cy="330" r="150" fill="url(#lampA)"/>
+    <circle cx="880" cy="410" r="190" fill="url(#lampB)"/>
+    <circle cx="1230" cy="300" r="130" fill="url(#lampA)"/>
+    <circle cx="1060" cy="560" r="120" fill="#3f6ea8" opacity="0.35"/>
+  </g>
+
+  <g opacity="0.5" fill="#0e1720">
+    <rect x="150" y="470" width="1300" height="14"/>
+    <rect x="150" y="640" width="1300" height="10" opacity="0.7"/>
+    <path d="M980 300 l120 0 l-20 90 l-80 0 z"/>
+  </g>
+
+  <g stroke="#cfe3ef" stroke-linecap="round" fill="none" filter="url(#blurB)">
+    <g opacity="0.34" stroke-width="3">
+      <path d="M300 90 L282 400"/>
+      <path d="M360 78 L346 320"/>
+      <path d="M470 96 L452 470"/>
+      <path d="M620 80 L604 360"/>
+      <path d="M740 92 L726 520"/>
+      <path d="M905 76 L890 330"/>
+      <path d="M1010 100 L994 460"/>
+      <path d="M1150 84 L1136 380"/>
+      <path d="M1290 96 L1274 500"/>
+      <path d="M1380 80 L1366 300"/>
+    </g>
+    <g opacity="0.22" stroke-width="2">
+      <path d="M330 200 L318 420"/>
+      <path d="M560 160 L548 430"/>
+      <path d="M840 190 L828 480"/>
+      <path d="M1090 170 L1078 440"/>
+      <path d="M1240 210 L1228 470"/>
+    </g>
+  </g>
+
+  <g fill="#dceaf2" opacity="0.5">
+    <circle cx="352" cy="132" r="5"/>
+    <circle cx="700" cy="176" r="4"/>
+    <circle cx="1124" cy="128" r="6"/>
+    <circle cx="1298" cy="240" r="4"/>
+    <circle cx="486" cy="300" r="4"/>
+  </g>
+
+  <g fill="#060b11">
+    <rect x="0" y="0" width="150" height="800"/>
+    <rect x="1450" y="0" width="150" height="800"/>
+    <rect x="0" y="0" width="1600" height="70"/>
+    <rect x="0" y="730" width="1600" height="70"/>
+  </g>
+  <rect x="150" y="70" width="1300" height="660" fill="none" stroke="#080e14" stroke-width="8"/>
+
+  <rect width="1600" height="800" filter="url(#grain)" opacity="0.09"/>
+</svg>

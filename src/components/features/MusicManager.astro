@@ -432,6 +432,74 @@ const managerConfigStr = JSON.stringify({
         emitPlayState();
     });
 
+    // ── 频谱分析（惰性开启，供回忆页律动条读取真实频谱）──────
+    // 说明：createMediaElementSource 对同一个 <audio> 只能调用一次，因此全局只建一次。
+    // <audio> 已设 crossOrigin=anonymous，能正常播放即说明 CORS 可用，接入 Web Audio 不会静音。
+    var analyserState = { ctx: null, analyser: null, data: null, failed: false };
+
+    function enableAnalyser() {
+        if (analyserState.analyser) {
+            resumeAnalyserContext();
+            return true;
+        }
+        if (analyserState.failed) return false;
+        try {
+            var win = /** @type {any} */ (window);
+            var Ctx = win.AudioContext || win.webkitAudioContext;
+            if (!Ctx) { analyserState.failed = true; return false; }
+            var ctx = new Ctx();
+            var source = ctx.createMediaElementSource(audio);
+            var analyser = ctx.createAnalyser();
+            analyser.fftSize = 512;
+            analyser.smoothingTimeConstant = 0.75;
+            source.connect(analyser);
+            analyser.connect(ctx.destination);
+            analyserState.ctx = ctx;
+            analyserState.analyser = analyser;
+            analyserState.data = new Uint8Array(analyser.frequencyBinCount);
+            resumeAnalyserContext();
+            return true;
+        } catch (e) {
+            analyserState.failed = true;
+            return false;
+        }
+    }
+
+    function resumeAnalyserContext() {
+        try {
+            if (analyserState.ctx && analyserState.ctx.state === 'suspended') {
+                analyserState.ctx.resume();
+            }
+        } catch (e) { /* 忽略：浏览器会在下次手势时自动恢复 */ }
+    }
+
+    /** 取 bands 段归一化频谱（0~1）；未开启或失败时返回 null */
+    function getSpectrum(bands) {
+        var analyser = analyserState.analyser;
+        var data = analyserState.data;
+        if (!analyser || !data) return null;
+        var n = Math.max(1, bands | 0);
+        try {
+            analyser.getByteFrequencyData(data);
+        } catch (e) {
+            return null;
+        }
+        var out = new Array(n);
+        // 对数分频：低频占更少条数、高频更密，视觉上更接近"律动"而非"低音独大"
+        var usable = Math.floor(data.length * 0.72);
+        var minBin = 2;
+        for (var i = 0; i < n; i++) {
+            var b0 = minBin + Math.pow(i / n, 2) * (usable - minBin);
+            var b1 = minBin + Math.pow((i + 1) / n, 2) * (usable - minBin);
+            var s = Math.floor(b0);
+            var e = Math.max(s + 1, Math.floor(b1));
+            var sum = 0, cnt = 0;
+            for (var j = s; j < e && j < data.length; j++) { sum += data[j]; cnt++; }
+            out[i] = cnt ? sum / cnt / 255 : 0;
+        }
+        return out;
+    }
+
     // ── Init (idempotent) ────────────────────────────────────
     async function init() {
         if (state.initialized || state.initializing) return;
@@ -523,7 +591,9 @@ const managerConfigStr = JSON.stringify({
         seek: seek,
         seekToTime: seekToTime,
         playTrackByIndex: playTrackByIndex,
-        loadTrack: loadTrack
+        loadTrack: loadTrack,
+        enableAnalyser: enableAnalyser,
+        getSpectrum: getSpectrum
     };
 })();
 </script>

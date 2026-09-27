@@ -1,0 +1,139 @@
+---
+// 暗色星空：仅在 html.dark 下显示（CSS 用 html.dark.is-memories-page .memories-galaxy.is-active 控制）
+// canvas 画缓慢漂移 + 呼吸闪烁的星点，并跟随指针做轻微视差
+---
+
+<div class="memories-galaxy" id="memories-galaxy" aria-hidden="true">
+	<canvas class="memories-galaxy-canvas" id="memories-galaxy-canvas"></canvas>
+</div>
+
+<script is:inline>
+	(function () {
+		var galaxy = document.getElementById("memories-galaxy");
+		var canvas = document.getElementById("memories-galaxy-canvas");
+		if (!galaxy || !canvas) return;
+
+		var ctx = canvas.getContext("2d");
+		if (!ctx) return;
+
+		var html = document.documentElement;
+		var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		var stars = [];
+		var width = 0;
+		var height = 0;
+		var dpr = 1;
+		var pointer = { x: 0, y: 0, tx: 0, ty: 0 };
+		var rafId = null;
+
+		function rand(min, max) {
+			return min + Math.random() * (max - min);
+		}
+
+		function build() {
+			dpr = Math.min(window.devicePixelRatio || 1, 2);
+			width = window.innerWidth;
+			height = window.innerHeight;
+			canvas.width = Math.floor(width * dpr);
+			canvas.height = Math.floor(height * dpr);
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+			var count = Math.round(Math.min(220, Math.max(90, (width * height) / 9000)));
+			stars = [];
+			for (var i = 0; i < count; i++) {
+				stars.push({
+					x: rand(0, width),
+					y: rand(0, height),
+					r: rand(0.5, 1.7),
+					depth: rand(0.25, 1),
+					alpha: rand(0.25, 0.85),
+					phase: rand(0, Math.PI * 2),
+					speed: rand(0.0007, 0.0022),
+					drift: rand(0.02, 0.09),
+					hue: Math.random() < 0.18 ? rand(200, 300) : 0
+				});
+			}
+		}
+
+		function draw(t) {
+			ctx.clearRect(0, 0, width, height);
+			pointer.x += (pointer.tx - pointer.x) * 0.06;
+			pointer.y += (pointer.ty - pointer.y) * 0.06;
+
+			for (var i = 0; i < stars.length; i++) {
+				var s = stars[i];
+				var twinkle = reduce ? 1 : 0.62 + 0.38 * Math.sin(t * s.speed + s.phase);
+				var px = s.x + pointer.x * s.depth * 18;
+				var py = s.y + pointer.y * s.depth * 18;
+				var a = s.alpha * twinkle;
+
+				ctx.beginPath();
+				ctx.arc(px, py, s.r * (0.85 + s.depth * 0.5), 0, Math.PI * 2);
+				ctx.fillStyle =
+					s.hue > 0
+						? "hsla(" + s.hue.toFixed(0) + ", 80%, 82%, " + a.toFixed(3) + ")"
+						: "rgba(255, 255, 255, " + a.toFixed(3) + ")";
+				ctx.fill();
+
+				if (!reduce) {
+					s.y -= s.drift;
+					if (s.y < -4) {
+						s.y = height + 4;
+						s.x = rand(0, width);
+					}
+				}
+			}
+		}
+
+		function loop(t) {
+			draw(t);
+			rafId = window.requestAnimationFrame(loop);
+		}
+
+		function start() {
+			if (rafId !== null) return;
+			build();
+			if (reduce) {
+				draw(0);
+				return;
+			}
+			rafId = window.requestAnimationFrame(loop);
+		}
+
+		function stop() {
+			if (rafId !== null) {
+				window.cancelAnimationFrame(rafId);
+				rafId = null;
+			}
+		}
+
+		function syncVisibility() {
+			var isDark = html.classList.contains("dark");
+			galaxy.classList.toggle("is-active", isDark);
+			if (isDark) start();
+			else {
+				stop();
+				ctx.clearRect(0, 0, width, height);
+			}
+		}
+
+		window.addEventListener(
+			"pointermove",
+			function (e) {
+				pointer.tx = (e.clientX / window.innerWidth) * 2 - 1;
+				pointer.ty = (e.clientY / window.innerHeight) * 2 - 1;
+			},
+			{ passive: true }
+		);
+
+		var resizeTimer = null;
+		window.addEventListener("resize", function () {
+			if (resizeTimer) clearTimeout(resizeTimer);
+			resizeTimer = setTimeout(function () {
+				if (galaxy.classList.contains("is-active")) build();
+			}, 160);
+		});
+
+		new MutationObserver(syncVisibility).observe(html, { attributes: true, attributeFilter: ["class"] });
+		syncVisibility();
+	})();
+</script>

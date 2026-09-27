@@ -1,0 +1,100 @@
+---
+// 回忆页：开屏闪频 → 黑胶唱片机 + 歌词 + 胶片墙 → 详情弹窗
+// 条目来自 src/content/memories/ 内容集合，正文在构建期渲染进隐藏的详情模板里
+import { getCollection, render } from "astro:content";
+import MemoriesLayout from "@/layouts/MemoriesLayout.astro";
+import MemoriesSplash from "@/components/memories/MemoriesSplash.astro";
+import MemoriesGalaxy from "@/components/memories/MemoriesGalaxy.astro";
+import MemoriesStage from "@/components/memories/MemoriesStage.svelte";
+import { siteConfig } from "@/config";
+
+export const prerender = true;
+
+/** 开屏字幕条文案 */
+const SPLASH_CAPTION = "有些日子过去了，却一直没走远";
+/** 开屏立绘：留空即不渲染（可换成自己的图片，放 public/ 下） */
+const SPLASH_HERO = "";
+
+const entries = (await getCollection("memories")).sort(
+	(a, b) => b.data.date.getTime() - a.data.date.getTime()
+);
+
+const rendered = await Promise.all(
+	entries.map(async (entry) => {
+		const { Content } = await render(entry);
+		return { entry, Content };
+	})
+);
+
+const items = rendered.map(({ entry }, i) => ({
+	url: `#memory-${String(i + 1).padStart(2, "0")}`,
+	title: entry.data.title,
+	image: entry.data.image,
+}));
+
+const splashImages = entries.map((entry) => entry.data.image);
+
+function formatDate(date: Date) {
+	const y = date.getFullYear();
+	const m = String(date.getMonth() + 1).padStart(2, "0");
+	const d = String(date.getDate()).padStart(2, "0");
+	return `${y}.${m}.${d}`;
+}
+
+function isoDate(date: Date) {
+	return date.toISOString().slice(0, 10);
+}
+---
+
+<MemoriesLayout title="回忆" description="一些被收起来的片段，串成一条不止息的胶片">
+	<div class="memories-page is-splash-pending" data-memories-root>
+		<MemoriesSplash images={splashImages} caption={SPLASH_CAPTION} hero={SPLASH_HERO} />
+		<MemoriesGalaxy />
+		<MemoriesStage
+			client:load
+			{items}
+			metaTitle={siteConfig.title}
+			metaSubtitle="点击唱片，把回忆放起来"
+		/>
+
+		<div id="memories-entry-store" hidden>
+			{
+				rendered.map(({ entry, Content }, i) => (
+					<div
+						class="memories-entry"
+						data-url={`#memory-${String(i + 1).padStart(2, "0")}`}
+						data-title={entry.data.title}
+					>
+						<div class="memories-detail">
+							<div class="memories-detail__media">
+								<img
+									class="memories-detail__cover"
+									src={entry.data.image}
+									alt=""
+									width="960"
+									height="480"
+									decoding="async"
+									draggable="false"
+								/>
+								<div class="memories-detail__media-fade" aria-hidden="true" />
+								<header class="memories-detail__header">
+									<h2 class="memories-detail__title">{entry.data.title}</h2>
+									<p class="memories-detail__meta">
+										<span class="memories-detail__tag">MEMORY</span>
+										<time class="memories-detail__date" datetime={isoDate(entry.data.date)}>
+											{formatDate(entry.data.date)}
+										</time>
+									</p>
+									<p class="memories-detail__summary">{entry.data.summary}</p>
+								</header>
+							</div>
+							<div class="memories-detail__body">
+								<Content />
+							</div>
+						</div>
+					</div>
+				))
+			}
+		</div>
+	</div>
+</MemoriesLayout>

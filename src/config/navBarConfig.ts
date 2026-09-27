@@ -66,6 +66,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 			// 日记
 			LinkPresets.Diary,
 
+			// 回忆
+			LinkPresets.Memories,
+
 			// 工具
 			LinkPresets.Tools,
 		],
@@ -208,6 +211,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		url: "/diary/",
 		icon: "material-symbols:edit-note",
 		pageKey: "diary",
+	},
+	Memories: {
+		name: "回忆",
+		url: "/memories/",
+		icon: "material-symbols:history-rounded",
 	},
 };
 

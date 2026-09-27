@@ -1,0 +1,233 @@
+---
+// 开屏闪频：全屏快速切换背景图 + 玻璃字幕条打字机 + 颗粒/暗角/边缘模糊
+// 生命周期完全由本组件内联脚本驱动，结束时给根节点加 is-splash-done 让 stage 浮现
+interface Props {
+	/** 闪频用的背景图列表（会循环取用） */
+	images: string[];
+	/** 字幕条文案（打字机逐字显示） */
+	caption: string;
+	/** 开屏立绘，留空则不渲染 */
+	hero?: string;
+	/** 每张图停留时长(ms) */
+	interval?: number;
+	/** 整段闪频总时长(ms) */
+	duration?: number;
+}
+
+const { images, caption, hero = "", interval = 160, duration = 4800 } = Astro.props;
+---
+
+<div
+	class="memories-flash memories-flash--boot"
+	id="memories-flash"
+	role="presentation"
+	aria-hidden="true"
+	style={`--flash-interval-ms:${interval}ms`}
+>
+	<div class="memories-flash__stage" id="memories-flash-stage">
+		<svg class="memories-flash__svg-filters" aria-hidden="true" focusable="false" width="0" height="0">
+			<defs>
+				<filter
+					id="memories-flash-ripple"
+					x="-25%"
+					y="-25%"
+					width="150%"
+					height="150%"
+					color-interpolation-filters="sRGB"
+				>
+					<feTurbulence
+						type="fractalNoise"
+						baseFrequency="0.018 0.028"
+						numOctaves="2"
+						seed="3"
+						result="noise"
+					>
+						<animate
+							attributeName="baseFrequency"
+							values="0.014 0.022;0.024 0.036;0.016 0.028;0.014 0.022"
+							dur=".42s"
+							repeatCount="indefinite"></animate>
+					</feTurbulence>
+					<feDisplacementMap
+						in="SourceGraphic"
+						in2="noise"
+						scale="16"
+						xChannelSelector="R"
+						yChannelSelector="G"
+					>
+						<animate attributeName="scale" values="20;10;18;8;20" dur=".42s" repeatCount="indefinite"></animate>
+					</feDisplacementMap>
+				</filter>
+			</defs>
+		</svg>
+
+		<div class="memories-flash__bg" id="memories-flash-bg-a" aria-hidden="true">
+			<div class="memories-flash__bg-media"></div>
+		</div>
+		<div class="memories-flash__bg" id="memories-flash-bg-b" aria-hidden="true">
+			<div class="memories-flash__bg-media"></div>
+		</div>
+
+		<div class="memories-flash__grain" aria-hidden="true"></div>
+		<div class="memories-flash__edge-blur" aria-hidden="true"></div>
+		<div class="memories-flash__vignette" aria-hidden="true"></div>
+
+		{
+			hero && (
+				<img
+					class="memories-flash__hero"
+					src={hero}
+					alt=""
+					width="1024"
+					height="1024"
+					decoding="async"
+					fetchpriority="high"
+				/>
+			)
+		}
+
+		<div class="memories-flash__caption" aria-hidden="true">
+			<div class="memories-flash__caption-bg" aria-hidden="true"></div>
+			<p class="memories-flash__caption-text" data-caption-text={caption}></p>
+		</div>
+	</div>
+</div>
+
+<script is:inline define:vars={{ images, caption, interval, duration }}>
+	(function () {
+		var root = document.querySelector("[data-memories-root]");
+		var flash = document.getElementById("memories-flash");
+		var stage = document.getElementById("memories-flash-stage");
+		if (!root || !flash || !stage) return;
+
+		var html = document.documentElement;
+		var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		var bgEls = [
+			document.getElementById("memories-flash-bg-a"),
+			document.getElementById("memories-flash-bg-b")
+		];
+		var captionEl = flash.querySelector(".memories-flash__caption");
+		var captionText = flash.querySelector(".memories-flash__caption-text");
+		var list = Array.isArray(images) ? images.filter(Boolean) : [];
+
+		var finished = false;
+		var timer = null;
+		var cursor = 0;
+		var slot = 0;
+
+		// 闪频期间锁滚动；stage 结束后仍保持 overflow:hidden（桌面端一整屏布局）
+		html.classList.add("memories-flash-open");
+		html.classList.add("memories-stage-open");
+
+		function paint(el, src) {
+			var media = el.querySelector(".memories-flash__bg-media");
+			if (media) media.style.backgroundImage = src ? 'url("' + src + '")' : "";
+		}
+
+		function typeCaption() {
+			if (!captionText) return;
+			var text = captionText.getAttribute("data-caption-text") || "";
+			if (reduce) {
+				captionText.textContent = text;
+				captionText.classList.add("is-done");
+				return;
+			}
+			var i = 0;
+			(function step() {
+				if (finished) return;
+				captionText.textContent = text.slice(0, i);
+				if (i >= text.length) {
+					captionText.classList.add("is-done");
+					return;
+				}
+				i += 1;
+				setTimeout(step, 95);
+			})();
+		}
+
+		function tick() {
+			if (finished || list.length === 0) return;
+			var el = bgEls[slot % 2];
+			var other = bgEls[(slot + 1) % 2];
+			if (other) other.classList.remove("is-active");
+			paint(el, list[cursor % list.length]);
+			// 强制重排，让 memories-flash-cycle 动画从头播放
+			void el.offsetWidth;
+			el.classList.add("is-active");
+			cursor += 1;
+			slot += 1;
+		}
+
+		function settleCaption() {
+			if (!captionText) return;
+			captionText.textContent = captionText.getAttribute("data-caption-text") || "";
+			captionText.classList.add("is-done");
+		}
+
+		function finish() {
+			if (finished) return;
+			finished = true;
+			if (timer) clearInterval(timer);
+			timer = null;
+			settleCaption();
+			if (captionEl) captionEl.classList.add("is-on");
+
+			if (reduce) {
+				reveal(0);
+				return;
+			}
+			// 先定格在最后一张，再整体放大淡出，同时让 stage 在底下浮现
+			flash.classList.add("is-holding");
+			setTimeout(function () {
+				flash.classList.add("is-holding-out");
+				root.classList.remove("is-splash-pending");
+				root.classList.add("is-splash-done");
+				html.classList.add("memories-stage-revealing");
+			}, 500);
+			setTimeout(function () {
+				reveal(0);
+			}, 1900);
+		}
+
+		function reveal() {
+			html.classList.remove("memories-flash-open");
+			html.classList.remove("memories-stage-revealing");
+			html.classList.add("memories-stage-open");
+			flash.classList.add("is-gone");
+			root.classList.remove("is-splash-pending");
+			root.classList.add("is-splash-done");
+			window.dispatchEvent(new CustomEvent("memories:splash-done"));
+		}
+
+		// 用户点击：既跳过闪频，也顺手把手势交给音乐（浏览器自动播放策略要求由手势触发）
+		function onGesture() {
+			window.dispatchEvent(new CustomEvent("memories:user-gesture"));
+			if (!finished) finish();
+		}
+
+		stage.addEventListener("pointerdown", onGesture);
+		stage.addEventListener("keydown", onGesture);
+		window.addEventListener("keydown", function (e) {
+			if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+				if (!finished) onGesture();
+			}
+		});
+
+		// 闪频本体
+		flash.classList.remove("memories-flash--boot");
+		flash.classList.add("is-playing");
+		if (captionEl && reduce) captionEl.classList.add("is-on");
+		typeCaption();
+		tick();
+		if (!reduce && list.length > 1) {
+			timer = setInterval(tick, interval);
+		}
+		if (reduce) {
+			finished = true;
+			html.classList.remove("memories-flash-open");
+			reveal(0);
+		} else {
+			setTimeout(finish, duration);
+		}
+	})();
+</script>
