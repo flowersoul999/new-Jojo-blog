@@ -35,7 +35,7 @@
 	--treasure-default-border: color-mix(in srgb, var(--treasure-secondary) 26%, transparent);
 }
 
-/* 百宝箱页面容器：独立全屏背景，不套用主站卡片布局 */
+/* 独立全屏布局容器（写作页 WriteLayout 使用）：自带整屏背景 */
 .treasure-root {
 	min-height: 100vh;
 	color: var(--treasure-text);
@@ -44,6 +44,12 @@
 		radial-gradient(46rem 28rem at 96% 12%, color-mix(in srgb, var(--treasure-brand-secondary) 10%, transparent), transparent 58%),
 		var(--treasure-bg);
 	transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* 百宝箱并入主站布局后：沿用令牌与默认边框，但不再自带整屏背景/最小高度 */
+.treasure-root-embedded {
+	min-height: 0;
+	background: none;
 }
 
 /* 旧博客边框默认浅灰的行为回填；zero 特异性，具体色值工具类可正常覆盖 */

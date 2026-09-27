@@ -50,7 +50,7 @@ export default function TreasureHome(): ReactElement {
 	}, [keyword])
 
 	return (
-		<div className='mx-auto w-full max-w-5xl px-4 pt-24 pb-16 sm:px-6'>
+		<div className='mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:px-6'>
 			{/* Hero */}
 			<div className='mb-8 text-center'>
 				<h1 className='font-averia flex items-center justify-center gap-2 text-4xl font-medium'>

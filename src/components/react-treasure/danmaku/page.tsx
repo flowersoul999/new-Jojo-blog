@@ -145,7 +145,7 @@ export default function DanmakuPage(): ReactElement {
 	const total = PRESET_BLESSINGS.length + userTexts.length
 
 	return (
-		<div className='mx-auto w-full max-w-2xl px-6 pt-24 pb-12 max-sm:px-4'>
+		<div className='mx-auto w-full max-w-2xl px-6 pt-8 pb-12 max-sm:px-4'>
 			<style>{`@keyframes danmaku-move { from { transform: translateX(0); } to { transform: translateX(calc(-100% - 100vw)); } }`}</style>
 
 			<div className='mb-10 text-center'>

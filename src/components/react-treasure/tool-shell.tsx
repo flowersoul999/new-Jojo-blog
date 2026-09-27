@@ -16,7 +16,7 @@ interface Props {
 
 export default function ToolShell({ icon: Icon, title, desc, children, wide }: Props): ReactElement {
 	return (
-		<div className={`mx-auto w-full px-4 pt-24 pb-16 sm:px-6 ${wide ? 'max-w-3xl' : 'max-w-xl'}`}>
+		<div className={`mx-auto w-full px-4 pt-8 pb-16 sm:px-6 ${wide ? 'max-w-3xl' : 'max-w-xl'}`}>
 			<div className='mb-8 text-center'>
 				<h1 className='font-averia flex items-center justify-center gap-2 text-3xl font-medium'>
 					<Icon className='h-7 w-7 text-brand' />
