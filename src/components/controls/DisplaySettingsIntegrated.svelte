@@ -68,7 +68,7 @@ type WallpaperOption = {
 	label: string;
 };
 
-type MobileSettingsTab = "appearance" | "wallpaper" | "preferences";
+type MobileSettingsTab = "appearance" | "wallpaper" | "effects";
 
 const wallpaperPreviewModules = import.meta.glob<string>(
 	"../../assets/images/{DesktopWallpaper,MobileWallpaper}/*.{avif,png,jpg,jpeg,webp}",
@@ -116,6 +116,17 @@ let isMobileWidth = $state(
 );
 let mobileSettingsTab = $state<MobileSettingsTab>("appearance");
 let isSwitching = $state(false);
+// 分区折叠状态：默认全部展开，点击分区标题右侧箭头收起/展开
+let collapsedSections = $state<Record<string, boolean>>({});
+
+function isSectionCollapsed(key: string) {
+	return collapsedSections[key] ?? false;
+}
+
+function toggleSection(key: string) {
+	collapsedSections = { ...collapsedSections, [key]: !isSectionCollapsed(key) };
+	requestAnimationFrame(refreshAllRangeProgress);
+}
 let wavesEnabled = $state(true);
 const defaultWavesEnabled = getDefaultWavesEnabled();
 let gradientEnabled = $state(true);
@@ -518,8 +529,8 @@ function switchWallpaperMode(newMode: WALLPAPER_MODE) {
 	setWallpaperMode(newMode);
 
 	if (isMobileWidth) {
-		mobileSettingsTab =
-			newMode === WALLPAPER_NONE ? "appearance" : "wallpaper";
+		// 页面背景分区归入「壁纸」标签，切换模式后保持在该分类
+		mobileSettingsTab = "wallpaper";
 		requestAnimationFrame(() => {
 			document
 				.getElementById("display-setting")
@@ -835,12 +846,12 @@ $effect(() => {
             <button
                 type="button"
                 class="mobile-settings-tab"
-                class:mobile-settings-tab-active={mobileSettingsTab === "preferences"}
-                aria-pressed={mobileSettingsTab === "preferences"}
-                onclick={() => selectMobileSettingsTab("preferences")}
+                class:mobile-settings-tab-active={mobileSettingsTab === "effects"}
+                aria-pressed={mobileSettingsTab === "effects"}
+                onclick={() => selectMobileSettingsTab("effects")}
             >
-                <Icon icon="material-symbols:tune-rounded" class="text-[1.05rem]" />
-                <span>偏好</span>
+                <Icon icon="material-symbols:auto-awesome-rounded" class="text-[1.05rem]" />
+                <span>特效</span>
             </button>
     </nav>
 
@@ -849,8 +860,9 @@ $effect(() => {
     <div
         class="mt-2 mb-2 mobile-settings-section"
         class:mobile-settings-section-hidden={mobileSettingsTab !== "appearance"}
+        class:section-collapsed={isSectionCollapsed("themeColor")}
     >
-        <div class="flex flex-row gap-2 mb-2 items-center justify-between">
+        <div class="section-head flex flex-row gap-2 mb-2 items-center justify-between">
             <div class="flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3
                 before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
                 before:absolute before:-left-3 before:top-1/2 before:-translate-y-1/2"
@@ -863,14 +875,23 @@ $effect(() => {
                     </div>
                 </button>
             </div>
-            <div class="flex gap-1">
+            <div class="flex gap-1.5 items-center">
                 <div id="hueValue" class="transition bg-(--btn-regular-bg) w-10 h-7 rounded-md flex justify-center
                 font-bold text-sm items-center text-(--btn-content)">
                     {hue}
                 </div>
+                <button
+                    type="button"
+                    class="section-toggle"
+                    aria-expanded={!isSectionCollapsed("themeColor")}
+                    aria-label="收起或展开主题色分区"
+                    onclick={() => toggleSection("themeColor")}
+                >
+                    <Icon icon="material-symbols:keyboard-arrow-down-rounded" class="text-[1.15rem]" />
+                </button>
             </div>
         </div>
-        <div class="w-full h-6 px-1 bg-[oklch(0.80_0.10_0)] dark:bg-[oklch(0.70_0.10_0)] rounded select-none">
+        <div class="w-full select-none">
             <input aria-label={i18n(I18nKey.themeColor)} type="range" min="0" max="360" bind:value={hue}
                    class="slider" id="colorSlider" step="5" style="width: 100%">
         </div>
@@ -881,9 +902,10 @@ $effect(() => {
     {#if isWallpaperSwitchable}
         <div
             class="mt-2 mb-2 mobile-settings-section"
-            class:mobile-settings-section-hidden={mobileSettingsTab !== "appearance"}
+            class:mobile-settings-section-hidden={mobileSettingsTab !== "wallpaper"}
+            class:section-collapsed={isSectionCollapsed("wallpaperMode")}
         >
-            <div class="flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
+            <div class="section-head flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
                 before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
                 before:absolute before:-left-3 before:top-1/2 before:-translate-y-1/2"
             >
@@ -893,6 +915,15 @@ $effect(() => {
                     <div class="text-(--btn-content)">
                         <Icon icon="fa7-solid:arrow-rotate-left" class="text-[0.875rem]"></Icon>
                     </div>
+                </button>
+                <button
+                    type="button"
+                    class="section-toggle"
+                    aria-expanded={!isSectionCollapsed("wallpaperMode")}
+                    aria-label="收起或展开页面背景分区"
+                    onclick={() => toggleSection("wallpaperMode")}
+                >
+                    <Icon icon="material-symbols:keyboard-arrow-down-rounded" class="text-[1.15rem]" />
                 </button>
             </div>
             <div class="flex gap-2">
@@ -943,8 +974,9 @@ $effect(() => {
         <div
             class="mt-2 mb-2 mobile-settings-section"
             class:mobile-settings-section-hidden={mobileSettingsTab !== "wallpaper"}
+            class:section-collapsed={isSectionCollapsed("overlaySettings")}
         >
-            <div class="flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
+            <div class="section-head flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
                 before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
                 before:absolute before:-left-3 before:top-1/2 before:-translate-y-1/2"
             >
@@ -954,6 +986,15 @@ $effect(() => {
                     <div class="text-(--btn-content)">
                         <Icon icon="fa7-solid:arrow-rotate-left" class="text-[0.875rem]"></Icon>
                     </div>
+                </button>
+                <button
+                    type="button"
+                    class="section-toggle"
+                    aria-expanded={!isSectionCollapsed("overlaySettings")}
+                    aria-label="收起或展开透明设置分区"
+                    onclick={() => toggleSection("overlaySettings")}
+                >
+                    <Icon icon="material-symbols:keyboard-arrow-down-rounded" class="text-[1.15rem]" />
                 </button>
             </div>
             <div class="space-y-2">
@@ -1019,8 +1060,9 @@ $effect(() => {
         <div
             class="mt-2 mb-2 mobile-settings-section"
             class:mobile-settings-section-hidden={mobileSettingsTab !== "wallpaper"}
+            class:section-collapsed={isSectionCollapsed("wallpaperSettings")}
         >
-            <div class="flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
+            <div class="section-head flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
                 before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
                 before:absolute before:-left-3 before:top-1/2 before:-translate-y-1/2"
             >
@@ -1030,6 +1072,15 @@ $effect(() => {
                     <div class="text-(--btn-content)">
                         <Icon icon="fa7-solid:arrow-rotate-left" class="text-[0.875rem]"></Icon>
                     </div>
+                </button>
+                <button
+                    type="button"
+                    class="section-toggle"
+                    aria-expanded={!isSectionCollapsed("wallpaperSettings")}
+                    aria-label="收起或展开壁纸设置分区"
+                    onclick={() => toggleSection("wallpaperSettings")}
+                >
+                    <Icon icon="material-symbols:keyboard-arrow-down-rounded" class="text-[1.15rem]" />
                 </button>
             </div>
             <div class="space-y-1">
@@ -1145,9 +1196,10 @@ $effect(() => {
     <!-- Home Intro Settings Section -->
     <div
         class="mt-2 mb-2 mobile-settings-section"
-        class:mobile-settings-section-hidden={mobileSettingsTab !== "preferences"}
+        class:mobile-settings-section-hidden={mobileSettingsTab !== "effects"}
+        class:section-collapsed={isSectionCollapsed("intro")}
     >
-        <div class="flex items-center gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
+        <div class="section-head flex items-center gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
             before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
             before:absolute before:-left-3 before:top-1/2 before:-translate-y-1/2"
         >
@@ -1166,6 +1218,15 @@ $effect(() => {
                 <div class="text-(--btn-content)">
                     <Icon icon="fa7-solid:arrow-rotate-left" class="text-[0.875rem]"></Icon>
                 </div>
+            </button>
+            <button
+                type="button"
+                class="section-toggle"
+                aria-expanded={!isSectionCollapsed("intro")}
+                aria-label="收起或展开开屏动画分区"
+                onclick={() => toggleSection("intro")}
+            >
+                <Icon icon="material-symbols:keyboard-arrow-down-rounded" class="text-[1.15rem]" />
             </button>
         </div>
         <div class="space-y-2">
@@ -1289,9 +1350,10 @@ $effect(() => {
     {#if isSakuraSwitchable}
         <div
             class="mt-2 mb-2 mobile-settings-section"
-            class:mobile-settings-section-hidden={mobileSettingsTab !== "preferences"}
+            class:mobile-settings-section-hidden={mobileSettingsTab !== "effects"}
+            class:section-collapsed={isSectionCollapsed("effects")}
         >
-            <div class="flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
+            <div class="section-head flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
                 before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
                 before:absolute before:-left-3 before:top-1/2 before:-translate-y-1/2"
             >
@@ -1301,6 +1363,15 @@ $effect(() => {
                     <div class="text-(--btn-content)">
                         <Icon icon="fa7-solid:arrow-rotate-left" class="text-[0.875rem]"></Icon>
                     </div>
+                </button>
+                <button
+                    type="button"
+                    class="section-toggle"
+                    aria-expanded={!isSectionCollapsed("effects")}
+                    aria-label="收起或展开特效设置分区"
+                    onclick={() => toggleSection("effects")}
+                >
+                    <Icon icon="material-symbols:keyboard-arrow-down-rounded" class="text-[1.15rem]" />
                 </button>
             </div>
             <div class="space-y-1">
@@ -1329,9 +1400,10 @@ $effect(() => {
     {#if allowLayoutSwitch}
         <div
             class="mt-2 mb-2 mobile-settings-section"
-            class:mobile-settings-section-hidden={mobileSettingsTab !== "preferences"}
+            class:mobile-settings-section-hidden={mobileSettingsTab !== "appearance"}
+            class:section-collapsed={isSectionCollapsed("layout")}
         >
-            <div class="flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
+            <div class="section-head flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
                 before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
                 before:absolute before:-left-3 before:top-1/2 before:-translate-y-1/2"
             >
@@ -1341,6 +1413,15 @@ $effect(() => {
                     <div class="text-(--btn-content)">
                         <Icon icon="fa7-solid:arrow-rotate-left" class="text-[0.875rem]"></Icon>
                     </div>
+                </button>
+                <button
+                    type="button"
+                    class="section-toggle"
+                    aria-expanded={!isSectionCollapsed("layout")}
+                    aria-label="收起或展开文章列表布局分区"
+                    onclick={() => toggleSection("layout")}
+                >
+                    <Icon icon="material-symbols:keyboard-arrow-down-rounded" class="text-[1.15rem]" />
                 </button>
             </div>
             <div class="flex gap-2">
@@ -1386,6 +1467,49 @@ $effect(() => {
         overscroll-behavior none
 
     #display-setting
+        /* 面板整体：更大的圆角、分层阴影与更透气的留白 */
+        padding 0.85rem 0.9rem 1.05rem
+        border-radius 1.35rem
+        box-shadow 0 30px 60px -30px rgba(15, 23, 42, 0.42), 0 16px 32px -24px rgba(15, 23, 42, 0.3)
+
+        /* 分区标题行：右侧箭头控制收起/展开 */
+        .section-head
+            width 100%
+
+        .section-toggle
+            margin-left auto
+            display inline-flex
+            align-items center
+            justify-content center
+            flex none
+            width 1.65rem
+            height 1.65rem
+            border-radius 0.55rem
+            color var(--btn-content)
+            opacity 0.6
+            transition transform 180ms ease, opacity 180ms ease, background-color 180ms ease
+
+            &:hover
+                opacity 1
+                background var(--btn-regular-bg)
+
+            &:active
+                transform scale(0.9)
+
+        .mobile-settings-section
+            &.section-collapsed
+                > *:not(.section-head)
+                    display none
+
+                .section-toggle
+                    transform rotate(-90deg)
+                    opacity 0.85
+
+        /* 可见分区后面还有可见分区时才画底部细线：隐藏分区（其他标签页）不参与，也不会留下悬空分隔线 */
+        .mobile-settings-section:not(.mobile-settings-section-hidden):has(~ .mobile-settings-section:not(.mobile-settings-section-hidden))
+            padding-bottom 0.7rem
+            border-bottom 1px solid var(--btn-regular-bg)
+
         .mobile-settings-nav
             position sticky
             top -0.5rem
@@ -1400,11 +1524,11 @@ $effect(() => {
 
         .mobile-settings-tab
             display flex
-            min-height 2.5rem
+            min-height 2.6rem
             align-items center
             justify-content center
-            gap 0.3rem
-            border-radius 0.75rem
+            gap 0.35rem
+            border-radius 0.8rem
             background var(--btn-regular-bg)
             color var(--btn-content)
             font-size 0.78rem
@@ -1417,7 +1541,7 @@ $effect(() => {
             &.mobile-settings-tab-active
                 background var(--primary)
                 color white
-                box-shadow unquote("0 7px 15px -9px hsla(var(--hue), 82%, 50%, 0.46)")
+                box-shadow unquote("0 10px 22px -12px hsla(var(--hue), 82%, 50%, 0.62)")
 
         .mobile-settings-section-hidden
             display none
@@ -1545,12 +1669,40 @@ $effect(() => {
                 img
                     display block
 
+        /* 统一滑条样式：主题色进度轨道 + 圆形滑块，不再使用彩虹渐变 */
         input[type="range"]
             -webkit-appearance none
+            appearance none
             height 1.5rem
             border-radius 999px
-            background-image unquote("linear-gradient(90deg, var(--primary) 0 var(--range-progress, 50%), hsla(var(--hue), 22%, 28%, 0.18) var(--range-progress, 50%) 100%)")
+            background-image unquote("linear-gradient(90deg, var(--primary) 0 var(--range-progress, 50%), hsla(var(--hue), 22%, 28%, 0.16) var(--range-progress, 50%) 100%)")
             transition background-image 0.15s ease-in-out
+            cursor pointer
+
+            &::-webkit-slider-thumb
+                -webkit-appearance none
+                appearance none
+                height 1rem
+                width 1rem
+                border 2px solid rgba(255, 255, 255, 0.92)
+                border-radius 999px
+                background var(--primary)
+                box-shadow 0 2px 6px -1px rgba(15, 23, 42, 0.35)
+                transition transform 140ms ease
+
+                &:hover
+                    transform scale(1.08)
+
+                &:active
+                    transform scale(0.96)
+
+            &::-moz-range-thumb
+                height 1rem
+                width 1rem
+                border 2px solid rgba(255, 255, 255, 0.92)
+                border-radius 999px
+                background var(--primary)
+                box-shadow 0 2px 6px -1px rgba(15, 23, 42, 0.35)
 
         input[type="range"].overlay-slider
             height 0.85rem
@@ -1582,51 +1734,6 @@ $effect(() => {
                 background transparent
                 box-shadow none
 
-        #colorSlider
-            background-image var(--color-selection-bar)
-            transition background-image 0.15s ease-in-out
-
-            &::-webkit-slider-thumb
-                -webkit-appearance none
-                height 1rem
-                width 0.5rem
-                border-radius 0.125rem
-                background rgba(255, 255, 255, 0.7)
-                box-shadow none
-
-                &:hover
-                    background rgba(255, 255, 255, 0.8)
-
-                &:active
-                    background rgba(255, 255, 255, 0.6)
-
-            &::-moz-range-thumb
-                -webkit-appearance none
-                height 1rem
-                width 0.5rem
-                border-radius 0.125rem
-                border-width 0
-                background rgba(255, 255, 255, 0.7)
-                box-shadow none
-
-                &:hover
-                    background rgba(255, 255, 255, 0.8)
-
-                &:active
-                    background rgba(255, 255, 255, 0.6)
-
-            &::-ms-thumb
-                -webkit-appearance none
-                height 1rem
-                width 0.5rem
-                border-radius 0.125rem
-                background rgba(255, 255, 255, 0.7)
-                box-shadow none
-
-                &:hover
-                    background rgba(255, 255, 255, 0.8)
-
-                &:active
-                    background rgba(255, 255, 255, 0.6)
+        /* 主题色滑条已统一为上方的主色进度轨道，不再单独使用彩虹渐变 */
 
 </style>
