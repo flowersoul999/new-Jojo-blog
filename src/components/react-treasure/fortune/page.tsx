@@ -111,7 +111,7 @@ export default function FortunePage(): ReactElement {
 	}
 
 	return (
-		<div className='mx-auto flex w-full max-w-md flex-col items-center px-6 pt-24 pb-12 max-sm:px-4'>
+		<div className='mx-auto flex w-full max-w-md flex-col items-center px-6 pt-8 pb-12 max-sm:px-4'>
 			<div className='mb-10 text-center'>
 				<h1 className='font-averia flex items-center justify-center gap-2 text-3xl font-medium'>
 					<Sparkles className='text-brand h-6 w-6' />

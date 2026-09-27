@@ -148,7 +148,7 @@ export default function CountdownPage(): ReactElement {
 	const sorted = items && today ? [...items].sort((a, b) => getDaysLeft(a, today) - getDaysLeft(b, today)) : []
 
 	return (
-		<div className='mx-auto w-full max-w-2xl px-6 pt-24 pb-12 max-sm:px-4'>
+		<div className='mx-auto w-full max-w-2xl px-6 pt-8 pb-12 max-sm:px-4'>
 			<div className='mb-10 text-center'>
 				<h1 className='font-averia flex items-center justify-center gap-2 text-3xl font-medium'>
 					<CalendarHeart className='text-brand h-7 w-7' />
