@@ -1,235 +1,243 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+import { onMount } from "svelte";
 
-	/**
-	 * Tab 径向轮盘菜单（搬自 Jojo-blog）
-	 * 按住 Tab：在鼠标位置呼出轮盘；鼠标移动吸附最近图标；
-	 * 松开 Tab：跳转到选中项；什么都没选/按 ESC：收起。
-	 */
+/**
+ * Tab 径向轮盘菜单（搬自 Jojo-blog）
+ * 按住 Tab：在鼠标位置呼出轮盘；鼠标移动吸附最近图标；
+ * 松开 Tab：跳转到选中项；什么都没选/按 ESC：收起。
+ */
 
-	interface NavItem {
-		label: string;
-		href: string;
-		d: string[]; // SVG path 数据（Feather 风格描边图标）
-	}
+interface NavItem {
+	label: string;
+	href: string;
+	d: string[]; // SVG path 数据（Feather 风格描边图标）
+}
 
-	// 12 个导航项 —— 顺序 = 从正上方开始、顺时针的出场顺序
-	const NAV_ITEMS: NavItem[] = [
-		{
-			label: "主页",
-			href: "/",
-			d: ["M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "M9 22V12h6v10"],
-		},
-		{
-			label: "归档",
-			href: "/archive/",
-			d: ["M21 8v13H3V8", "M23 3H1v5h22V3z", "M10 12h4"],
-		},
-		{
-			label: "分类",
-			href: "/categories/",
-			d: ["M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"],
-		},
-		{
-			label: "标签",
-			href: "/tags/",
-			d: [
-				"M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z",
-				"M7 7h.01",
-			],
-		},
-		{
-			label: "友链",
-			href: "/friends/",
-			d: [
-				"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2",
-				"M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
-				"M23 21v-2a4 4 0 0 0-3-3.87",
-				"M16 3.13a4 4 0 0 1 0 7.75",
-			],
-		},
-		{
-			label: "朋友圈",
-			href: "/moments/",
-			d: ["M4 11a9 9 0 0 1 9 9", "M4 4a16 16 0 0 1 16 16", "M5 19h.01"],
-		},
-		{
-			label: "留言",
-			href: "/guestbook/",
-			d: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"],
-		},
-		{
-			label: "相册",
-			href: "/gallery/",
-			d: [
-				"M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
-				"M10 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z",
-				"M21 15l-5-5L5 21",
-			],
-		},
-		{
-			label: "追番",
-			href: "/anime/",
-			d: ["M4 7h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z", "M17 2l-5 5-5-5"],
-		},
-		{
-			label: "日记",
-			href: "/diary/",
-			d: [
-				"M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z",
-				"M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z",
-			],
-		},
-		{
-			label: "工具",
-			href: "/tools/",
-			d: [
-				"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z",
-			],
-		},
-		{
-			label: "关于",
-			href: "/about/",
-			d: ["M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2", "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
-		},
-	];
+// 12 个导航项 —— 顺序 = 从正上方开始、顺时针的出场顺序
+const NAV_ITEMS: NavItem[] = [
+	{
+		label: "主页",
+		href: "/",
+		d: ["M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "M9 22V12h6v10"],
+	},
+	{
+		label: "归档",
+		href: "/archive/",
+		d: ["M21 8v13H3V8", "M23 3H1v5h22V3z", "M10 12h4"],
+	},
+	{
+		label: "分类",
+		href: "/categories/",
+		d: [
+			"M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z",
+		],
+	},
+	{
+		label: "标签",
+		href: "/tags/",
+		d: [
+			"M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z",
+			"M7 7h.01",
+		],
+	},
+	{
+		label: "友链",
+		href: "/friends/",
+		d: [
+			"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2",
+			"M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+			"M23 21v-2a4 4 0 0 0-3-3.87",
+			"M16 3.13a4 4 0 0 1 0 7.75",
+		],
+	},
+	{
+		label: "朋友圈",
+		href: "/moments/",
+		d: ["M4 11a9 9 0 0 1 9 9", "M4 4a16 16 0 0 1 16 16", "M5 19h.01"],
+	},
+	{
+		label: "留言",
+		href: "/guestbook/",
+		d: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"],
+	},
+	{
+		label: "相册",
+		href: "/gallery/",
+		d: [
+			"M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
+			"M10 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z",
+			"M21 15l-5-5L5 21",
+		],
+	},
+	{
+		label: "追番",
+		href: "/anime/",
+		d: [
+			"M4 7h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z",
+			"M17 2l-5 5-5-5",
+		],
+	},
+	{
+		label: "日记",
+		href: "/diary/",
+		d: [
+			"M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z",
+			"M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z",
+		],
+	},
+	{
+		label: "工具",
+		href: "/tools/",
+		d: [
+			"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z",
+		],
+	},
+	{
+		label: "关于",
+		href: "/about/",
+		d: [
+			"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2",
+			"M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+		],
+	},
+];
 
-	const RADIUS = 140; // 菜单项中心到轮盘圆心的距离
-	const BTN_SIZE = 64; // 方块按钮尺寸
-	const CENTER_DEAD = 30; // 圆心 30px 内不选中，留给中心玻璃圆
-	const CLOSE_DURATION = 150; // 收起动画时长
+const RADIUS = 140; // 菜单项中心到轮盘圆心的距离
+const BTN_SIZE = 64; // 方块按钮尺寸
+const CENTER_DEAD = 30; // 圆心 30px 内不选中，留给中心玻璃圆
+const CLOSE_DURATION = 150; // 收起动画时长
 
-	let open = $state(false);
-	let closing = $state(false);
-	let center = $state({ x: 0, y: 0 });
-	let active = $state(-1);
-	let pathname = $state("/");
+let open = $state(false);
+let closing = $state(false);
+let center = $state({ x: 0, y: 0 });
+let active = $state(-1);
+let pathname = $state("/");
 
-	// 监听器只挂载一次，用普通变量同步最新状态，避免闭包拿到旧值
-	const mouse = { x: 0, y: 0 };
-	let closeTimer: ReturnType<typeof setTimeout> | undefined;
+// 监听器只挂载一次，用普通变量同步最新状态，避免闭包拿到旧值
+const mouse = { x: 0, y: 0 };
+let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
-	/** 把轮盘中心限制在视口内，避免鼠标靠近屏幕边缘时按钮被裁切；视口太小直接居中 */
-	function clampCenter(x: number, y: number) {
-		const marginX = RADIUS + 56;
-		const marginY = RADIUS + 72;
-		const w = window.innerWidth;
-		const h = window.innerHeight;
-		if (w < marginX * 2 || h < marginY * 2) return { x: w / 2, y: h / 2 };
-		return {
-			x: Math.min(Math.max(x, marginX), w - marginX),
-			y: Math.min(Math.max(y, marginY), h - marginY),
-		};
-	}
+/** 把轮盘中心限制在视口内，避免鼠标靠近屏幕边缘时按钮被裁切；视口太小直接居中 */
+function clampCenter(x: number, y: number) {
+	const marginX = RADIUS + 56;
+	const marginY = RADIUS + 72;
+	const w = window.innerWidth;
+	const h = window.innerHeight;
+	if (w < marginX * 2 || h < marginY * 2) return { x: w / 2, y: h / 2 };
+	return {
+		x: Math.min(Math.max(x, marginX), w - marginX),
+		y: Math.min(Math.max(y, marginY), h - marginY),
+	};
+}
 
-	/** 找离鼠标坐标最近的菜单项下标；鼠标位于中心圆区域内时返回 -1 */
-	function getActiveIndex(mx: number, my: number) {
-		if (Math.hypot(mx - center.x, my - center.y) < CENTER_DEAD) return -1;
-		let closest = -1;
-		let minDist = Number.POSITIVE_INFINITY;
-		NAV_ITEMS.forEach((_, i) => {
-			const angle = (i / NAV_ITEMS.length) * Math.PI * 2 - Math.PI / 2;
-			const ix = center.x + Math.cos(angle) * RADIUS;
-			const iy = center.y + Math.sin(angle) * RADIUS;
-			const d = Math.hypot(mx - ix, my - iy);
-			if (d < minDist) {
-				minDist = d;
-				closest = i;
-			}
-		});
-		return closest;
-	}
+/** 找离鼠标坐标最近的菜单项下标；鼠标位于中心圆区域内时返回 -1 */
+function getActiveIndex(mx: number, my: number) {
+	if (Math.hypot(mx - center.x, my - center.y) < CENTER_DEAD) return -1;
+	let closest = -1;
+	let minDist = Number.POSITIVE_INFINITY;
+	NAV_ITEMS.forEach((_, i) => {
+		const angle = (i / NAV_ITEMS.length) * Math.PI * 2 - Math.PI / 2;
+		const ix = center.x + Math.cos(angle) * RADIUS;
+		const iy = center.y + Math.sin(angle) * RADIUS;
+		const d = Math.hypot(mx - ix, my - iy);
+		if (d < minDist) {
+			minDist = d;
+			closest = i;
+		}
+	});
+	return closest;
+}
 
-	function openMenu() {
-		clearTimeout(closeTimer);
-		closing = false;
-		// 没有鼠标记录（如刚打开页面直接按 Tab）就居中呼出
-		const mx = mouse.x || window.innerWidth / 2;
-		const my = mouse.y || window.innerHeight / 2;
-		center = clampCenter(mx, my);
-		active = -1;
-		open = true;
-	}
+function openMenu() {
+	clearTimeout(closeTimer);
+	closing = false;
+	// 没有鼠标记录（如刚打开页面直接按 Tab）就居中呼出
+	const mx = mouse.x || window.innerWidth / 2;
+	const my = mouse.y || window.innerHeight / 2;
+	center = clampCenter(mx, my);
+	active = -1;
+	open = true;
+}
 
-	/** 带淡出动画地收起 */
-	function beginClose() {
-		if (!open || closing) return;
-		closing = true;
-		closeTimer = setTimeout(() => {
-			open = false;
-			closing = false;
-			active = -1;
-		}, CLOSE_DURATION);
-	}
-
-	/** 立即收起（跳转前用，不做淡出） */
-	function closeNow() {
-		clearTimeout(closeTimer);
+/** 带淡出动画地收起 */
+function beginClose() {
+	if (!open || closing) return;
+	closing = true;
+	closeTimer = setTimeout(() => {
 		open = false;
 		closing = false;
 		active = -1;
-	}
+	}, CLOSE_DURATION);
+}
 
-	function goTo(i: number) {
-		const item = NAV_ITEMS[i];
-		if (!item) return;
-		closeNow();
-		// Astro 多页应用：直接整页跳转；同页则只收起轮盘
-		const normalize = (p: string) => (p.endsWith("/") ? p : `${p}/`);
-		if (normalize(pathname) === normalize(item.href)) return;
-		window.location.href = item.href;
-	}
+/** 立即收起（跳转前用，不做淡出） */
+function closeNow() {
+	clearTimeout(closeTimer);
+	open = false;
+	closing = false;
+	active = -1;
+}
 
-	function onMouseMove(e: MouseEvent) {
-		mouse.x = e.clientX;
-		mouse.y = e.clientY;
-		// 轮盘打开期间：鼠标移动 → 实时吸附到最近的图标
-		if (open && !closing) active = getActiveIndex(e.clientX, e.clientY);
-	}
+function goTo(i: number) {
+	const item = NAV_ITEMS[i];
+	if (!item) return;
+	closeNow();
+	// Astro 多页应用：直接整页跳转；同页则只收起轮盘
+	const normalize = (p: string) => (p.endsWith("/") ? p : `${p}/`);
+	if (normalize(pathname) === normalize(item.href)) return;
+	window.location.href = item.href;
+}
 
-	function onKeyDown(e: KeyboardEvent) {
-		if (e.key === "Escape" && open) {
-			e.preventDefault();
-			beginClose();
-			return;
-		}
-		if (e.key !== "Tab") return;
-		// 正在输入框/编辑器里打字时不劫持 Tab
-		const el = document.activeElement as HTMLElement | null;
-		if (
-			el &&
-			(el.tagName === "INPUT" ||
-				el.tagName === "TEXTAREA" ||
-				el.tagName === "SELECT" ||
-				el.isContentEditable)
-		) {
-			return;
-		}
+function onMouseMove(e: MouseEvent) {
+	mouse.x = e.clientX;
+	mouse.y = e.clientY;
+	// 轮盘打开期间：鼠标移动 → 实时吸附到最近的图标
+	if (open && !closing) active = getActiveIndex(e.clientX, e.clientY);
+}
 
-		e.preventDefault(); // 一律阻止浏览器默认的焦点切换
-		// 按住 Tab 不松会连续触发 keydown（e.repeat），且轮盘已开时也不重复呼出
-		if (e.repeat || open) return;
-
-		el?.blur();
-		openMenu();
-	}
-
-	function onKeyUp(e: KeyboardEvent) {
-		if (e.key !== "Tab" || !open) return;
+function onKeyDown(e: KeyboardEvent) {
+	if (e.key === "Escape" && open) {
 		e.preventDefault();
-		// 收起动画期间松开 Tab：直接完成收起
-		if (closing) {
-			closeNow();
-			return;
-		}
-		// 松开 Tab：有选中项就跳转，什么都没选中则收起
-		if (active >= 0) goTo(active);
-		else beginClose();
+		beginClose();
+		return;
+	}
+	if (e.key !== "Tab") return;
+	// 正在输入框/编辑器里打字时不劫持 Tab
+	const el = document.activeElement as HTMLElement | null;
+	if (
+		el &&
+		(el.tagName === "INPUT" ||
+			el.tagName === "TEXTAREA" ||
+			el.tagName === "SELECT" ||
+			el.isContentEditable)
+	) {
+		return;
 	}
 
-	onMount(() => {
-		pathname = window.location.pathname;
-	});
+	e.preventDefault(); // 一律阻止浏览器默认的焦点切换
+	// 按住 Tab 不松会连续触发 keydown（e.repeat），且轮盘已开时也不重复呼出
+	if (e.repeat || open) return;
+
+	el?.blur();
+	openMenu();
+}
+
+function onKeyUp(e: KeyboardEvent) {
+	if (e.key !== "Tab" || !open) return;
+	e.preventDefault();
+	// 收起动画期间松开 Tab：直接完成收起
+	if (closing) {
+		closeNow();
+		return;
+	}
+	// 松开 Tab：有选中项就跳转，什么都没选中则收起
+	if (active >= 0) goTo(active);
+	else beginClose();
+}
+
+onMount(() => {
+	pathname = window.location.pathname;
+});
 </script>
 
 <svelte:window onmousemove={onMouseMove} onkeydown={onKeyDown} onkeyup={onKeyUp} onblur={closeNow} />

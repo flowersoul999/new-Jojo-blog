@@ -90,7 +90,8 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "夏夜流萤",
-		imgurl: "https://weavatar.com/avatar/d252655d40d6874417a720bad0a6c5f77f8f6a1fd2f882f8f338402dc37e4190?s=640",
+		imgurl:
+			"https://weavatar.com/avatar/d252655d40d6874417a720bad0a6c5f77f8f6a1fd2f882f8f338402dc37e4190?s=640",
 		desc: "飞萤之火自无梦的长夜亮起，绽放在终竟的明天。",
 		siteurl: "https://blog.cuteleaf.cn/",
 		rss: "https://blog.cuteleaf.cn/rss.xml",
@@ -102,7 +103,8 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "AIOVTUE-雪",
-		imgurl: "https://r2tc.20030327.xyz/file/博客/主题/1780655293662_avatar_me.jpg.PNG",
+		imgurl:
+			"https://r2tc.20030327.xyz/file/博客/主题/1780655293662_avatar_me.jpg.PNG",
 		desc: "雨滴会记录生命中的每一个瞬间",
 		siteurl: "https://daily.yybb.us/",
 		screenshot: "/friends/screenshots/aiovtue.webp",
@@ -148,7 +150,8 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "Asteri5m的小破站",
-		imgurl: "https://asteri5m.icu/upload/20af907e-4769-4251-8e8c-0f0b52355380.png",
+		imgurl:
+			"https://asteri5m.icu/upload/20af907e-4769-4251-8e8c-0f0b52355380.png",
 		desc: "别等时间不够的时候再后悔",
 		siteurl: "https://asteri5m.icu/",
 		screenshot: "/friends/screenshots/asteri5m.webp",
@@ -389,11 +392,13 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "日和",
-		imgurl: "https://i0.hdslb.com/bfs/face/a09cb25595f69324ed7da361391de337dbe47601.jpg",
+		imgurl:
+			"https://i0.hdslb.com/bfs/face/a09cb25595f69324ed7da361391de337dbe47601.jpg",
 		desc: "想把一些代码笔记、阅读碎片和日常里的小幸福慢慢留下来，以及分享一些有趣的东西",
 		siteurl: "https://codevfun.work/",
 		rss: "https://codevfun.work/feed.xml",
-		screenshot: "https://codevfun.work/api/img/1787289449376-r1f0io.webp?w=1200",
+		screenshot:
+			"https://codevfun.work/api/img/1787289449376-r1f0io.webp?w=1200",
 		tags: ["个人博客", "代码笔记", "阅读记录", "生活记录"],
 		weight: -160,
 		enabled: true,
@@ -420,7 +425,8 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "没吃饱的天镜镜",
-		imgurl: "https://blogr2.8765777.xyz/assets/my/7590A261E0E39A642ABF4873E89EAFF9.jpg",
+		imgurl:
+			"https://blogr2.8765777.xyz/assets/my/7590A261E0E39A642ABF4873E89EAFF9.jpg",
 		desc: "诺贝尔奖关注者，文学奖读者",
 		siteurl: "https://blog.8765777.xyz/",
 		rss: "https://blog.8765777.xyz/rss.xml",
@@ -548,7 +554,8 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "第四世界",
-		imgurl: "https://onewumi.com/wp-content/uploads/2025/10/cropped-cropped-cropped-cropped-4world-LOGO-scaled-1-192x192.png",
+		imgurl:
+			"https://onewumi.com/wp-content/uploads/2025/10/cropped-cropped-cropped-cropped-4world-LOGO-scaled-1-192x192.png",
 		desc: "记录生活、分享思考、创造美。",
 		siteurl: "https://onewumi.com/",
 		rss: "https://onewumi.com/feed/",
@@ -586,7 +593,8 @@ export const friendsConfig: FriendLink[] = [
 		desc: "星宇安全实验室，专注网络安全技术分享，记录团队实战经历、安全研究与编程成长笔记，致力于分享网安学习干货。",
 		siteurl: "https://bk.zhaozhiqiang.pw",
 		rss: "https://bk.zhaozhiqiang.pw/feed",
-		screenshot: "https://bk.zhaozhiqiang.pw/wp-content/uploads/2026/09/2026-09-09-140947.png",
+		screenshot:
+			"https://bk.zhaozhiqiang.pw/wp-content/uploads/2026/09/2026-09-09-140947.png",
 		tags: ["网络安全", "技术分享", "编程成长"],
 		weight: -340,
 		enabled: true,

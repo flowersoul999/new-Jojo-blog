@@ -60,7 +60,23 @@ let statusType: "info" | "success" | "error" = "info";
 let markedLoaded = false;
 
 // 可编辑的文本文件扩展名
-const TEXT_EXTENSIONS = [".md", ".mdx", ".ts", ".tsx", ".js", ".mjs", ".cjs", ".json", ".css", ".styl", ".html", ".astro", ".yml", ".yaml", ".txt"];
+const TEXT_EXTENSIONS = [
+	".md",
+	".mdx",
+	".ts",
+	".tsx",
+	".js",
+	".mjs",
+	".cjs",
+	".json",
+	".css",
+	".styl",
+	".html",
+	".astro",
+	".yml",
+	".yaml",
+	".txt",
+];
 
 // 判断是否为可编辑文本文件
 function isEditable(name: string): boolean {
@@ -76,7 +92,9 @@ function isImage(name: string): boolean {
 async function checkAuth() {
 	checkingAuth = true;
 	try {
-		const res = await fetch("/api/auth/status/", { credentials: "same-origin" });
+		const res = await fetch("/api/auth/status/", {
+			credentials: "same-origin",
+		});
 		const data = await res.json();
 		authenticated = data.authenticated === true;
 		user = data.user || null;
@@ -93,7 +111,9 @@ async function loadFiles(path = currentPath) {
 	loading = true;
 	statusMsg = "";
 	try {
-		const res = await fetch(`/api/content/list/?path=${encodeURIComponent(path)}`);
+		const res = await fetch(
+			`/api/content/list/?path=${encodeURIComponent(path)}`,
+		);
 		if (!res.ok) throw new Error((await res.json()).error || "加载失败");
 		const data = await res.json();
 		files = Array.isArray(data) ? data : [];
@@ -118,7 +138,9 @@ async function readFile(path: string, name: string) {
 	loading = true;
 	statusMsg = "";
 	try {
-		const res = await fetch(`/api/content/read/?path=${encodeURIComponent(path)}`);
+		const res = await fetch(
+			`/api/content/read/?path=${encodeURIComponent(path)}`,
+		);
 		if (!res.ok) throw new Error((await res.json()).error || "读取失败");
 		const data: FileContent = await res.json();
 		activeFile = data;
@@ -269,6 +291,14 @@ onMount(() => {
 	} else {
 		markedLoaded = true;
 	}
+
+	// 响应导航栏「内容管理」入口：打开全屏编辑器面板
+	function handleOpenRequest() {
+		if (authenticated) open = true;
+	}
+	window.addEventListener("content-editor:open", handleOpenRequest);
+	return () =>
+		window.removeEventListener("content-editor:open", handleOpenRequest);
 });
 </script>
 

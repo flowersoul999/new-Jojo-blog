@@ -13,10 +13,10 @@ const { style } = Astro.props;
 const className = Astro.props.class;
 const umamiAnalytics = analyticsConfig.umamiAnalytics;
 const showUmamiStats = Boolean(
-  umamiAnalytics?.websiteId &&
-  umamiAnalytics.shareId &&
-  umamiAnalytics.shareApiBase &&
-  umamiAnalytics.showSiteStats !== false,
+	umamiAnalytics?.websiteId &&
+		umamiAnalytics.shareId &&
+		umamiAnalytics.shareApiBase &&
+		umamiAnalytics.showSiteStats !== false,
 );
 ---
 

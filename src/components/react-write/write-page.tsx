@@ -1,22 +1,22 @@
 "use client";
 
-// 线上发文编辑器（UI 迁移自 jojoblog /write，存储适配 Aemeath）
-// - 文章：src/content/posts/{slug}.md（Astro content collection，frontmatter 由表单生成）
-// - 图片：public/blogs/{slug}/{hash}.ext，正文以 /blogs/{slug}/x.png 引用
-// - 读写全部走站点 /api/content/* 端点（本地 DEV 直接写文件，线上经 GitHub Contents API）
-import { useEffect, useRef, useState, type ReactElement } from "react";
-import { toast } from "sonner";
 import {
+	Eye,
+	FileUp,
+	FolderOpen,
 	Loader2,
 	Plus,
-	FileUp,
-	Eye,
 	Save,
 	Send,
 	Trash2,
 	X,
-	FolderOpen,
 } from "lucide-react";
+// 线上发文编辑器（UI 迁移自 jojoblog /write，存储适配 Aemeath）
+// - 文章：src/content/posts/{slug}.md（Astro content collection，frontmatter 由表单生成）
+// - 图片：public/blogs/{slug}/{hash}.ext，正文以 /blogs/{slug}/x.png 引用
+// - 读写全部走站点 /api/content/* 端点（本地 DEV 直接写文件，线上经 GitHub Contents API）
+import { type ReactElement, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { buildPostMarkdown, parsePostMarkdown } from "./frontmatter";
 
 // ---------- 类型 ----------
@@ -25,7 +25,14 @@ type GithubUser = { login: string; avatar_url: string; name: string | null };
 
 type ImageItem =
 	| { id: string; type: "url"; url: string }
-	| { id: string; type: "file"; file: File; previewUrl: string; filename: string; hash?: string };
+	| {
+			id: string;
+			type: "file";
+			file: File;
+			previewUrl: string;
+			filename: string;
+			hash?: string;
+	  };
 
 type PostForm = {
 	slug: string;
@@ -52,7 +59,14 @@ type Draft = {
 // 任务持久化到 sessionStorage，刷新后自动续跑（图片按 hash 幂等上传）。
 type JobImage =
 	| { id: string; kind: "url"; url: string }
-	| { id: string; kind: "file"; hash: string; ext: string; publicPath: string; confirmed: boolean };
+	| {
+			id: string;
+			kind: "file";
+			hash: string;
+			ext: string;
+			publicPath: string;
+			confirmed: boolean;
+	  };
 
 type PublishJob = {
 	slug: string;
@@ -140,7 +154,13 @@ function loadMarked(): Promise<void> {
 
 // ---------- 小组件 ----------
 
-function TagInput({ tags, onChange }: { tags: string[]; onChange: (v: string[]) => void }): ReactElement {
+function TagInput({
+	tags,
+	onChange,
+}: {
+	tags: string[];
+	onChange: (v: string[]) => void;
+}): ReactElement {
 	const [value, setValue] = useState("");
 	const add = () => {
 		const v = value.trim();
@@ -157,7 +177,10 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (v: string[]) 
 							className="flex items-center gap-1.5 rounded-md bg-brand/15 px-2 py-0.5 text-xs text-brand"
 						>
 							#{tag}
-							<button type="button" onClick={() => onChange(tags.filter((_, idx) => idx !== i))}>
+							<button
+								type="button"
+								onClick={() => onChange(tags.filter((_, idx) => idx !== i))}
+							>
 								×
 							</button>
 						</span>
@@ -185,7 +208,9 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (v: string[]) 
 
 export default function WritePage(): ReactElement {
 	// 认证
-	const [authState, setAuthState] = useState<"checking" | "anon" | "authed">("checking");
+	const [authState, setAuthState] = useState<"checking" | "anon" | "authed">(
+		"checking",
+	);
 	const [, setUser] = useState<GithubUser | null>(null);
 
 	// 模式与表单
@@ -212,24 +237,36 @@ export default function WritePage(): ReactElement {
 	const imagesFileRef = useRef<HTMLInputElement>(null);
 	const [urlInput, setUrlInput] = useState("");
 
-	const update = (patch: Partial<PostForm>) => setForm((f) => ({ ...f, ...patch }));
-	const coverPreview = cover ? (cover.type === "url" ? cover.url : cover.previewUrl) : "";
+	const update = (patch: Partial<PostForm>) =>
+		setForm((f) => ({ ...f, ...patch }));
+	const coverPreview = cover
+		? cover.type === "url"
+			? cover.url
+			: cover.previewUrl
+		: "";
 
 	// ---------- 初始化：认证 + 文章列表 + 草稿 ----------
+	// 仅在挂载时执行一次：runJob/hydrateFromJob 每次渲染都会重建，加入依赖会导致重复请求
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 仅挂载执行一次，runJob/hydrateFromJob 每次渲染重建，加入依赖会导致重复请求
 	useEffect(() => {
 		(async () => {
 			try {
-				const res = await fetch("/api/auth/status/", { credentials: "same-origin" });
+				const res = await fetch("/api/auth/status/", {
+					credentials: "same-origin",
+				});
 				const data = await res.json();
 				if (data.authenticated) {
 					setAuthState("authed");
 					setUser(data.user || null);
-					const listRes = await fetch("/api/content/list/?path=src/content/posts");
+					const listRes = await fetch(
+						"/api/content/list/?path=src/content/posts",
+					);
 					if (listRes.ok) {
 						const list = (await listRes.json()) as PostListItem[];
 						setPostList(
 							list.filter(
-								(item) => item.type === "file" && /\.(md|mdx)$/i.test(item.name),
+								(item) =>
+									item.type === "file" && /\.(md|mdx)$/i.test(item.name),
 							),
 						);
 					}
@@ -272,7 +309,10 @@ export default function WritePage(): ReactElement {
 		// 与当前会话中已添加的图片按 hash 去重
 		const existingHashes = new Set(
 			images
-				.filter((it): it is Extract<ImageItem, { type: "file" }> => it.type === "file" && !!it.hash)
+				.filter(
+					(it): it is Extract<ImageItem, { type: "file" }> =>
+						it.type === "file" && !!it.hash,
+				)
 				.map((it) => it.hash),
 		);
 		const seen = new Set<string>();
@@ -304,14 +344,18 @@ export default function WritePage(): ReactElement {
 			toast.info("该图片已在列表中");
 			return;
 		}
-		setImages((prev) => [{ id: Math.random().toString(36).slice(2, 10), type: "url", url }, ...prev]);
+		setImages((prev) => [
+			{ id: Math.random().toString(36).slice(2, 10), type: "url", url },
+			...prev,
+		]);
 		setUrlInput("");
 	};
 
 	const deleteImage = (id: string) => {
 		setImages((prev) => {
 			for (const it of prev) {
-				if (it.id === id && it.type === "file") URL.revokeObjectURL(it.previewUrl);
+				if (it.id === id && it.type === "file")
+					URL.revokeObjectURL(it.previewUrl);
 			}
 			return prev.filter((it) => it.id !== id);
 		});
@@ -326,10 +370,14 @@ export default function WritePage(): ReactElement {
 		}
 		ta.focus();
 		const { selectionStart, selectionEnd, value } = ta;
-		const next = value.slice(0, selectionStart) + text + value.slice(selectionEnd);
+		const next =
+			value.slice(0, selectionStart) + text + value.slice(selectionEnd);
 		update({ md: next });
 		requestAnimationFrame(() => {
-			ta.setSelectionRange(selectionStart + text.length, selectionStart + text.length);
+			ta.setSelectionRange(
+				selectionStart + text.length,
+				selectionStart + text.length,
+			);
 			ta.focus();
 		});
 	};
@@ -373,21 +421,28 @@ export default function WritePage(): ReactElement {
 		if (files.length === 0) return;
 		e.preventDefault();
 		const added = await addFiles(files);
-		const md = added.map((it) =>
-			it.type === "url" ? `![](${it.url})` : `![](local-image:${it.id})`,
-		).join("\n");
+		const md = added
+			.map((it) =>
+				it.type === "url" ? `![](${it.url})` : `![](local-image:${it.id})`,
+			)
+			.join("\n");
 		if (md) insertMarkdown(md);
 	};
 
 	// ---------- 加载已有文章 ----------
 	const loadPost = async (filePath: string) => {
 		if (!filePath) return;
-		if (form.md && !window.confirm("当前内容尚未发布，确定切换文章吗？未保存内容将丢失。")) {
+		if (
+			form.md &&
+			!window.confirm("当前内容尚未发布，确定切换文章吗？未保存内容将丢失。")
+		) {
 			setSelectedPost("");
 			return;
 		}
 		try {
-			const res = await fetch(`/api/content/read/?path=${encodeURIComponent(filePath)}`);
+			const res = await fetch(
+				`/api/content/read/?path=${encodeURIComponent(filePath)}`,
+			);
 			if (!res.ok) throw new Error((await res.json()).error || "读取失败");
 			const data = await res.json();
 			const raw: string = data.content ?? "";
@@ -396,19 +451,34 @@ export default function WritePage(): ReactElement {
 			// 解析正文里已有的网络图/本站图
 			const urlImages: ImageItem[] = [];
 			const imgRegex = /!\[.*?\]\(([^)]+)\)/g;
-			let m: RegExpExecArray | null;
-			while ((m = imgRegex.exec(body)) !== null) {
+			let m = imgRegex.exec(body);
+			while (m !== null) {
 				const u = m[1];
-				if (u && !u.startsWith("local-image:") && !urlImages.some((it) => it.type === "url" && it.url === u)) {
-					urlImages.push({ id: Math.random().toString(36).slice(2, 10), type: "url", url: u });
+				if (
+					u &&
+					!u.startsWith("local-image:") &&
+					!urlImages.some((it) => it.type === "url" && it.url === u)
+				) {
+					urlImages.push({
+						id: Math.random().toString(36).slice(2, 10),
+						type: "url",
+						url: u,
+					});
 				}
+				m = imgRegex.exec(body);
 			}
 
-			const slug = filePath.split("/").pop()?.replace(/\.(md|mdx)$/i, "") || "";
+			const slug =
+				filePath
+					.split("/")
+					.pop()
+					?.replace(/\.(md|mdx)$/i, "") || "";
 			setMode("edit");
 			setOriginalSlug(slug);
 			setImages(urlImages);
-			setCover(meta.image ? { id: "cover", type: "url", url: meta.image } : null);
+			setCover(
+				meta.image ? { id: "cover", type: "url", url: meta.image } : null,
+			);
 			setForm({
 				slug,
 				title: meta.title,
@@ -449,7 +519,10 @@ export default function WritePage(): ReactElement {
 			form,
 			coverUrl: cover?.type === "url" ? cover.url : "",
 		};
-		const next = [draft, ...drafts.filter((d) => d.form.slug !== form.slug)].slice(0, 20);
+		const next = [
+			draft,
+			...drafts.filter((d) => d.form.slug !== form.slug),
+		].slice(0, 20);
 		setDrafts(next);
 		localStorage.setItem(DRAFTS_KEY, JSON.stringify(next));
 		toast.success("草稿已存入本地浏览器");
@@ -461,7 +534,9 @@ export default function WritePage(): ReactElement {
 		setSelectedPost("");
 		setForm(draft.form);
 		setImages([]);
-		setCover(draft.coverUrl ? { id: "cover", type: "url", url: draft.coverUrl } : null);
+		setCover(
+			draft.coverUrl ? { id: "cover", type: "url", url: draft.coverUrl } : null,
+		);
 		setShowDrafts(false);
 		toast.success("草稿已载入");
 	};
@@ -512,7 +587,10 @@ export default function WritePage(): ReactElement {
 		setPublishing(true);
 		try {
 			// 1. 图片：快照已确认 / 目标 URL 已存在则跳过；否则用本次会话里的 File 上传
-			const all: JobImage[] = [...job.images, ...(job.cover ? [job.cover] : [])];
+			const all: JobImage[] = [
+				...job.images,
+				...(job.cover ? [job.cover] : []),
+			];
 			const handled = new Set<string>();
 			for (const img of all) {
 				if (img.kind === "url" || handled.has(img.id)) continue;
@@ -524,7 +602,9 @@ export default function WritePage(): ReactElement {
 					} else {
 						const file = liveFiles.get(img.id);
 						if (!file) {
-							throw new Error("页面已刷新且部分图片尚未上传，请重新添加图片后再发布");
+							throw new Error(
+								"页面已刷新且部分图片尚未上传，请重新添加图片后再发布",
+							);
 						}
 						const filename = `${img.hash}${img.ext}`;
 						toast.info(`上传图片 ${filename.slice(0, 12)}…`);
@@ -538,7 +618,10 @@ export default function WritePage(): ReactElement {
 								message: `Upload image ${filename}`,
 							}),
 						});
-						if (!res.ok) throw new Error((await res.json()).error || `图片上传失败：${filename}`);
+						if (!res.ok)
+							throw new Error(
+								(await res.json()).error || `图片上传失败：${filename}`,
+							);
 						img.confirmed = true;
 					}
 					// 写入后 dev 可能立刻全量刷新，尽快落盘快照
@@ -550,7 +633,9 @@ export default function WritePage(): ReactElement {
 			let bodyMd = job.md;
 			for (const img of all) {
 				if (img.kind === "file") {
-					bodyMd = bodyMd.split(`(local-image:${img.id})`).join(`(${img.publicPath})`);
+					bodyMd = bodyMd
+						.split(`(local-image:${img.id})`)
+						.join(`(${img.publicPath})`);
 				}
 			}
 			bodyMd = bodyMd.replace(/\(local-image:[^)]+\)/g, "()");
@@ -578,7 +663,9 @@ export default function WritePage(): ReactElement {
 			const postPath = `src/content/posts/${job.slug}.md`;
 			let remote = "";
 			try {
-				const readRes = await fetch(`/api/content/read/?path=${encodeURIComponent(postPath)}`);
+				const readRes = await fetch(
+					`/api/content/read/?path=${encodeURIComponent(postPath)}`,
+				);
 				if (readRes.ok) {
 					const data = await readRes.json();
 					remote = String(data.content ?? "").replace(/\r\n/g, "\n");
@@ -640,7 +727,11 @@ export default function WritePage(): ReactElement {
 				return toast.error("存在已失效的粘贴图片，请删除对应占位符后重新粘贴");
 			}
 		}
-		if ([...jobImages, ...(jobCover ? [jobCover] : [])].some((i) => i.kind === "file" && !i.hash)) {
+		if (
+			[...jobImages, ...(jobCover ? [jobCover] : [])].some(
+				(i) => i.kind === "file" && !i.hash,
+			)
+		) {
 			return toast.error("部分图片尚未完成处理，请稍后重试");
 		}
 
@@ -671,7 +762,10 @@ export default function WritePage(): ReactElement {
 	const removePost = async () => {
 		const target = originalSlug || form.slug;
 		if (!target) return toast.error("缺少 slug，无法删除");
-		if (!window.confirm(`确定删除《${form.title || target}》吗？此操作不可恢复。`)) return;
+		if (
+			!window.confirm(`确定删除《${form.title || target}》吗？此操作不可恢复。`)
+		)
+			return;
 		try {
 			const res = await fetch("/api/content/delete/", {
 				method: "POST",
@@ -703,7 +797,8 @@ export default function WritePage(): ReactElement {
 			title: meta.title || file.name.replace(/\.mdx?$/i, ""),
 			md: body,
 		});
-		if (!form.slug) update({ slug: slugify(file.name.replace(/\.mdx?$/i, "")) });
+		if (!form.slug)
+			update({ slug: slugify(file.name.replace(/\.mdx?$/i, "")) });
 		toast.success("已导入 Markdown 文件");
 		e.target.value = "";
 	};
@@ -735,7 +830,13 @@ export default function WritePage(): ReactElement {
 						className="brand-btn mx-auto mt-6 gap-2 bg-gray-900"
 						style={{ background: "#24292f" }}
 					>
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+						<svg
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="currentColor"
+							aria-hidden="true"
+						>
 							<path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
 						</svg>
 						GitHub 登录
@@ -748,7 +849,13 @@ export default function WritePage(): ReactElement {
 	// ---------- 渲染：编辑器 ----------
 	return (
 		<div className="treasure-root min-h-screen px-4 pb-16 pt-20">
-			<input ref={mdFileRef} type="file" accept=".md,.mdx" className="hidden" onChange={importMdFile} />
+			<input
+				ref={mdFileRef}
+				type="file"
+				accept=".md,.mdx"
+				className="hidden"
+				onChange={importMdFile}
+			/>
 			<input
 				ref={coverFileRef}
 				type="file"
@@ -803,37 +910,62 @@ export default function WritePage(): ReactElement {
 					</div>
 
 					<div className="ml-auto flex flex-wrap items-center gap-2">
-						<button className="brand-btn !bg-transparent !text-current border" onClick={resetToCreate}>
+						<button
+							type="button"
+							className="brand-btn !bg-transparent !text-current border"
+							onClick={resetToCreate}
+						>
 							<Plus className="mr-1 h-3.5 w-3.5" /> 新建
 						</button>
 						<button
+							type="button"
 							className="brand-btn !bg-transparent !text-current border"
 							onClick={() => mdFileRef.current?.click()}
 						>
 							<FileUp className="mr-1 h-3.5 w-3.5" /> 导入 MD
 						</button>
 						<button
+							type="button"
 							className="brand-btn !bg-transparent !text-current border"
 							onClick={() => setShowDrafts(true)}
 						>
-							<Save className="mr-1 h-3.5 w-3.5" /> 草稿箱{drafts.length ? ` (${drafts.length})` : ""}
+							<Save className="mr-1 h-3.5 w-3.5" /> 草稿箱
+							{drafts.length ? ` (${drafts.length})` : ""}
 						</button>
-						<button className="brand-btn !bg-transparent !text-current border" onClick={() => void openPreview()}>
+						<button
+							type="button"
+							className="brand-btn !bg-transparent !text-current border"
+							onClick={() => void openPreview()}
+						>
 							<Eye className="mr-1 h-3.5 w-3.5" /> 预览
 						</button>
-						<button className="brand-btn !bg-transparent !text-current border" onClick={saveDraft}>
+						<button
+							type="button"
+							className="brand-btn !bg-transparent !text-current border"
+							onClick={saveDraft}
+						>
 							存草稿
 						</button>
 						{mode === "edit" && (
 							<button
+								type="button"
 								className="rounded-xl border border-red-300 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
 								onClick={() => void removePost()}
 							>
 								<Trash2 className="mr-1 inline h-3.5 w-3.5" /> 删除
 							</button>
 						)}
-						<button className="brand-btn" disabled={publishing} onClick={() => void publish()}>
-							{publishing ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1 h-3.5 w-3.5" />}
+						<button
+							type="button"
+							className="brand-btn"
+							disabled={publishing}
+							onClick={() => void publish()}
+						>
+							{publishing ? (
+								<Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+							) : (
+								<Send className="mr-1 h-3.5 w-3.5" />
+							)}
 							{mode === "edit" ? "更新发布" : "发布文章"}
 						</button>
 					</div>
@@ -842,10 +974,17 @@ export default function WritePage(): ReactElement {
 				{publishedUrl && (
 					<div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700 dark:bg-green-950/30 dark:text-green-300">
 						<span>发布成功！站点重建后文章即可访问。</span>
-						<a href={publishedUrl} className="rounded-lg bg-green-600 px-3 py-1 text-xs text-white">
+						<a
+							href={publishedUrl}
+							className="rounded-lg bg-green-600 px-3 py-1 text-xs text-white"
+						>
 							查看文章
 						</a>
-						<button className="ml-auto text-xs underline" onClick={resetToCreate}>
+						<button
+							type="button"
+							className="ml-auto text-xs underline"
+							onClick={resetToCreate}
+						>
 							再写一篇
 						</button>
 					</div>
@@ -900,7 +1039,11 @@ export default function WritePage(): ReactElement {
 							>
 								{coverPreview ? (
 									<div className="group relative h-full w-full">
-										<img src={coverPreview} alt="cover" className="h-full w-full object-cover" />
+										<img
+											src={coverPreview}
+											alt="cover"
+											className="h-full w-full object-cover"
+										/>
 										<button
 											type="button"
 											className="absolute right-1.5 top-1.5 hidden rounded-full bg-black/60 p-1 text-white group-hover:block"
@@ -918,7 +1061,9 @@ export default function WritePage(): ReactElement {
 									</div>
 								)}
 							</div>
-							<p className="mt-1.5 text-[11px] text-secondary">点击或拖入图片设置封面</p>
+							<p className="mt-1.5 text-[11px] text-secondary">
+								点击或拖入图片设置封面
+							</p>
 						</div>
 
 						{/* 元信息 */}
@@ -932,7 +1077,10 @@ export default function WritePage(): ReactElement {
 									value={form.description}
 									onChange={(e) => update({ description: e.target.value })}
 								/>
-								<TagInput tags={form.tags} onChange={(tags) => update({ tags })} />
+								<TagInput
+									tags={form.tags}
+									onChange={(tags) => update({ tags })}
+								/>
 								<input
 									type="text"
 									placeholder="分类（如：前端基础）"
@@ -969,7 +1117,11 @@ export default function WritePage(): ReactElement {
 									value={urlInput}
 									onChange={(e) => setUrlInput(e.target.value)}
 								/>
-								<button className="rounded-lg border px-3 py-1.5 text-sm" onClick={addUrlImage}>
+								<button
+									type="button"
+									className="rounded-lg border px-3 py-1.5 text-sm"
+									onClick={addUrlImage}
+								>
 									添加
 								</button>
 							</div>
@@ -988,7 +1140,9 @@ export default function WritePage(): ReactElement {
 								{images.map((item) => {
 									const src = item.type === "url" ? item.url : item.previewUrl;
 									const markdown =
-										item.type === "url" ? `![](${item.url})` : `![](local-image:${item.id})`;
+										item.type === "url"
+											? `![](${item.url})`
+											: `![](local-image:${item.id})`;
 									const isCover = cover?.id === item.id;
 									return (
 										<div
@@ -1035,7 +1189,10 @@ export default function WritePage(): ReactElement {
 
 			{/* Markdown 预览弹层 */}
 			{previewHtml !== null && (
-				<div className="fixed inset-0 z-[90] overflow-y-auto bg-black/50 p-4 backdrop-blur-sm" onClick={() => setPreviewHtml(null)}>
+				<div
+					className="fixed inset-0 z-[90] overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
+					onClick={() => setPreviewHtml(null)}
+				>
 					<div
 						className="treasure-root mx-auto my-6 max-w-3xl rounded-2xl p-8 shadow-2xl"
 						onClick={(e) => e.stopPropagation()}
@@ -1043,6 +1200,7 @@ export default function WritePage(): ReactElement {
 						<div className="mb-4 flex items-center justify-between">
 							<h2 className="text-lg font-bold">{form.title || "预览"}</h2>
 							<button
+								type="button"
 								className="rounded-lg border px-3 py-1.5 text-sm"
 								onClick={() => setPreviewHtml(null)}
 							>
@@ -1052,6 +1210,7 @@ export default function WritePage(): ReactElement {
 						<article
 							className="write-preview"
 							// eslint-disable-next-line react/no-danger
+							// biome-ignore lint/security/noDangerouslySetInnerHtml: 此处为本地 Markdown 预览，内容来自已登录作者自己在编辑器里撰写的草稿并交由 marked 渲染，非第三方/外部输入
 							dangerouslySetInnerHTML={{ __html: previewHtml }}
 						/>
 					</div>
@@ -1060,36 +1219,52 @@ export default function WritePage(): ReactElement {
 
 			{/* 草稿箱弹层 */}
 			{showDrafts && (
-				<div className="fixed inset-0 z-[90] overflow-y-auto bg-black/50 p-4 backdrop-blur-sm" onClick={() => setShowDrafts(false)}>
+				<div
+					className="fixed inset-0 z-[90] overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
+					onClick={() => setShowDrafts(false)}
+				>
 					<div
 						className="treasure-root mx-auto my-10 max-w-2xl rounded-2xl p-6 shadow-2xl"
 						onClick={(e) => e.stopPropagation()}
 					>
 						<div className="mb-4 flex items-center justify-between">
 							<h2 className="text-lg font-bold">本地草稿箱</h2>
-							<button className="rounded-lg border px-3 py-1.5 text-sm" onClick={() => setShowDrafts(false)}>
+							<button
+								type="button"
+								className="rounded-lg border px-3 py-1.5 text-sm"
+								onClick={() => setShowDrafts(false)}
+							>
 								关闭
 							</button>
 						</div>
 						{drafts.length === 0 ? (
-							<p className="py-10 text-center text-sm text-secondary">还没有草稿</p>
+							<p className="py-10 text-center text-sm text-secondary">
+								还没有草稿
+							</p>
 						) : (
 							<ul className="space-y-2">
 								{drafts.map((d) => (
-									<li key={d.id} className="bg-card flex items-center gap-3 rounded-lg border px-4 py-3">
+									<li
+										key={d.id}
+										className="bg-card flex items-center gap-3 rounded-lg border px-4 py-3"
+									>
 										<div className="min-w-0 flex-1">
-											<p className="truncate text-sm font-medium">{d.form.title || d.form.slug || "未命名"}</p>
+											<p className="truncate text-sm font-medium">
+												{d.form.title || d.form.slug || "未命名"}
+											</p>
 											<p className="text-xs text-secondary">
 												{new Date(d.savedAt).toLocaleString("zh-CN")}
 											</p>
 										</div>
 										<button
+											type="button"
 											className="rounded-lg bg-brand px-3 py-1.5 text-xs text-white"
 											onClick={() => loadDraft(d)}
 										>
 											载入
 										</button>
 										<button
+											type="button"
 											className="rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-500"
 											onClick={() => deleteDraft(d.id)}
 										>

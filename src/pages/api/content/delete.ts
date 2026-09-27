@@ -1,5 +1,10 @@
 import type { APIRoute } from "astro";
-import { requireAuth, GITHUB_REPO, isLocalDev, deleteLocalFile } from "@/utils/editor-auth";
+import {
+	deleteLocalFile,
+	GITHUB_REPO,
+	isLocalDev,
+	requireAuth,
+} from "@/utils/editor-auth";
 
 export const prerender = false;
 
@@ -21,10 +26,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 		token = requireAuth(cookies);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "认证失败";
-		return new Response(
-			JSON.stringify({ ok: false, error: message }),
-			{ status: 401, headers: { "Content-Type": "application/json" } },
-		);
+		return new Response(JSON.stringify({ ok: false, error: message }), {
+			status: 401,
+			headers: { "Content-Type": "application/json" },
+		});
 	}
 
 	try {
@@ -71,13 +76,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
 			if (!getResponse.ok) {
 				const errorText = await getResponse.text();
-				return new Response(
-					JSON.stringify({ ok: false, error: errorText }),
-					{
-						status: getResponse.status,
-						headers: { "Content-Type": "application/json" },
-					},
-				);
+				return new Response(JSON.stringify({ ok: false, error: errorText }), {
+					status: getResponse.status,
+					headers: { "Content-Type": "application/json" },
+				});
 			}
 
 			const fileData: GitHubContentItem = await getResponse.json();
@@ -109,21 +111,20 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			return new Response(
-				JSON.stringify({ ok: false, error: errorText }),
-				{ status: response.status, headers: { "Content-Type": "application/json" } },
-			);
+			return new Response(JSON.stringify({ ok: false, error: errorText }), {
+				status: response.status,
+				headers: { "Content-Type": "application/json" },
+			});
 		}
 
-		return new Response(
-			JSON.stringify({ ok: true }),
-			{ headers: { "Content-Type": "application/json" } },
-		);
+		return new Response(JSON.stringify({ ok: true }), {
+			headers: { "Content-Type": "application/json" },
+		});
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "未知错误";
-		return new Response(
-			JSON.stringify({ ok: false, error: message }),
-			{ status: 500, headers: { "Content-Type": "application/json" } },
-		);
+		return new Response(JSON.stringify({ ok: false, error: message }), {
+			status: 500,
+			headers: { "Content-Type": "application/json" },
+		});
 	}
 };

@@ -1,9 +1,9 @@
 ---
 import { Icon } from "astro-icon/components";
 import { getEnabledFriends, siteConfig } from "@/config";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
 import { formatDateToYYYYMMDD } from "@/utils/date-utils";
 import { loadFriendsFeed } from "@/utils/friends-feed";
-import MainGridLayout from "@/layouts/MainGridLayout.astro";
 
 const friends = getEnabledFriends();
 const feed = await loadFriendsFeed(friends);
@@ -32,7 +32,10 @@ const unsubscribedFriends = friends.filter(
 const randomArticleItems = JSON.stringify(
 	feed.items.map((item) => {
 		const isOwnSite = normalizeFriendUrl(item.friendUrl) === ownSiteUrl;
-		const isRecommended = !isOwnSite && friendsByUrl.get(normalizeFriendUrl(item.friendUrl))?.recommended === true;
+		const isRecommended =
+			!isOwnSite &&
+			friendsByUrl.get(normalizeFriendUrl(item.friendUrl))?.recommended ===
+				true;
 
 		return {
 			friendTitle: item.friendTitle,

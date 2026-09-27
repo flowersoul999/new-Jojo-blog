@@ -112,7 +112,10 @@ export default defineConfig({
 			],
 			smoothScrolling: false,
 			cache: true,
-			preload: true,
+			// hover: 鼠标悬停时预取；visible: 链接进入视口即预取。
+			// 列表页/首页的文章卡片在进入视口时就会把详情页 HTML 取回缓存，
+			// 点击时直接命中 swup 缓存，省掉整篇文章（约 1MB）的下载等待。
+			preload: { hover: true, visible: true },
 			accessibility: true,
 			// The portfolio is a deliberately full-bleed layout and does not use the
 			// standard MainGridLayout Swup containers. Crossing this layout boundary

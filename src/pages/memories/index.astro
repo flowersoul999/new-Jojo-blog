@@ -2,11 +2,11 @@
 // 回忆页：开屏闪频 → 黑胶唱片机 + 歌词 + 胶片墙 → 详情弹窗
 // 条目来自 src/content/memories/ 内容集合，正文在构建期渲染进隐藏的详情模板里
 import { getCollection, render } from "astro:content";
-import MemoriesLayout from "@/layouts/MemoriesLayout.astro";
-import MemoriesSplash from "@/components/memories/MemoriesSplash.astro";
 import MemoriesGalaxy from "@/components/memories/MemoriesGalaxy.astro";
+import MemoriesSplash from "@/components/memories/MemoriesSplash.astro";
 import MemoriesStage from "@/components/memories/MemoriesStage.svelte";
 import { siteConfig } from "@/config";
+import MemoriesLayout from "@/layouts/MemoriesLayout.astro";
 
 export const prerender = true;
 
@@ -16,14 +16,14 @@ const SPLASH_CAPTION = "有些日子过去了，却一直没走远";
 const SPLASH_HERO = "";
 
 const entries = (await getCollection("memories")).sort(
-	(a, b) => b.data.date.getTime() - a.data.date.getTime()
+	(a, b) => b.data.date.getTime() - a.data.date.getTime(),
 );
 
 const rendered = await Promise.all(
 	entries.map(async (entry) => {
 		const { Content } = await render(entry);
 		return { entry, Content };
-	})
+	}),
 );
 
 const items = rendered.map(({ entry }, i) => ({

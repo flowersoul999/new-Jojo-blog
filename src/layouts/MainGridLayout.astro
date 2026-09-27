@@ -7,6 +7,7 @@ import Navbar from "@components/layout/Navbar.astro";
 import SideBar from "@components/layout/SideBar.astro";
 import type { MarkdownHeading } from "astro";
 import { Icon } from "astro-icon/components";
+import AiRecommendationNote from "@/components/common/AiRecommendationNote.astro";
 import ImageWrapper from "@/components/common/ImageWrapper.astro";
 import FloatingControls from "@/components/controls/FloatingControls.astro";
 import ScrollDownIndicator from "@/components/controls/ScrollDownIndicator.astro";
@@ -15,13 +16,13 @@ import CodeInteractionManager from "@/components/features/CodeInteractionManager
 import HomePortfolioIntro from "@/components/features/HomePortfolioIntro.astro";
 import HomeWallpaperDecor from "@/components/features/HomeWallpaperDecor.astro";
 import TypewriterText from "@/components/features/TypewriterText.astro";
-import AiRecommendationNote from "@/components/common/AiRecommendationNote.astro";
 import CategoryBar from "@/components/layout/CategoryBar.astro";
 import {
 	backgroundWallpaper,
 	live2dWidgetConfig,
 	sidebarLayoutConfig,
 	siteConfig,
+	spineModelConfig,
 } from "@/config";
 import {
 	BANNER_HEIGHT,
@@ -141,7 +142,9 @@ const shouldRenderCategoryBar = !!siteConfig.categoryBar;
 // 检查是否在文章详情页
 const isPostPage = !!postSlug;
 const enabledMobileBottomComponents =
-	sidebarLayoutConfig.mobileBottomComponents?.filter((component) => component.enable) ?? [];
+	sidebarLayoutConfig.mobileBottomComponents?.filter(
+		(component) => component.enable,
+	) ?? [];
 const hideMobileBottomOnPostPage =
 	enabledMobileBottomComponents.length > 0 &&
 	enabledMobileBottomComponents.every(
@@ -162,8 +165,7 @@ const randomSubtitle = getRandomSubtitle();
 // 主页横幅文本只在首页的横幅模式且全局开关为 true 时显示。
 // 全屏模式使用独立的 HomeWallpaperDecor，不能再叠加旧的横幅文案。
 const homeTextEnable = backgroundWallpaper.common?.homeText?.enable;
-const showHomeText =
-	isBannerMode && !!homeTextEnable && isHomePageCheck;
+const showHomeText = isBannerMode && !!homeTextEnable && isHomePageCheck;
 
 const showBannerPostMeta =
 	(isBannerMode || isFullscreenMode) &&
@@ -1092,7 +1094,9 @@ const hasMultipleImages =
             </div>
         </div>
 
-        <SpineModel></SpineModel>
+        {/* 看板娘按配置渲染：关闭时不再下发 Spine 脚本（约 14KB），
+            该脚本每次 swup 导航都会被重新执行一次。 */}
+        {spineModelConfig.enable && <SpineModel />}
         {live2dWidgetConfig.enable && <Live2DWidget config={live2dWidgetConfig} />}
     </div>
 </div>

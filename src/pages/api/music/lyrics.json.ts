@@ -18,15 +18,15 @@ function parseLrc(lrcText: string): LyricLine[] {
 		tsRegex.lastIndex = 0;
 		const text = raw.replace(tsRegex, "").trim();
 		if (!text) continue;
-		let match: RegExpExecArray | null;
-		tsRegex.lastIndex = 0;
-		while ((match = tsRegex.exec(raw)) !== null) {
+		let match = tsRegex.exec(raw);
+		while (match !== null) {
 			const m = Number.parseInt(match[1], 10);
 			const s = Number.parseInt(match[2], 10);
 			const ms = match[3]
 				? Number.parseInt(match[3].padEnd(3, "0").slice(0, 3), 10)
 				: 0;
 			result.push({ time: m * 60 + s + ms / 1000, text });
+			match = tsRegex.exec(raw);
 		}
 	}
 	return result.sort((a, b) => a.time - b.time);
@@ -38,7 +38,10 @@ const BROWSER_HEADERS = {
 };
 
 /** ===== QQ 音乐 ===== */
-async function qqSearch(keyword: string, artist?: string): Promise<string | null> {
+async function qqSearch(
+	keyword: string,
+	artist?: string,
+): Promise<string | null> {
 	const api = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?p=1&n=8&w=${encodeURIComponent(keyword)}&format=json`;
 	const res = await fetch(api, {
 		headers: { ...BROWSER_HEADERS, Referer: "https://y.qq.com/" },
@@ -47,7 +50,12 @@ async function qqSearch(keyword: string, artist?: string): Promise<string | null
 	const json = (await res.json().catch(() => null)) as any;
 	const list = json?.data?.song?.list;
 	if (!Array.isArray(list) || list.length === 0) return null;
-	const pick = pickByArtist(list, artist, (it) => it?.singer?.map?.((s: any) => s?.name).filter(Boolean).join(" "));
+	const pick = pickByArtist(list, artist, (it) =>
+		it?.singer
+			?.map?.((s: any) => s?.name)
+			.filter(Boolean)
+			.join(" "),
+	);
 	return pick?.songmid || list[0].songmid || null;
 }
 
@@ -62,7 +70,10 @@ async function qqLyric(songmid: string): Promise<string | null> {
 }
 
 /** ===== 网易云（降级） ===== */
-async function neteaseSearch(keyword: string, artist?: string): Promise<number | null> {
+async function neteaseSearch(
+	keyword: string,
+	artist?: string,
+): Promise<number | null> {
 	const api = `https://music.163.com/api/search/get/web?s=${encodeURIComponent(keyword)}&type=1&limit=8`;
 	const res = await fetch(api, {
 		headers: { ...BROWSER_HEADERS, Referer: "https://music.163.com/" },
@@ -71,7 +82,12 @@ async function neteaseSearch(keyword: string, artist?: string): Promise<number |
 	const json = (await res.json().catch(() => null)) as any;
 	const list = json?.result?.songs;
 	if (!Array.isArray(list) || list.length === 0) return null;
-	const pick = pickByArtist(list, artist, (it) => it?.artists?.map?.((a: any) => a?.name).filter(Boolean).join(" "));
+	const pick = pickByArtist(list, artist, (it) =>
+		it?.artists
+			?.map?.((a: any) => a?.name)
+			.filter(Boolean)
+			.join(" "),
+	);
 	return pick?.id || list[0].id || null;
 }
 
@@ -79,7 +95,11 @@ async function neteaseSearch(keyword: string, artist?: string): Promise<number |
  * 从搜索结果中挑选歌手最匹配的一条：
  * 歌手名包含关键词（或反之）优先，其次取第一条。
  */
-function pickByArtist<T>(list: T[], artist: string | undefined, getArtists: (item: T) => unknown): T {
+function pickByArtist<T>(
+	list: T[],
+	artist: string | undefined,
+	getArtists: (item: T) => unknown,
+): T {
 	const name = artist?.split(/[/、]/)[0]?.trim();
 	if (!name) return list[0];
 	const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
@@ -123,9 +143,7 @@ export const GET: APIRoute = async ({ url }) => {
 	if (!q) return json({ code: 1, msg: "缺少 q 参数" }, 400);
 
 	// 优先 "歌名 歌手" 提高准确率
-	const fullQuery = artist
-		? `${q} ${artist.split(/[/、]/)[0]}`
-		: q;
+	const fullQuery = artist ? `${q} ${artist.split(/[/、]/)[0]}` : q;
 
 	let lrcText: string | null = null;
 	let source = "";

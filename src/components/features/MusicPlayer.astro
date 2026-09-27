@@ -206,6 +206,13 @@ const widgetId =
 
 <script define:vars={{ viewConfigStr, widgetId }} is:inline>
 (function () {
+    // 播放器只存在于导航栏/侧边栏等 swup 容器之外的静态区域，导航时不会被替换，
+    // 因此把自己标记为忽略，省掉每次导航重复解析执行约 29KB 脚本的开销。
+    // （Astro 的 define:vars 会丢弃写在 script 标签上的属性，只能在运行时补上。）
+    if (document.currentScript) {
+        document.currentScript.setAttribute("data-swup-ignore-script", "");
+    }
+
     var cfg = JSON.parse(viewConfigStr);
     var widget = document.getElementById(widgetId);
     if (!widget) return;

@@ -67,8 +67,16 @@ export function getAlbumCover(album: GalleryAlbum, photos: string[]): string {
  *   [{ "src": "cat.webp" 或完整 URL, "description": "..." }]
  * 键既可以是文件名，也可以是 urls.txt 里的完整远程地址。
  */
-function readPhotoMetaMap(albumId: string): Map<string, Omit<GalleryPhoto, "src">> {
-	const metaFile = path.join(process.cwd(), "public", "gallery", albumId, "photos.json");
+function readPhotoMetaMap(
+	albumId: string,
+): Map<string, Omit<GalleryPhoto, "src">> {
+	const metaFile = path.join(
+		process.cwd(),
+		"public",
+		"gallery",
+		albumId,
+		"photos.json",
+	);
 	if (!fs.existsSync(metaFile)) return new Map();
 	try {
 		const raw = JSON.parse(fs.readFileSync(metaFile, "utf-8"));
@@ -81,7 +89,8 @@ function readPhotoMetaMap(albumId: string): Map<string, Omit<GalleryPhoto, "src"
 			}
 		} else if (raw && typeof raw === "object") {
 			for (const [key, value] of Object.entries(raw)) {
-				if (value && typeof value === "object") map.set(key, value as Omit<GalleryPhoto, "src">);
+				if (value && typeof value === "object")
+					map.set(key, value as Omit<GalleryPhoto, "src">);
 			}
 		}
 		return map;

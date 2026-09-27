@@ -5,6 +5,13 @@ const config = sakuraConfig;
 ---
 
 <script is:inline define:vars={{ sakuraConfig: config }}>
+		// 樱花画布挂在 swup 容器之外的静态区域，导航时不会重建；
+		// 把自己标记为忽略，既省掉重复解析，也避免全局事件监听器被重复注册。
+		// （Astro 的 define:vars 会丢弃写在 script 标签上的属性，只能在运行时补上。）
+		if (document.currentScript) {
+			document.currentScript.setAttribute("data-swup-ignore-script", "");
+		}
+
 		let windowWidth = window.innerWidth;
 		let windowHeight = window.innerHeight;
 

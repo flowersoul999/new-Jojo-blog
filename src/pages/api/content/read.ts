@@ -1,5 +1,10 @@
 import type { APIRoute } from "astro";
-import { requireAuth, GITHUB_REPO, isLocalDev, readLocalFile } from "@/utils/editor-auth";
+import {
+	GITHUB_REPO,
+	isLocalDev,
+	readLocalFile,
+	requireAuth,
+} from "@/utils/editor-auth";
 
 export const prerender = false;
 
@@ -32,10 +37,10 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 		token = requireAuth(cookies);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "认证失败";
-		return new Response(
-			JSON.stringify({ ok: false, error: message }),
-			{ status: 401, headers: { "Content-Type": "application/json" } },
-		);
+		return new Response(JSON.stringify({ ok: false, error: message }), {
+			status: 401,
+			headers: { "Content-Type": "application/json" },
+		});
 	}
 
 	try {
@@ -79,10 +84,10 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			return new Response(
-				JSON.stringify({ ok: false, error: errorText }),
-				{ status: response.status, headers: { "Content-Type": "application/json" } },
-			);
+			return new Response(JSON.stringify({ ok: false, error: errorText }), {
+				status: response.status,
+				headers: { "Content-Type": "application/json" },
+			});
 		}
 
 		const data: GitHubContentItem = await response.json();
@@ -93,9 +98,7 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 		// 尝试将 base64 content 解码为 UTF-8 字符串
 		try {
 			const content =
-				data.encoding === "base64"
-					? decodeBase64Utf8(rawContent)
-					: rawContent;
+				data.encoding === "base64" ? decodeBase64Utf8(rawContent) : rawContent;
 
 			return new Response(
 				JSON.stringify({ path, content, sha, name: fileName }),
@@ -117,9 +120,9 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "未知错误";
-		return new Response(
-			JSON.stringify({ ok: false, error: message }),
-			{ status: 500, headers: { "Content-Type": "application/json" } },
-		);
+		return new Response(JSON.stringify({ ok: false, error: message }), {
+			status: 500,
+			headers: { "Content-Type": "application/json" },
+		});
 	}
 };

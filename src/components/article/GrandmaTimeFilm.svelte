@@ -1,325 +1,366 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+import { onMount } from "svelte";
 
-  const balconyWaiting = "/in-grandmas-white-hair-i-saw-time/balcony-grandma-waiting.webp";
-  const balconyApproaching = "/in-grandmas-white-hair-i-saw-time/balcony-sitting.webp";
-  const balconyTogether = "/in-grandmas-white-hair-i-saw-time/balcony-relaxed.webp";
-  const balconySunset = "/in-grandmas-white-hair-i-saw-time/balcony-relaxed-sunset.webp";
-  const balconyEmpty = "/in-grandmas-white-hair-i-saw-time/balcony-empty-blue-hour.webp";
-  const grandmaMemory = "/in-grandmas-white-hair-i-saw-time/grandma-memory.webp";
-  const grandmaHair = "/in-grandmas-white-hair-i-saw-time/grandma-hair.webp";
-  const deskDay = "/in-grandmas-white-hair-i-saw-time/desk-day-v2.webp";
-  const deskDusk = "/in-grandmas-white-hair-i-saw-time/desk-dusk-v2.webp";
-  const deskNight = "/in-grandmas-white-hair-i-saw-time/desk-night-v2.webp";
+const balconyWaiting =
+	"/in-grandmas-white-hair-i-saw-time/balcony-grandma-waiting.webp";
+const balconyApproaching =
+	"/in-grandmas-white-hair-i-saw-time/balcony-sitting.webp";
+const balconyTogether =
+	"/in-grandmas-white-hair-i-saw-time/balcony-relaxed.webp";
+const balconySunset =
+	"/in-grandmas-white-hair-i-saw-time/balcony-relaxed-sunset.webp";
+const balconyEmpty =
+	"/in-grandmas-white-hair-i-saw-time/balcony-empty-blue-hour.webp";
+const grandmaMemory = "/in-grandmas-white-hair-i-saw-time/grandma-memory.webp";
+const grandmaHair = "/in-grandmas-white-hair-i-saw-time/grandma-hair.webp";
+const deskDay = "/in-grandmas-white-hair-i-saw-time/desk-day-v2.webp";
+const deskDusk = "/in-grandmas-white-hair-i-saw-time/desk-dusk-v2.webp";
+const deskNight = "/in-grandmas-white-hair-i-saw-time/desk-night-v2.webp";
 
-  let filmRoot: HTMLElement;
-  let plainTextMode = false;
-  let isSmallDevice = false;
-  let mobileNoticeVisible = false;
-  let mobileNoticeTimer: ReturnType<typeof setTimeout> | undefined;
-  let tocRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+let filmRoot: HTMLElement;
+let plainTextMode = false;
+let isSmallDevice = false;
+let mobileNoticeVisible = false;
+let mobileNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+let tocRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const refreshArticleToc = () => {
-    if (typeof window === "undefined") return;
-    if (tocRefreshTimer) clearTimeout(tocRefreshTimer);
-    tocRefreshTimer = setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("article-toc-refresh"));
-      tocRefreshTimer = undefined;
-    }, 0);
-  };
+const refreshArticleToc = () => {
+	if (typeof window === "undefined") return;
+	if (tocRefreshTimer) clearTimeout(tocRefreshTimer);
+	tocRefreshTimer = setTimeout(() => {
+		window.dispatchEvent(new CustomEvent("article-toc-refresh"));
+		tocRefreshTimer = undefined;
+	}, 0);
+};
 
-  const showMobileNotice = () => {
-    mobileNoticeVisible = true;
-    if (mobileNoticeTimer) clearTimeout(mobileNoticeTimer);
-    mobileNoticeTimer = setTimeout(() => {
-      mobileNoticeVisible = false;
-      mobileNoticeTimer = undefined;
-    }, 2600);
-  };
+const showMobileNotice = () => {
+	mobileNoticeVisible = true;
+	if (mobileNoticeTimer) clearTimeout(mobileNoticeTimer);
+	mobileNoticeTimer = setTimeout(() => {
+		mobileNoticeVisible = false;
+		mobileNoticeTimer = undefined;
+	}, 2600);
+};
 
-  const toggleTextMode = () => {
-    if (isSmallDevice && plainTextMode) {
-      showMobileNotice();
-      return;
-    }
+const toggleTextMode = () => {
+	if (isSmallDevice && plainTextMode) {
+		showMobileNotice();
+		return;
+	}
 
-    plainTextMode = !plainTextMode;
-    mobileNoticeVisible = false;
-    refreshArticleToc();
-  };
+	plainTextMode = !plainTextMode;
+	mobileNoticeVisible = false;
+	refreshArticleToc();
+};
 
-  onMount(() => {
-    if (!filmRoot) return;
+onMount(() => {
+	if (!filmRoot) return;
 
-    const smallDeviceQuery = window.matchMedia("(max-width: 767px)");
-    const syncViewportMode = () => {
-      isSmallDevice = smallDeviceQuery.matches;
-      if (isSmallDevice) {
-        plainTextMode = true;
-        mobileNoticeVisible = false;
-      }
-      refreshArticleToc();
-    };
+	const smallDeviceQuery = window.matchMedia("(max-width: 767px)");
+	const syncViewportMode = () => {
+		isSmallDevice = smallDeviceQuery.matches;
+		if (isSmallDevice) {
+			plainTextMode = true;
+			mobileNoticeVisible = false;
+		}
+		refreshArticleToc();
+	};
 
-    syncViewportMode();
+	syncViewportMode();
 
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const revealTargets = Array.from(
-      filmRoot.querySelectorAll<HTMLElement>("[data-film-reveal]"),
-    );
-    const scenes = Array.from(
-      filmRoot.querySelectorAll<HTMLElement>("[data-film-scene]"),
-    );
-    const balconyScene = filmRoot.querySelector<HTMLElement>(".grandma-film__scene--balcony");
-    const deskScene = filmRoot.querySelector<HTMLElement>(".grandma-film__scene--desk");
-    const endingScene = filmRoot.querySelector<HTMLElement>(".grandma-film__scene--ending");
-    const endingCopyTargets = Array.from(
-      filmRoot.querySelectorAll<HTMLElement>("[data-ending-copy]"),
-    );
-    const dialogueLines = Array.from(
-      filmRoot.querySelectorAll<HTMLElement>("[data-film-dialogue-line]"),
-    );
+	const reducedMotion = window.matchMedia(
+		"(prefers-reduced-motion: reduce)",
+	).matches;
+	const revealTargets = Array.from(
+		filmRoot.querySelectorAll<HTMLElement>("[data-film-reveal]"),
+	);
+	const scenes = Array.from(
+		filmRoot.querySelectorAll<HTMLElement>("[data-film-scene]"),
+	);
+	const balconyScene = filmRoot.querySelector<HTMLElement>(
+		".grandma-film__scene--balcony",
+	);
+	const deskScene = filmRoot.querySelector<HTMLElement>(
+		".grandma-film__scene--desk",
+	);
+	const endingScene = filmRoot.querySelector<HTMLElement>(
+		".grandma-film__scene--ending",
+	);
+	const endingCopyTargets = Array.from(
+		filmRoot.querySelectorAll<HTMLElement>("[data-ending-copy]"),
+	);
+	const dialogueLines = Array.from(
+		filmRoot.querySelectorAll<HTMLElement>("[data-film-dialogue-line]"),
+	);
 
-    filmRoot.dataset.filmReady = "true";
+	filmRoot.dataset.filmReady = "true";
 
-    const cleanups: Array<() => void> = [];
-    smallDeviceQuery.addEventListener("change", syncViewportMode);
-    cleanups.push(() => smallDeviceQuery.removeEventListener("change", syncViewportMode));
-    cleanups.push(() => {
-      if (mobileNoticeTimer) clearTimeout(mobileNoticeTimer);
-      if (tocRefreshTimer) clearTimeout(tocRefreshTimer);
-    });
-    let scrollFrame = 0;
+	const cleanups: Array<() => void> = [];
+	smallDeviceQuery.addEventListener("change", syncViewportMode);
+	cleanups.push(() =>
+		smallDeviceQuery.removeEventListener("change", syncViewportMode),
+	);
+	cleanups.push(() => {
+		if (mobileNoticeTimer) clearTimeout(mobileNoticeTimer);
+		if (tocRefreshTimer) clearTimeout(tocRefreshTimer);
+	});
+	let scrollFrame = 0;
 
-    const clamp = (value: number, min = 0, max = 1) =>
-      Math.min(Math.max(value, min), max);
+	const clamp = (value: number, min = 0, max = 1) =>
+		Math.min(Math.max(value, min), max);
 
-    const easeInOut = (value: number) => {
-      const t = clamp(value);
-      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    };
+	const easeInOut = (value: number) => {
+		const t = clamp(value);
+		return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+	};
 
-    const updateEndingCopy = (progress: number) => {
-      if (reducedMotion) {
-        endingCopyTargets.forEach((target) => {
-          target.style.setProperty("--ending-copy-opacity", "1");
-          target.style.setProperty("--ending-copy-y", "0rem");
-          target.style.setProperty("--ending-copy-blur", "0rem");
-          target.style.setProperty("--ending-copy-scale", "1");
-        });
-        return;
-      }
+	const updateEndingCopy = (progress: number) => {
+		if (reducedMotion) {
+			endingCopyTargets.forEach((target) => {
+				target.style.setProperty("--ending-copy-opacity", "1");
+				target.style.setProperty("--ending-copy-y", "0rem");
+				target.style.setProperty("--ending-copy-blur", "0rem");
+				target.style.setProperty("--ending-copy-scale", "1");
+			});
+			return;
+		}
 
-      const fadeWindow = 0.07;
+		const fadeWindow = 0.07;
 
-      endingCopyTargets.forEach((target) => {
-        const start = Number(target.dataset.endingStart ?? 0);
-        const fadeIn = easeInOut((progress - start) / fadeWindow);
-        const opacity = fadeIn;
+		endingCopyTargets.forEach((target) => {
+			const start = Number(target.dataset.endingStart ?? 0);
+			const fadeIn = easeInOut((progress - start) / fadeWindow);
+			const opacity = fadeIn;
 
-        target.style.setProperty("--ending-copy-opacity", opacity.toFixed(3));
-        target.style.setProperty(
-          "--ending-copy-y",
-          `${((1 - opacity) * 0.85).toFixed(3)}rem`,
-        );
-        target.style.setProperty(
-          "--ending-copy-blur",
-          `${((1 - opacity) * 0.32).toFixed(3)}rem`,
-        );
-        target.style.setProperty(
-          "--ending-copy-scale",
-          (0.985 + opacity * 0.015).toFixed(3),
-        );
-      });
-    };
+			target.style.setProperty("--ending-copy-opacity", opacity.toFixed(3));
+			target.style.setProperty(
+				"--ending-copy-y",
+				`${((1 - opacity) * 0.85).toFixed(3)}rem`,
+			);
+			target.style.setProperty(
+				"--ending-copy-blur",
+				`${((1 - opacity) * 0.32).toFixed(3)}rem`,
+			);
+			target.style.setProperty(
+				"--ending-copy-scale",
+				(0.985 + opacity * 0.015).toFixed(3),
+			);
+		});
+	};
 
-    const setVisible = (target: HTMLElement) => {
-      target.classList.add("is-visible");
-    };
+	const setVisible = (target: HTMLElement) => {
+		target.classList.add("is-visible");
+	};
 
-    if (reducedMotion) {
-      revealTargets.forEach(setVisible);
-      dialogueLines.forEach((line) => {
-        line.style.setProperty("--dialogue-opacity", "1");
-        line.style.setProperty("--dialogue-y", "0rem");
-      });
-      balconyScene?.style.setProperty("--dialogue-ellipsis", "1");
-      balconyScene?.style.setProperty("--sunset-frame-opacity", "0");
-      balconyScene?.style.setProperty("--memory-pair-opacity", "1");
-      balconyScene?.style.setProperty("--memory-mid-opacity", "1");
-      balconyScene?.style.setProperty("--memory-final-opacity", "1");
-      balconyScene?.style.setProperty("--balcony-copy-opacity", "0");
-      balconyScene?.style.setProperty("--balcony-copy-y", "1.1rem");
-      balconyScene?.style.setProperty("--hair-copy-opacity", "1");
-      balconyScene?.style.setProperty("--hair-copy-y", "0rem");
-      balconyScene?.style.setProperty("--hair-glow-opacity", "1");
-      deskScene?.style.setProperty("--desk-dusk-opacity", "0");
-      deskScene?.style.setProperty("--desk-night-opacity", "1");
-      deskScene?.style.setProperty("--desk-copy-opacity", "1");
-      deskScene?.style.setProperty("--desk-copy-y", "0rem");
-      endingScene?.style.setProperty("--ending-empty-opacity", "1");
-      updateEndingCopy(1);
-    } else {
-      const revealObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            setVisible(entry.target as HTMLElement);
-            revealObserver.unobserve(entry.target);
-          });
-        },
-        { threshold: 0.14, rootMargin: "0px 0px -10% 0px" },
-      );
+	if (reducedMotion) {
+		revealTargets.forEach(setVisible);
+		dialogueLines.forEach((line) => {
+			line.style.setProperty("--dialogue-opacity", "1");
+			line.style.setProperty("--dialogue-y", "0rem");
+		});
+		balconyScene?.style.setProperty("--dialogue-ellipsis", "1");
+		balconyScene?.style.setProperty("--sunset-frame-opacity", "0");
+		balconyScene?.style.setProperty("--memory-pair-opacity", "1");
+		balconyScene?.style.setProperty("--memory-mid-opacity", "1");
+		balconyScene?.style.setProperty("--memory-final-opacity", "1");
+		balconyScene?.style.setProperty("--balcony-copy-opacity", "0");
+		balconyScene?.style.setProperty("--balcony-copy-y", "1.1rem");
+		balconyScene?.style.setProperty("--hair-copy-opacity", "1");
+		balconyScene?.style.setProperty("--hair-copy-y", "0rem");
+		balconyScene?.style.setProperty("--hair-glow-opacity", "1");
+		deskScene?.style.setProperty("--desk-dusk-opacity", "0");
+		deskScene?.style.setProperty("--desk-night-opacity", "1");
+		deskScene?.style.setProperty("--desk-copy-opacity", "1");
+		deskScene?.style.setProperty("--desk-copy-y", "0rem");
+		endingScene?.style.setProperty("--ending-empty-opacity", "1");
+		updateEndingCopy(1);
+	} else {
+		const revealObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (!entry.isIntersecting) return;
+					setVisible(entry.target as HTMLElement);
+					revealObserver.unobserve(entry.target);
+				});
+			},
+			{ threshold: 0.14, rootMargin: "0px 0px -10% 0px" },
+		);
 
-      revealTargets.forEach((target) => {
-        if (target.getBoundingClientRect().bottom < 0) setVisible(target);
-        else revealObserver.observe(target);
-      });
-      cleanups.push(() => revealObserver.disconnect());
+		revealTargets.forEach((target) => {
+			if (target.getBoundingClientRect().bottom < 0) setVisible(target);
+			else revealObserver.observe(target);
+		});
+		cleanups.push(() => revealObserver.disconnect());
+	}
 
-    }
+	const updateDialogue = (progress: number) => {
+		if (!balconyScene || !dialogueLines.length || reducedMotion) return;
 
-    const updateDialogue = (progress: number) => {
-      if (!balconyScene || !dialogueLines.length || reducedMotion) return;
+		const dialogueStart = 0.15;
+		const dialogueEnd = 0.58;
+		const dialogueProgress = clamp(
+			(progress - dialogueStart) / (dialogueEnd - dialogueStart),
+		);
+		const pairCount = Math.ceil(dialogueLines.length / 2);
+		const pairSegment = dialogueProgress * pairCount;
+		const currentPair = Math.min(pairCount - 1, Math.floor(pairSegment));
+		const localPairProgress = Math.min(pairSegment - currentPair, 1);
+		const incomingWindow = 0.18;
+		const replyStart = 0.45;
+		const replyWindow = 0.18;
 
-      const dialogueStart = 0.15;
-      const dialogueEnd = 0.58;
-      const dialogueProgress = clamp((progress - dialogueStart) / (dialogueEnd - dialogueStart));
-      const pairCount = Math.ceil(dialogueLines.length / 2);
-      const pairSegment = dialogueProgress * pairCount;
-      const currentPair = Math.min(pairCount - 1, Math.floor(pairSegment));
-      const localPairProgress = Math.min(pairSegment - currentPair, 1);
-      const incomingWindow = 0.18;
-      const replyStart = 0.45;
-      const replyWindow = 0.18;
+		dialogueLines.forEach((line, index) => {
+			let opacity = 0;
+			let offset = index % 2 === 0 ? 1.2 : -1.2;
+			const pairIndex = Math.floor(index / 2);
+			const isIncoming = index % 2 === 0;
 
-      dialogueLines.forEach((line, index) => {
-        let opacity = 0;
-        let offset = index % 2 === 0 ? 1.2 : -1.2;
-        const pairIndex = Math.floor(index / 2);
-        const isIncoming = index % 2 === 0;
+			if (dialogueProgress >= 1) {
+				opacity = 0;
+			} else if (pairIndex === currentPair) {
+				if (isIncoming) {
+					opacity = clamp(localPairProgress / incomingWindow);
+				} else {
+					opacity = clamp((localPairProgress - replyStart) / replyWindow);
+				}
+				offset = (isIncoming ? 1 : -1) * (1 - opacity) * 1.2;
+			} else if (
+				pairIndex === currentPair - 1 &&
+				localPairProgress < incomingWindow
+			) {
+				opacity = 1 - clamp(localPairProgress / incomingWindow);
+				offset = (isIncoming ? -1 : 1) * (1 - opacity) * 0.8;
+			}
 
-        if (dialogueProgress >= 1) {
-          opacity = 0;
-        } else if (pairIndex === currentPair) {
-          if (isIncoming) {
-            opacity = clamp(localPairProgress / incomingWindow);
-          } else {
-            opacity = clamp((localPairProgress - replyStart) / replyWindow);
-          }
-          offset = (isIncoming ? 1 : -1) * (1 - opacity) * 1.2;
-        } else if (pairIndex === currentPair - 1 && localPairProgress < incomingWindow) {
-          opacity = 1 - clamp(localPairProgress / incomingWindow);
-          offset = (isIncoming ? -1 : 1) * (1 - opacity) * 0.8;
-        }
+			line.style.setProperty("--dialogue-opacity", opacity.toFixed(3));
+			line.style.setProperty("--dialogue-y", `${offset.toFixed(3)}rem`);
+		});
 
-        line.style.setProperty("--dialogue-opacity", opacity.toFixed(3));
-        line.style.setProperty("--dialogue-y", `${offset.toFixed(3)}rem`);
-      });
+		balconyScene.style.setProperty("--dialogue-ellipsis", "0");
+	};
 
-      balconyScene.style.setProperty("--dialogue-ellipsis", "0");
-    };
+	const updateBalconyComposition = (progress: number) => {
+		if (!balconyScene || reducedMotion) return;
 
-    const updateBalconyComposition = (progress: number) => {
-      if (!balconyScene || reducedMotion) return;
+		// Finish the sunset first, then crossfade into the memory scene. The
+		// eased values keep the image and copy from snapping at the boundary.
+		const sunsetIn = easeInOut((progress - 0.44) / 0.16);
+		const sunsetExit = easeInOut((progress - 0.64) / 0.14);
+		const sunsetFrameOpacity = sunsetIn * (1 - sunsetExit);
+		const hairCopyIn = easeInOut((progress - 0.78) / 0.14);
+		const midHairIn = easeInOut((progress - 0.77) / 0.13);
+		const finalHairIn = easeInOut((progress - 0.9) / 0.1);
+		const balconyCopyOpacity = 1 - easeInOut((progress - 0.48) / 0.16);
 
-      // Finish the sunset first, then crossfade into the memory scene. The
-      // eased values keep the image and copy from snapping at the boundary.
-      const sunsetIn = easeInOut((progress - 0.44) / 0.16);
-      const sunsetExit = easeInOut((progress - 0.64) / 0.14);
-      const sunsetFrameOpacity = sunsetIn * (1 - sunsetExit);
-      const hairCopyIn = easeInOut((progress - 0.78) / 0.14);
-      const midHairIn = easeInOut((progress - 0.77) / 0.13);
-      const finalHairIn = easeInOut((progress - 0.9) / 0.1);
-      const balconyCopyOpacity = 1 - easeInOut((progress - 0.48) / 0.16);
+		balconyScene.style.setProperty(
+			"--sunset-frame-opacity",
+			sunsetFrameOpacity.toFixed(3),
+		);
+		balconyScene.style.setProperty(
+			"--memory-pair-opacity",
+			sunsetExit.toFixed(3),
+		);
+		balconyScene.style.setProperty(
+			"--memory-mid-opacity",
+			midHairIn.toFixed(3),
+		);
+		balconyScene.style.setProperty(
+			"--memory-final-opacity",
+			finalHairIn.toFixed(3),
+		);
+		balconyScene.style.setProperty(
+			"--balcony-copy-opacity",
+			balconyCopyOpacity.toFixed(3),
+		);
+		balconyScene.style.setProperty(
+			"--balcony-copy-y",
+			`${((1 - balconyCopyOpacity) * 1.1).toFixed(3)}rem`,
+		);
+		balconyScene.style.setProperty(
+			"--hair-copy-opacity",
+			hairCopyIn.toFixed(3),
+		);
+		balconyScene.style.setProperty(
+			"--hair-copy-y",
+			`${((1 - hairCopyIn) * 1.1).toFixed(3)}rem`,
+		);
+		balconyScene.style.setProperty(
+			"--hair-glow-opacity",
+			(sunsetExit * (0.16 + finalHairIn * 0.84)).toFixed(3),
+		);
+	};
 
-      balconyScene.style.setProperty("--sunset-frame-opacity", sunsetFrameOpacity.toFixed(3));
-      balconyScene.style.setProperty("--memory-pair-opacity", sunsetExit.toFixed(3));
-      balconyScene.style.setProperty("--memory-mid-opacity", midHairIn.toFixed(3));
-      balconyScene.style.setProperty("--memory-final-opacity", finalHairIn.toFixed(3));
-      balconyScene.style.setProperty(
-        "--balcony-copy-opacity",
-        balconyCopyOpacity.toFixed(3),
-      );
-      balconyScene.style.setProperty(
-        "--balcony-copy-y",
-        `${((1 - balconyCopyOpacity) * 1.1).toFixed(3)}rem`,
-      );
-      balconyScene.style.setProperty("--hair-copy-opacity", hairCopyIn.toFixed(3));
-      balconyScene.style.setProperty(
-        "--hair-copy-y",
-        `${((1 - hairCopyIn) * 1.1).toFixed(3)}rem`,
-      );
-      balconyScene.style.setProperty(
-        "--hair-glow-opacity",
-        (sunsetExit * (0.16 + finalHairIn * 0.84)).toFixed(3),
-      );
-    };
+	const updateDeskComposition = (progress: number) => {
+		if (!deskScene || reducedMotion) return;
 
-    const updateDeskComposition = (progress: number) => {
-      if (!deskScene || reducedMotion) return;
+		const duskIn = easeInOut((progress - 0.14) / 0.28);
+		const duskOut = easeInOut((progress - 0.48) / 0.26);
+		const duskOpacity = duskIn * (1 - duskOut);
+		const nightIn = easeInOut((progress - 0.46) / 0.48);
+		const copyIn = easeInOut((progress - 0.08) / 0.24);
+		const copyOut = easeInOut((progress - 0.86) / 0.14);
+		const copyOpacity = copyIn * (1 - copyOut);
 
-      const duskIn = easeInOut((progress - 0.14) / 0.28);
-      const duskOut = easeInOut((progress - 0.48) / 0.26);
-      const duskOpacity = duskIn * (1 - duskOut);
-      const nightIn = easeInOut((progress - 0.46) / 0.48);
-      const copyIn = easeInOut((progress - 0.08) / 0.24);
-      const copyOut = easeInOut((progress - 0.86) / 0.14);
-      const copyOpacity = copyIn * (1 - copyOut);
+		deskScene.style.setProperty("--desk-dusk-opacity", duskOpacity.toFixed(3));
+		deskScene.style.setProperty("--desk-night-opacity", nightIn.toFixed(3));
+		deskScene.style.setProperty("--desk-copy-opacity", copyOpacity.toFixed(3));
+		deskScene.style.setProperty(
+			"--desk-copy-y",
+			`${((1 - copyIn) * 1.1 + copyOut * 0.75).toFixed(3)}rem`,
+		);
+	};
 
-      deskScene.style.setProperty("--desk-dusk-opacity", duskOpacity.toFixed(3));
-      deskScene.style.setProperty("--desk-night-opacity", nightIn.toFixed(3));
-      deskScene.style.setProperty("--desk-copy-opacity", copyOpacity.toFixed(3));
-      deskScene.style.setProperty(
-        "--desk-copy-y",
-        `${((1 - copyIn) * 1.1 + copyOut * 0.75).toFixed(3)}rem`,
-      );
-    };
+	const updateEndingComposition = (progress: number) => {
+		if (!endingScene || reducedMotion) return;
 
-    const updateEndingComposition = (progress: number) => {
-      if (!endingScene || reducedMotion) return;
+		const emptyIn = easeInOut((progress - 0.2) / 0.74);
 
-      const emptyIn = easeInOut((progress - 0.2) / 0.74);
+		endingScene.style.setProperty("--ending-empty-opacity", emptyIn.toFixed(3));
+		updateEndingCopy(progress);
+	};
 
-      endingScene.style.setProperty("--ending-empty-opacity", emptyIn.toFixed(3));
-      updateEndingCopy(progress);
-    };
+	const updateSceneProgress = () => {
+		scrollFrame = 0;
+		scenes.forEach((scene) => {
+			const rect = scene.getBoundingClientRect();
+			const travel = Math.max(
+				scene.offsetHeight - window.innerHeight * 0.64,
+				1,
+			);
+			const progress = reducedMotion
+				? 1
+				: clamp((window.innerHeight * 0.2 - rect.top) / travel);
+			scene.style.setProperty("--film-progress", progress.toFixed(4));
+			if (scene === balconyScene) {
+				updateDialogue(progress);
+				updateBalconyComposition(progress);
+			} else if (scene === deskScene) {
+				updateDeskComposition(progress);
+			} else if (scene === endingScene) {
+				updateEndingComposition(progress);
+			}
+		});
+	};
 
-    const updateSceneProgress = () => {
-      scrollFrame = 0;
-      scenes.forEach((scene) => {
-        const rect = scene.getBoundingClientRect();
-        const travel = Math.max(scene.offsetHeight - window.innerHeight * 0.64, 1);
-        const progress = reducedMotion
-          ? 1
-          : clamp((window.innerHeight * 0.2 - rect.top) / travel);
-        scene.style.setProperty("--film-progress", progress.toFixed(4));
-        if (scene === balconyScene) {
-          updateDialogue(progress);
-          updateBalconyComposition(progress);
-        } else if (scene === deskScene) {
-          updateDeskComposition(progress);
-        } else if (scene === endingScene) {
-          updateEndingComposition(progress);
-        }
-      });
-    };
+	const queueSceneProgress = () => {
+		if (!scrollFrame)
+			scrollFrame = window.requestAnimationFrame(updateSceneProgress);
+	};
 
-    const queueSceneProgress = () => {
-      if (!scrollFrame) scrollFrame = window.requestAnimationFrame(updateSceneProgress);
-    };
+	updateSceneProgress();
+	window.addEventListener("scroll", queueSceneProgress, { passive: true });
+	window.addEventListener("resize", queueSceneProgress);
+	cleanups.push(
+		() => window.removeEventListener("scroll", queueSceneProgress),
+		() => window.removeEventListener("resize", queueSceneProgress),
+		() => window.cancelAnimationFrame(scrollFrame),
+	);
 
-    updateSceneProgress();
-    window.addEventListener("scroll", queueSceneProgress, { passive: true });
-    window.addEventListener("resize", queueSceneProgress);
-    cleanups.push(
-      () => window.removeEventListener("scroll", queueSceneProgress),
-      () => window.removeEventListener("resize", queueSceneProgress),
-      () => window.cancelAnimationFrame(scrollFrame),
-    );
-
-    return () => cleanups.forEach((cleanup) => cleanup());
-  });
+	return () =>
+		cleanups.forEach((cleanup) => {
+			cleanup();
+		});
+});
 </script>
 
 <article
