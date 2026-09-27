@@ -33,6 +33,16 @@ type PostData = {
 type PostsCollection = CollectionConfig<z.ZodType<PostData>>;
 type SpecCollection = CollectionConfig<z.ZodType<Record<string, never>>>;
 
+/** 回忆页条目：封面 + 标题/日期/摘要，正文即详情弹窗里的长文 */
+type MemoriesData = {
+	title: string;
+	date: Date;
+	summary: string;
+	image: string;
+};
+
+type MemoriesCollection = CollectionConfig<z.ZodType<MemoriesData>>;
+
 const postsCollection: PostsCollection = defineCollection({
 	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/posts" }),
 	schema: z.object({
@@ -70,10 +80,22 @@ const specCollection: SpecCollection = defineCollection({
 	schema: z.object({}),
 });
 
+const memoriesCollection: MemoriesCollection = defineCollection({
+	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/memories" }),
+	schema: z.object({
+		title: z.string(),
+		date: z.date(),
+		summary: z.string().optional().default(""),
+		image: z.string(),
+	}),
+});
+
 export const collections: {
 	posts: typeof postsCollection;
 	spec: typeof specCollection;
+	memories: typeof memoriesCollection;
 } = {
 	posts: postsCollection,
 	spec: specCollection,
+	memories: memoriesCollection,
 };

@@ -126,7 +126,9 @@ export default defineConfig({
 					targetPath === "/portfolio/" ||
 					currentPath === "/portfolio/" ||
 					targetPath === "/write/" ||
-					currentPath.startsWith("/write/")
+					currentPath.startsWith("/write/") ||
+					targetPath === "/memories/" ||
+					currentPath.startsWith("/memories/")
 				);
 			},
 			updateHead: true,

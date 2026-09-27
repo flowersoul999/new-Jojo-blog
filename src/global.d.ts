@@ -62,6 +62,10 @@ declare global {
 			seekToTime: (time: number) => void;
 			playTrackByIndex: (index: number) => void;
 			loadTrack: (index: number, autoPlay: boolean) => void;
+			/** 惰性开启 Web Audio 频谱分析；返回是否可用 */
+			enableAnalyser: () => boolean;
+			/** 读取 bands 段归一化频谱（0~1）；未开启或失败时返回 null */
+			getSpectrum: (bands: number) => number[] | null;
 		};
 	}
 
