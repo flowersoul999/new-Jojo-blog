@@ -86,6 +86,11 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		var errorCount = 0;
 		var toastTimer = null;
 
+		// 页面加载后立即在后台预加载第一个视频（不播放），
+		// 这样用户点击播放按钮时视频已在缓存中，可以秒播
+		video.src = urlList[currentIndex];
+		video.load();
+
 		function showToast() {
 			if (!toast) return;
 			toast.classList.remove("opacity-0");
@@ -119,8 +124,12 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			window.dispatchEvent(new CustomEvent("bg-player-state-change", { detail: { playing: isPlaying } }));
 		}
 
-		function doPlay() {
-			video.src = urlList[currentIndex];
+		function doPlay(changeSrc) {
+			// 首次播放时 src 已在页面加载阶段预加载，无需重新设置，直接播放实现秒开
+			// 切换到其他视频（changeSrc=true）时才更新 src
+			if (changeSrc !== false) {
+				video.src = urlList[currentIndex];
+			}
 			video.muted = true;
 			video.play()
 				.then(function () { setTimeout(function () { if (video) video.muted = false; }, 100); })
@@ -144,7 +153,8 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				if (currentIndex >= urlList.length) currentIndex = 0;
 				syncAttr();
 				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
-				requestAnimationFrame(function () { doPlay(); });
+				// changeSrc=false：直接播放已预加载的视频，实现点击秒开
+				requestAnimationFrame(function () { doPlay(false); });
 			} else {
 				video.pause();
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
