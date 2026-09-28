@@ -1,12 +1,12 @@
 ---
 /**
- * 全屏散落照片墙（拍立得模式，相册页本体）
+ * 有边界的软木照片板（相册详情页本体）
  *
- * 进入相册页即直接展开，无需点击任何东西：
- * - 照片以拍立得白框随机散落在页面上（站点自身背景，无黑色遮罩）
- * - 每张照片可自由拖动，拖动后的位置按 相册+图片 维度持久化到 localStorage
+ * 与行内软木板 AlbumBoard 风格一致，但位于独立详情页：
+ * - 有边界的软木板，嵌入页面正文流中，不铺满全屏、不隐藏左右侧栏
+ * - 照片按顺序从上往下排列，页面可正常上下滚动看到每一张
  * - 单击照片放大居中，旁边出现彩色便签，显示标签 / 日期 / 描述
- * - 再次单击照片或 ESC 还原；再按 ESC 或点击右上角返回按钮回到相册列表
+ * - 再次单击照片或 ESC 还原；右上角返回按钮回到相册列表
  *
  * 页面数据：相册页在模板中埋 <script type="application/json" data-scatter-data>，
  * 加密相册解密后通过 password:decrypted 事件启动。
@@ -14,13 +14,33 @@
 ---
 
 <style is:global>
-  .ps-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1300;
-    display: none;
+  .ps-board {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin: 1.25rem 0 0.5rem;
     overflow: hidden;
-    /* 淡黄色布料：底色 + 经纬织纹 + 布面起伏明暗 */
+    border-radius: var(--radius-large, 1rem);
+    border: 1px solid rgba(150, 118, 52, 0.3);
+    box-shadow: 0 18px 44px rgba(90, 66, 20, 0.16);
+    font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+    animation: ps-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes ps-in {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* 淡黄色布料软木板：底色 + 经纬织纹 + 布面起伏明暗 */
+  .ps-board-bg {
+    position: absolute;
+    inset: 0;
     background-color: #f6e8c1;
     background-image:
       repeating-linear-gradient(
@@ -39,229 +59,219 @@
     background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
     background-size: 4px 4px, 4px 4px, 100% 100%, 100% 100%, 100% 100%;
   }
+  .ps-noise {
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    pointer-events: none;
+  }
 
-  .ps-overlay.ps-open {
-    display: block;
+  .ps-head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 0 0 auto;
+    padding: 0.7rem 1rem;
+    color: rgba(92, 68, 24, 0.9);
+    background: rgba(255, 253, 244, 0.88);
+    border-bottom: 1px solid rgba(150, 118, 52, 0.24);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 2;
+  }
+  .ps-head-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin: 0;
+  }
+  .ps-head-spacer {
+    flex: 1 1 auto;
+  }
+  .ps-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    color: rgba(92, 68, 24, 0.9);
+    background: rgba(255, 253, 244, 0.95);
+    border: 1px solid rgba(150, 118, 52, 0.24);
+    cursor: pointer;
+    transition: transform 0.18s ease, background 0.18s ease;
+  }
+  .ps-back:hover {
+    transform: scale(1.04);
   }
 
   .ps-stage {
-    position: absolute;
-    inset: 0;
+    position: relative;
+    flex: 1 1 auto;
+    padding: 1.25rem;
     overflow: hidden;
-    /* 细颗粒噪点，让布料更有真实质感 */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
-    background-repeat: repeat;
   }
-
-  /* 画布模式：进入相册后隐藏左右侧边栏、分类栏与底部组件，让照片墙独占整个画布 */
-  body.ps-canvas-open #left-sidebar-wrapper,
-  body.ps-canvas-open #left-sidebar-dynamic,
-  body.ps-canvas-open #right-sidebar-static,
-  body.ps-canvas-open #right-sidebar-dynamic,
-  body.ps-canvas-open #category-bar-wrapper,
-  body.ps-canvas-open #mobile-bottom-sidebar {
-    display: none !important;
-  }
-
-  /* 导航栏浮在布料之上，保留站内导航能力 */
-  body.ps-canvas-open #top-row {
-    z-index: 1400 !important;
-  }
-
-  .ps-hint {
-    position: absolute;
-    top: calc(var(--ps-nav-bottom, 10px) + 14px);
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 1rem;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    letter-spacing: 0.04em;
-    color: rgba(92, 68, 24, 0.88);
-    background: rgba(255, 253, 244, 0.82);
-    border: 1px solid rgba(150, 118, 52, 0.22);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 6px 20px rgba(120, 92, 34, 0.16);
-    pointer-events: none;
-    white-space: nowrap;
-    animation: ps-fade 0.5s ease 0.2s both;
-  }
-
-  .ps-back {
-    position: absolute;
-    top: calc(var(--ps-nav-bottom, 10px) + 10px);
-    right: 20px;
-    height: 42px;
-    padding: 0 16px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border-radius: 999px;
-    font-size: 0.85rem;
-    color: rgba(92, 68, 24, 0.9);
-    background: rgba(255, 253, 244, 0.85);
-    border: 1px solid rgba(150, 118, 52, 0.22);
-    box-shadow: 0 6px 20px rgba(120, 92, 34, 0.16);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    cursor: pointer;
-    transition:
-      background 0.2s ease,
-      transform 0.2s ease;
-    animation: ps-fade 0.5s ease 0.25s both;
-  }
-
-  .ps-back:hover {
-    transform: scale(1.05);
+  .ps-flow {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+    align-content: start;
+    gap: 1.1rem;
   }
 
   .ps-card {
+    position: relative;
+    cursor: zoom-in;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: auto;
+    animation: ps-pop 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+    transition: box-shadow 0.2s ease, transform 0.28s ease;
+  }
+  .ps-card:hover {
+    transform: translateY(-3px) rotate(var(--tilt, 0deg));
+  }
+  .ps-card.is-zoomed {
     position: fixed;
     left: 50%;
     top: 50%;
-    width: var(--w, 200px);
-    height: var(--h, 200px);
-    transform:
-      translate(calc(-50% + var(--ox, 0px)), calc(-50% + var(--oy, 0px)))
-      rotate(var(--rot, 0deg));
-    transition:
-      transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-      width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-      height 0.38s cubic-bezier(0.22, 1, 0.36, 1);
-    touch-action: none;
-    cursor: grab;
-    will-change: transform;
-    user-select: none;
-  }
-
-  .ps-card.is-dragging {
-    transition: none;
-    cursor: grabbing;
-  }
-
-  .ps-card.is-zoomed {
+    z-index: 45;
     transform: translate(-50%, -50%) rotate(0deg);
-    z-index: 1400 !important;
+    cursor: zoom-out;
   }
 
   .ps-frame {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+    position: relative;
     padding: 8px 8px 0;
     background: #fff;
     box-shadow:
-      0 14px 42px rgba(0, 0, 0, 0.26),
-      0 2px 10px rgba(0, 0, 0, 0.14);
-    animation: ps-pop 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+      0 10px 30px rgba(0, 0, 0, 0.24),
+      0 2px 8px rgba(0, 0, 0, 0.12);
   }
-
-  .ps-card:not(.is-zoomed):hover .ps-frame {
+  .ps-card:hover .ps-frame {
     box-shadow:
-      0 18px 52px rgba(0, 0, 0, 0.32),
-      0 2px 10px rgba(0, 0, 0, 0.16);
+      0 14px 38px rgba(0, 0, 0, 0.3),
+      0 2px 8px rgba(0, 0, 0, 0.14);
   }
-
   .ps-frame img {
-    flex: 1 1 auto;
-    min-height: 0;
+    display: block;
     width: 100%;
+    aspect-ratio: 1 / 1;
     object-fit: cover;
+    background: #e9e9ee;
     -webkit-user-drag: none;
     user-select: none;
-    background: #e9e9ee;
   }
-
   .ps-strip {
-    flex: 0 0 26px;
+    height: 22px;
     background: #fff;
   }
 
-  .ps-note {
+  .ps-tape {
     position: absolute;
-    z-index: 1401;
-    width: 224px;
-    min-height: 120px;
-    padding: 16px 18px;
-    color: #3a3530;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
-    display: none;
+    top: -12px;
+    left: 50%;
+    width: 70px;
+    height: 24px;
+    transform: translateX(-50%) rotate(var(--tape-rot, -3deg));
+    background: rgba(255, 235, 150, 0.6);
+    box-shadow: 0 1px 2px rgba(120, 90, 20, 0.12);
+    border-left: 1px dashed rgba(140, 110, 40, 0.18);
+    border-right: 1px dashed rgba(140, 110, 40, 0.18);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .ps-tack {
+    position: absolute;
+    bottom: -7px;
+    right: 14px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #d3452b, #8f2613 70%);
+    box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.35), 0 2px 3px rgba(0, 0, 0, 0.3);
+    z-index: 1;
+    pointer-events: none;
   }
 
+  .ps-note {
+    position: fixed;
+    z-index: 46;
+    width: 210px;
+    min-height: 96px;
+    padding: 14px 16px;
+    color: #3a3530;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
+    display: none;
+  }
   .ps-note.is-visible {
     display: block;
-    animation: ps-note-in 0.4s cubic-bezier(0.22, 1.3, 0.36, 1) both;
+    animation: ps-note-in 0.35s cubic-bezier(0.22, 1.3, 0.36, 1) both;
+  }
+  .ps-note-date {
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: rgba(58, 53, 48, 0.6);
+    margin-bottom: 6px;
+  }
+  .ps-note-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 8px;
+  }
+  .ps-note-tag {
+    font-size: 0.68rem;
+    padding: 1px 9px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.12);
+    color: rgba(58, 53, 48, 0.85);
+  }
+  .ps-note-desc {
+    font-size: 0.86rem;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+
+  .ps-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    min-height: 200px;
+    color: rgba(92, 68, 24, 0.6);
+    font-size: 0.9rem;
+    text-align: center;
   }
 
   @media (min-width: 768px) {
     .ps-note {
       right: 5%;
-      top: 50%;
     }
   }
-
   @media (max-width: 767.98px) {
     .ps-note {
       left: 14px;
       right: 14px;
       width: auto;
-      bottom: 34px;
+      bottom: 26px;
     }
-  }
-
-  .ps-note-date {
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    color: rgba(58, 53, 48, 0.62);
-    margin-bottom: 8px;
-  }
-
-  .ps-note-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 10px;
-  }
-
-  .ps-note-tag {
-    font-size: 0.72rem;
-    padding: 2px 10px;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.12);
-    color: rgba(58, 53, 48, 0.85);
-  }
-
-  .ps-note-desc {
-    font-size: 0.9rem;
-    line-height: 1.65;
-    word-break: break-word;
-  }
-
-  @keyframes ps-fade {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
+    .ps-flow {
+      grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
     }
   }
 
   @keyframes ps-pop {
     from {
       opacity: 0;
-      transform: scale(0.55) rotate(-4deg);
+      transform: translateY(12px) scale(0.9);
     }
     to {
       opacity: 1;
-      transform: scale(1) rotate(0);
+      transform: translateY(0) scale(1);
     }
   }
-
   @keyframes ps-note-in {
     from {
       opacity: 0;
@@ -274,81 +284,65 @@
   }
 </style>
 
+<div class="ps-board" data-ps-board>
+  <div class="ps-board-bg" data-ps-bg></div>
+  <div class="ps-noise"></div>
+
+  <div class="ps-head">
+    <span class="ps-head-title" data-ps-title></span>
+    <span class="ps-head-spacer"></span>
+    <button type="button" class="ps-back" data-ps-back>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      <span>返回相册列表</span>
+    </button>
+  </div>
+
+  <div class="ps-stage">
+    <div class="ps-flow" data-ps-flow></div>
+  </div>
+
+  <div class="ps-note" data-ps-note></div>
+</div>
+
 <script>
   (() => {
-    const w = window as Window & { __photoScatterBound?: boolean };
-    if (w.__photoScatterBound) return;
-    w.__photoScatterBound = true;
+    const boardEl = document.querySelector<HTMLElement>("[data-ps-board]");
+    if (!boardEl) return;
+    const board = boardEl;
 
     const NOTE_COLORS = ["#fff3b0", "#ffd6e0", "#cdeffd", "#d8f3dc", "#f3d9fa", "#ffe5c2"];
 
-    type PhotoMeta = {
-      src: string;
-      description: string;
-      date: string;
-      tags: string[];
-    };
-
-    type ScatterPayload = {
-      album: string;
+    type Photo = { src: string; description?: string; date?: string; tags?: string[] };
+    type Payload = {
       name?: string;
-      backHref?: string;
       date?: string;
       tags?: string[];
-      photos: PhotoMeta[];
+      backHref?: string;
+      photos: Photo[];
     };
+
+    const flow = board.querySelector<HTMLElement>("[data-ps-flow]");
+    const noteEl = board.querySelector<HTMLElement>("[data-ps-note]");
+    const backBtn = board.querySelector<HTMLButtonElement>("[data-ps-back]");
+    const titleEl = board.querySelector<HTMLElement>("[data-ps-title]");
 
     type Card = {
       el: HTMLElement;
       img: HTMLImageElement;
-      meta: PhotoMeta;
-      x: number;
-      y: number;
-      rot: number;
-      baseW: number;
-      baseH: number;
+      meta: Photo;
       noteColor: string;
     };
 
-    type DragState = {
-      card: Card;
-      pointerId: number;
-      startX: number;
-      startY: number;
-      origX: number;
-      origY: number;
-      moved: boolean;
-      downAt: number;
-    };
-
-    let overlay: HTMLElement | null = null;
-    let stage: HTMLElement | null = null;
-    let noteEl: HTMLElement | null = null;
-    let payload: ScatterPayload | null = null;
+    let payload: Payload | null = null;
     let zoomed: Card | null = null;
-    let zTop = 20;
-    let drag: DragState | null = null;
-    let cards: Card[] = [];
 
-    function ensureOverlay() {
-      if (overlay) return;
-      overlay = document.createElement("div");
-      overlay.className = "ps-overlay";
-      overlay.setAttribute("aria-hidden", "true");
-      overlay.innerHTML = `
-        <div class="ps-stage"></div>
-        <div class="ps-hint">拖动照片重新摆放 · 单击查看标签与描述 · ESC 返回相册</div>
-        <button type="button" class="ps-back" aria-label="返回相册列表">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-          返回相册
-        </button>
-        <div class="ps-note"></div>
-      `;
-      document.body.appendChild(overlay);
-      stage = overlay.querySelector(".ps-stage");
-      noteEl = overlay.querySelector(".ps-note");
-
-      overlay.querySelector(".ps-back")?.addEventListener("click", goBack);
+    function hashStr(s: string): number {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) {
+        h = (h << 5) - h + s.charCodeAt(i);
+        h &= h;
+      }
+      return Math.abs(h);
     }
 
     function goBack() {
@@ -359,194 +353,57 @@
       }
     }
 
-    function hashStr(s: string): number {
-      let hash = 0;
-      for (let i = 0; i < s.length; i++) {
-        hash = (hash << 5) - hash + s.charCodeAt(i);
-        hash &= hash;
-      }
-      return Math.abs(hash);
-    }
-
-    type CanvasRect = {
-      left: number;
-      top: number;
-      right: number;
-      bottom: number;
-      vw: number;
-      vh: number;
-    };
-
-    /** 导航栏底部位置（画布顶部与工具条需要避开它） */
-    function navBottom(): number {
-      const nav = document.getElementById("top-row");
-      return nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
-    }
-
-    /** 画布范围：铺满整个视口，但顶部避开导航栏与提示条、四周留少量边距 */
-    function canvasRect(): CanvasRect {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const pad = vw < 768 ? 10 : 20;
-      return {
-        left: pad,
-        top: Math.min(vh / 2, navBottom() + 62),
-        right: vw - pad,
-        bottom: vh - pad,
-        vw,
-        vh,
-      };
-    }
-
-    /** 旋转后卡片的半宽 / 半高，用于把照片限制在画布内 */
-    function halfExtents(card: Card) {
-      const rad = (card.rot * Math.PI) / 180;
-      const c = Math.abs(Math.cos(rad));
-      const s = Math.abs(Math.sin(rad));
-      return {
-        hw: (card.baseW * c + card.baseH * s) / 2,
-        hh: (card.baseW * s + card.baseH * c) / 2,
-      };
-    }
-
-    /** 把卡片拉回画布范围内（卡片位置以视口中心为原点的偏移表示） */
-    function clampCard(card: Card) {
-      const rect = canvasRect();
-      const { hw, hh } = halfExtents(card);
-      const minCx = rect.left + hw;
-      const maxCx = rect.right - hw;
-      const minCy = rect.top + hh;
-      const maxCy = rect.bottom - hh;
-      const cx = rect.vw / 2 + card.x;
-      const cy = rect.vh / 2 + card.y;
-      const nextCx =
-        maxCx <= minCx
-          ? (rect.left + rect.right) / 2
-          : Math.min(Math.max(cx, minCx), maxCx);
-      const nextCy =
-        maxCy <= minCy
-          ? (rect.top + rect.bottom) / 2
-          : Math.min(Math.max(cy, minCy), maxCy);
-      card.x = nextCx - rect.vw / 2;
-      card.y = nextCy - rect.vh / 2;
-    }
-
-    /** 让提示条 / 返回按钮贴在导航栏下方 */
-    function syncToolbarOffset() {
-      if (!overlay) return;
-      overlay.style.setProperty("--ps-nav-bottom", `${Math.round(navBottom())}px`);
-    }
-
-    /** 基于图片地址生成稳定的黄金角螺旋落点，铺满整个画布 + 随机感旋转 */
-    function stablePosition(uniqueId: string, rect: CanvasRect, baseW: number) {
-      const seed = hashStr(uniqueId) % 10000;
-      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-      const t = (seed % 1000) / 1000;
-      const radius = Math.pow(t, 0.72);
-      const angle = seed * goldenAngle;
-      // 预留旋转 + 竖图（最高 1.5 倍宽）所需空间，保证照片完整落在画布内
-      const spreadHw = Math.max(0, (rect.right - rect.left) / 2 - baseW * 0.75);
-      const spreadHh = Math.max(0, (rect.bottom - rect.top) / 2 - baseW * 0.92);
-      const cx = (rect.left + rect.right) / 2 + radius * Math.cos(angle) * spreadHw;
-      const cy = (rect.top + rect.bottom) / 2 + radius * Math.sin(angle) * spreadHh;
-      const rot = ((seed * 13) % 36) - 18;
-      return { x: cx - rect.vw / 2, y: cy - rect.vh / 2, rot };
-    }
-
-    function offsetKey(albumId: string, src: string) {
-      return `photo-scatter-offset:${albumId}:${src}`;
-    }
-
-    function loadOffset(albumId: string, src: string): { x: number; y: number } {
-      try {
-        const raw = localStorage.getItem(offsetKey(albumId, src));
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          return { x: Number(parsed.x) || 0, y: Number(parsed.y) || 0 };
-        }
-      } catch {
-        /* ignore */
-      }
-      return { x: 0, y: 0 };
-    }
-
-    function saveOffset(albumId: string, src: string, x: number, y: number) {
-      try {
-        localStorage.setItem(offsetKey(albumId, src), JSON.stringify({ x, y }));
-      } catch {
-        /* ignore */
-      }
-    }
-
-    function applyTransform(card: Card) {
-      card.el.style.setProperty("--ox", `${card.x}px`);
-      card.el.style.setProperty("--oy", `${card.y}px`);
-      card.el.style.setProperty("--rot", `${card.rot}deg`);
-    }
-
-    function bringToFront(card: Card) {
-      zTop += 1;
-      card.el.style.zIndex = String(zTop);
-    }
-
     function albumTags(): string[] {
       return Array.isArray(payload?.tags) ? payload!.tags.map(String) : [];
     }
 
     function unzoom() {
       if (!zoomed) return;
-      const card = zoomed;
+      zoomed.el.classList.remove("is-zoomed");
       zoomed = null;
-      card.el.classList.remove("is-zoomed");
-      card.el.style.setProperty("--w", `${card.baseW}px`);
-      card.el.style.setProperty("--h", `${card.baseH}px`);
       noteEl?.classList.remove("is-visible");
     }
 
     function zoom(card: Card) {
-      if (!payload) return;
       if (zoomed === card) {
         unzoom();
         return;
       }
       if (zoomed) unzoom();
       zoomed = card;
-      bringToFront(card);
+      card.el.classList.add("is-zoomed");
 
       const naturalW = card.img.naturalWidth || 4;
       const naturalH = card.img.naturalHeight || 3;
       const isMobile = window.innerWidth < 768;
-      const maxW = window.innerWidth - (isMobile ? 36 : 120);
+      const maxW = window.innerWidth - (isMobile ? 36 : 140);
       const maxH = window.innerHeight - (isMobile ? 260 : 140);
       const scale = Math.min(maxW / naturalW, maxH / naturalH, 1.25);
-      card.el.style.setProperty("--w", `${Math.round(naturalW * scale)}px`);
-      card.el.style.setProperty("--h", `${Math.round(naturalH * scale)}px`);
-      card.el.classList.add("is-zoomed");
+      card.el.style.width = `${Math.round(naturalW * scale)}px`;
 
       if (!noteEl) return;
-      const tags = card.meta.tags.length > 0 ? card.meta.tags : albumTags();
-      const date = card.meta.date || payload.date || "";
-      const desc = card.meta.description;
-
+      const tags = card.meta.tags?.length ? card.meta.tags : albumTags();
+      const date = card.meta.date || payload?.date || "";
+      const desc = card.meta.description || "";
       noteEl.style.backgroundColor = card.noteColor;
       noteEl.innerHTML = `
         ${date ? `<div class="ps-note-date"></div>` : ""}
         ${tags.length > 0 ? `<div class="ps-note-tags"></div>` : ""}
         ${desc ? `<div class="ps-note-desc"></div>` : ""}
       `;
-      const dateEl = noteEl.querySelector(".ps-note-date");
-      if (dateEl) dateEl.textContent = date;
-      const tagsWrap = noteEl.querySelector(".ps-note-tags");
-      if (tagsWrap) {
+      const dEl = noteEl.querySelector(".ps-note-date");
+      if (dEl) dEl.textContent = date;
+      const tgEl = noteEl.querySelector(".ps-note-tags");
+      if (tgEl) {
         for (const t of tags) {
           const chip = document.createElement("span");
           chip.className = "ps-note-tag";
           chip.textContent = `# ${t}`;
-          tagsWrap.appendChild(chip);
+          tgEl.appendChild(chip);
         }
       }
-      const descEl = noteEl.querySelector(".ps-note-desc");
-      if (descEl) descEl.textContent = desc;
+      const dsEl = noteEl.querySelector(".ps-note-desc");
+      if (dsEl) dsEl.textContent = desc;
 
       if (!date && tags.length === 0 && !desc) {
         noteEl.classList.remove("is-visible");
@@ -557,162 +414,56 @@
       }
     }
 
-    function closeScatter() {
-      if (!overlay || !overlay.classList.contains("ps-open")) return;
-      zoomed = null;
-      drag = null;
-      cards = [];
-      overlay.classList.remove("ps-open");
-      overlay.setAttribute("aria-hidden", "true");
-      if (stage) stage.innerHTML = "";
-      noteEl?.classList.remove("is-visible");
-      document.body.classList.remove("ps-canvas-open");
-    }
-
-    function renderScatter(data: ScatterPayload) {
-      ensureOverlay();
-      if (!overlay || !stage) return;
-      closeScatter();
-
+    function render(data: Payload) {
       payload = data;
+      if (titleEl && data.name) titleEl.textContent = data.name;
+
       const photos = data.photos || [];
+      if (!flow) return;
+      flow.innerHTML = "";
       if (photos.length === 0) return;
 
-      const rect = canvasRect();
-      syncToolbarOffset();
-      const baseW = rect.vw < 640 ? 148 : rect.vw < 1024 ? 180 : 210;
-      zTop = 20 + photos.length;
-      cards = [];
-
       photos.forEach((meta, index) => {
+        const tilt = ((hashStr(meta.src || String(index)) * 7) % 6) - 3;
         const el = document.createElement("div");
         el.className = "ps-card";
-        el.style.setProperty("--w", `${baseW}px`);
-        el.style.setProperty("--h", `${baseW}px`);
+        el.style.setProperty("--tilt", `${tilt}deg`);
+        el.style.setProperty("--tape-rot", `${((hashStr(meta.src || String(index)) * 7) % 14) - 7}deg`);
+        el.style.animationDelay = `${Math.min(index * 55, 600)}ms`;
 
         const frame = document.createElement("div");
         frame.className = "ps-frame";
-        frame.style.animationDelay = `${Math.min(index * 70, 700)}ms`;
-
+        const tape = document.createElement("div");
+        tape.className = "ps-tape";
+        const tack = document.createElement("div");
+        tack.className = "ps-tack";
         const img = document.createElement("img");
         img.src = meta.src;
         img.alt = meta.description || `照片 ${index + 1}`;
         img.draggable = false;
-
+        img.decoding = "async";
         const strip = document.createElement("div");
         strip.className = "ps-strip";
 
         frame.append(img, strip);
-        el.appendChild(frame);
-        stage!.appendChild(el);
+        el.append(tape, tack, frame);
+        flow.appendChild(el);
 
-        const pos = stablePosition(meta.src, rect, baseW);
-        const offset = loadOffset(data.album, meta.src);
         const card: Card = {
           el,
           img,
           meta,
-          x: pos.x + offset.x,
-          y: pos.y + offset.y,
-          rot: pos.rot,
-          baseW,
-          baseH: baseW,
           noteColor: NOTE_COLORS[index % NOTE_COLORS.length],
         };
-        clampCard(card);
-        applyTransform(card);
-        cards.push(card);
-
-        const applyNaturalSize = () => {
-          const ratio = img.naturalWidth / img.naturalHeight || 1;
-          const clamped = Math.min(Math.max(ratio, 2 / 3), 3 / 2);
-          card.baseH = Math.round(baseW / clamped);
-          if (!card.el.classList.contains("is-zoomed")) {
-            card.el.style.setProperty("--w", `${card.baseW}px`);
-            card.el.style.setProperty("--h", `${card.baseH}px`);
-            clampCard(card);
-            applyTransform(card);
-          }
-        };
-        if (img.complete && img.naturalWidth) applyNaturalSize();
-        img.addEventListener("load", applyNaturalSize);
-
-        let zoomClickStart = 0;
-        el.addEventListener("pointerdown", (e) => {
-          if (e.pointerType === "mouse" && e.button !== 0) return;
-          if (zoomed) {
-            zoomClickStart = e.timeStamp;
-            return;
-          }
-          e.preventDefault();
-          bringToFront(card);
-          el.classList.add("is-dragging");
-          try {
-            el.setPointerCapture(e.pointerId);
-          } catch {
-            /* ignore */
-          }
-          drag = {
-            card,
-            pointerId: e.pointerId,
-            startX: e.clientX,
-            startY: e.clientY,
-            origX: card.x,
-            origY: card.y,
-            moved: false,
-            downAt: e.timeStamp,
-          };
-        });
-
-        el.addEventListener("pointermove", (e) => {
-          if (!drag || drag.card !== card || drag.pointerId !== e.pointerId) return;
-          const dx = e.clientX - drag.startX;
-          const dy = e.clientY - drag.startY;
-          if (Math.abs(dx) + Math.abs(dy) > 6) drag.moved = true;
-          card.x = drag.origX + dx;
-          card.y = drag.origY + dy;
-          clampCard(card);
-          applyTransform(card);
-        });
-
-        el.addEventListener("pointerup", (e) => {
-          // 放大态下点当前照片还原，点别的照片切换放大
-          if (zoomed && zoomClickStart) {
-            zoom(card);
-            zoomClickStart = 0;
-            return;
-          }
-          if (!drag || drag.card !== card || drag.pointerId !== e.pointerId) return;
-          el.classList.remove("is-dragging");
-          try {
-            el.releasePointerCapture(e.pointerId);
-          } catch {
-            /* ignore */
-          }
-          const state = drag;
-          drag = null;
-          if (state.moved) {
-            saveOffset(data.album, meta.src, card.x, card.y);
-          } else if (e.timeStamp - state.downAt < 300) {
-            zoom(card);
-          }
-        });
-        el.addEventListener("pointercancel", () => {
-          el.classList.remove("is-dragging");
-          drag = null;
-        });
+        el.addEventListener("click", () => zoom(card));
       });
-
-      overlay.classList.add("ps-open");
-      overlay.setAttribute("aria-hidden", "false");
-      document.body.classList.add("ps-canvas-open");
     }
 
-    function readPayload(): ScatterPayload | null {
+    function readPayload(): Payload | null {
       const el = document.querySelector<HTMLScriptElement>("script[data-scatter-data]");
       if (!el?.textContent) return null;
       try {
-        const data = JSON.parse(el.textContent) as ScatterPayload;
+        const data = JSON.parse(el.textContent) as Payload;
         if (!data || !Array.isArray(data.photos) || data.photos.length === 0) return null;
         return data;
       } catch {
@@ -720,35 +471,21 @@
       }
     }
 
-    /** 页面里存在散落相册数据就立即展开 */
-    function boot() {
-      const data = readPayload();
-      if (data && !overlay?.classList.contains("ps-open")) renderScatter(data);
-    }
-
-    // Astro 的脚本在 DOM 解析后执行；加密相册解密后再启动一次
-    boot();
-    document.addEventListener("password:decrypted", () => setTimeout(boot, 150));
-    // swup 无刷新进入相册页
-    document.addEventListener("swup:contentReplaced", boot);
-    // 离开相册页时收起
-    document.addEventListener("swup:visit:start", closeScatter);
-
-    // 视口变化时把照片重新拉回画布内
-    window.addEventListener("resize", () => {
-      if (!overlay?.classList.contains("ps-open") || zoomed) return;
-      syncToolbarOffset();
-      for (const card of cards) {
-        clampCard(card);
-        applyTransform(card);
-      }
-    });
+    backBtn?.addEventListener("click", goBack);
 
     document.addEventListener("keydown", (e) => {
-      if (e.key !== "Escape" || !overlay?.classList.contains("ps-open")) return;
+      if (e.key !== "Escape") return;
       e.preventDefault();
       if (zoomed) unzoom();
-      else goBack();
     });
+
+    // 详情页存在封装数据就渲染（加密相册解密后再启动一次）
+    function boot() {
+      const data = readPayload();
+      if (data) render(data);
+    }
+    boot();
+    document.addEventListener("password:decrypted", () => setTimeout(boot, 150));
+    document.addEventListener("swup:contentReplaced", boot);
   })();
 </script>
