@@ -1,0 +1,509 @@
+---
+// 日记详情页：点击纸片后走站内平滑跳转到此页（不再弹窗）
+// 布局：封面大图 + 标题信息 → 其余照片（放在文章上方）→ 正文
+// 私密日记：静态页不渲染内容，仅显示锁定卡片，密码验证后由前端拉取渲染
+import { Icon } from "astro-icon/components";
+import fs from "node:fs";
+import { siteConfig } from "@/config";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+const MOOD_MAP: Record<string, { label: string; emoji: string }> = {
+	"super-happy": { label: "炒鸡开心", emoji: "🤩" },
+	happy: { label: "开心", emoji: "😊" },
+	neutral: { label: "平平淡淡", emoji: "😐" },
+	unhappy: { label: "不开心", emoji: "😔" },
+	sad: { label: "伤心难过", emoji: "😭" },
+};
+
+interface DiaryEntry {
+	slug: string;
+	title?: string;
+	content?: string;
+	date: string;
+	tags?: string[];
+	images?: { id: string; name: string; url: string; width: number; height: number; size: number }[];
+	mood?: string;
+	isPrivate?: boolean;
+}
+
+interface Props {
+	entry: DiaryEntry;
+}
+
+// 为每篇日记生成静态详情页
+export function getStaticPaths() {
+	const file = new URL("../../../public/diary/index.json", import.meta.url);
+	const diaries = JSON.parse(fs.readFileSync(file, "utf-8")) as DiaryEntry[];
+	return diaries.map((d) => ({ params: { slug: d.slug }, props: { entry: d } }));
+}
+
+const { entry } = Astro.props;
+
+if (!siteConfig.pages.diary) {
+	return Astro.redirect("/404/");
+}
+
+function formatDate(dateStr: string) {
+	const d = new Date(dateStr);
+	if (isNaN(d.getTime())) return dateStr;
+	return (
+		d.getFullYear() +
+		"年" +
+		String(d.getMonth() + 1).padStart(2, "0") +
+		"月" +
+		String(d.getDate()).padStart(2, "0") +
+		"日"
+	);
+}
+
+function formatChineseTime(dateStr: string) {
+	const d = new Date(dateStr);
+	if (isNaN(d.getTime())) return "";
+	let h = d.getHours();
+	const m = String(d.getMinutes()).padStart(2, "0");
+	let period = "凌晨";
+	if (h >= 5 && h < 8) period = "早上";
+	else if (h >= 8 && h < 11) period = "上午";
+	else if (h >= 11 && h < 13) period = "中午";
+	else if (h >= 13 && h < 17) period = "下午";
+	else if (h >= 17 && h < 19) period = "傍晚";
+	else if (h >= 19 && h < 23) period = "晚上";
+	else if (h >= 23) period = "深夜";
+	const h12 = h % 12 || 12;
+	return period + " " + h12 + ":" + m;
+}
+
+const images = entry.images || [];
+const cover = images.length ? images[0].url : null;
+const rest = images.slice(1);
+const mood = entry.mood ? MOOD_MAP[entry.mood] : null;
+const tags = entry.tags || [];
+const pageTitle = entry.title || "日记";
+---
+
+<MainGridLayout title={pageTitle} description="日记详情">
+	<div class="card-base z-10 relative w-full overflow-hidden">
+		{entry.isPrivate ? (
+			<!-- 私密日记：静态页不输出内容，由前端验证密码后渲染 -->
+			<div id="diary-locked" data-slug={entry.slug} class="diary-locked flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+				<div class="text-4xl">🔒</div>
+				<h1 class="diary-title">私密日记</h1>
+				<p class="text-sm text-neutral-500 dark:text-neutral-400">这篇日记需要密码才能查看</p>
+				<button
+					type="button"
+					id="diary-locked-btn"
+					class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-4 py-2 text-sm text-(--btn-content) transition-colors hover:bg-(--btn-regular-bg-hover)"
+				>
+					输入密码查看
+				</button>
+			</div>
+		) : (
+			<>
+				{cover ? (
+					<!-- 封面大图：标题与信息压在封面上 -->
+					<div class="diary-hero relative w-full overflow-hidden">
+						<img src={cover} alt="" class="diary-hero-img diary-img" data-src={cover} draggable="false" />
+						<div class="diary-hero-fade"></div>
+						<div class="diary-hero-head">
+							<h1 class="diary-hero-title">{entry.title || "无题"}</h1>
+							<div class="diary-hero-meta">
+								<span class="diary-hero-date">{formatDate(entry.date)} · {formatChineseTime(entry.date)}</span>
+								{mood && <span class="diary-hero-pill">{mood.emoji} {mood.label}</span>}
+								{tags.map((tag) => (
+									<span class="diary-hero-tag">{tag}</span>
+								))}
+							</div>
+						</div>
+					</div>
+				) : (
+					<!-- 无图日记：标题区 -->
+					<div class="px-5 sm:px-7 pt-5 sm:pt-6">
+						<h1 class="diary-title">
+							{entry.title || "无题"}
+							{mood && <span class="diary-title-mood"> {mood.emoji}</span>}
+						</h1>
+						<div class="diary-meta">
+							<span class="diary-hero-date">{formatDate(entry.date)} · {formatChineseTime(entry.date)}</span>
+							{mood && <span class="diary-hero-pill">{mood.emoji} {mood.label}</span>}
+							{tags.map((tag) => (
+								<span class="diary-hero-tag">{tag}</span>
+							))}
+						</div>
+					</div>
+				)}
+
+				{rest.length > 0 && (
+					<!-- 其余照片统一放在文章上方 -->
+					<div class={"diary-imgs px-5 sm:px-7 pt-5" + (rest.length === 1 ? " is-single" : "")}>
+						{rest.map((img) => (
+							<img src={img.url} alt="" class="diary-img" data-src={img.url} loading="lazy" draggable="false" />
+						))}
+					</div>
+				)}
+
+				<!-- 正文 -->
+				<div class="diary-text px-5 sm:px-7 pb-6 pt-4">{entry.content || ""}</div>
+			</>
+		)}
+	</div>
+
+	<!-- 图片灯箱：点击照片看大图 -->
+	<div id="diary-lightbox" class="diary-lightbox" hidden>
+		<button type="button" id="diary-lightbox-close" class="diary-lightbox-close" aria-label="关闭">
+			<Icon is:inline name="material-symbols:close" class="text-2xl" />
+		</button>
+		<img id="diary-lightbox-img" src="" alt="" class="diary-lightbox-img" />
+	</div>
+
+	<style is:global>
+		/* ===================== 封面大图 ===================== */
+		.diary-hero {
+			aspect-ratio: 21 / 10;
+			min-height: 180px;
+		}
+		.diary-hero-img {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			cursor: zoom-in;
+		}
+		.diary-hero-fade {
+			position: absolute;
+			inset: 0;
+			background: linear-gradient(
+				180deg,
+				rgb(0 0 0 / 0.18) 0%,
+				rgb(0 0 0 / 0) 32%,
+				rgb(0 0 0 / 0.62) 100%
+			);
+			pointer-events: none;
+		}
+		.diary-hero-head {
+			position: absolute;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			padding: 1rem 1.5rem 1.1rem;
+			color: #fff;
+		}
+		.diary-hero-title {
+			margin: 0 0 0.5rem;
+			font-size: 1.6rem;
+			font-weight: 700;
+			line-height: 1.3;
+			text-shadow: 0 2px 10px rgb(0 0 0 / 0.45);
+			word-break: break-all;
+		}
+		.diary-hero-meta {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 0.45rem;
+			font-size: 0.8rem;
+			color: rgb(255 255 255 / 0.9);
+		}
+		.diary-hero-pill,
+		.diary-hero-tag {
+			display: inline-flex;
+			align-items: center;
+			border-radius: 999px;
+			padding: 0.14rem 0.55rem;
+			border: 1px solid rgb(255 255 255 / 0.28);
+			background: rgb(255 255 255 / 0.16);
+			color: #fff;
+		}
+
+		/* ===================== 无图时的标题区 ===================== */
+		.diary-title {
+			margin: 0;
+			font-size: 1.5rem;
+			font-weight: 700;
+			line-height: 1.4;
+			color: var(--deep-text);
+			word-break: break-all;
+		}
+		.diary-title-mood {
+			font-size: 1.2rem;
+		}
+		.diary-meta {
+			margin-top: 0.7rem;
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 0.45rem;
+			font-size: 0.8rem;
+			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+		}
+
+		/* ===================== 照片（放在文章上方） ===================== */
+		.diary-imgs {
+			display: grid;
+			grid-template-columns: repeat(2, 1fr);
+			gap: 0.6rem;
+		}
+		.diary-imgs.is-single {
+			grid-template-columns: 1fr;
+		}
+		.diary-img {
+			display: block;
+			width: 100%;
+			aspect-ratio: 16 / 9;
+			object-fit: cover;
+			border-radius: 12px;
+			border: 1px solid var(--line-divider);
+			cursor: zoom-in;
+			transition: transform 0.25s ease;
+		}
+		.diary-img:hover {
+			transform: scale(1.02);
+		}
+
+		/* ===================== 正文 ===================== */
+		.diary-text {
+			white-space: pre-wrap;
+			word-break: break-word;
+			line-height: 1.9;
+			font-size: 0.95rem;
+			color: var(--deep-text);
+		}
+
+		/* ===================== 图片灯箱 ===================== */
+		.diary-lightbox {
+			position: fixed;
+			inset: 0;
+			z-index: 9999;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: rgb(0 0 0 / 0.82);
+			backdrop-filter: blur(6px);
+			-webkit-backdrop-filter: blur(6px);
+		}
+		.diary-lightbox[hidden] {
+			display: none;
+		}
+		.diary-lightbox-close {
+			position: absolute;
+			top: 1rem;
+			right: 1rem;
+			z-index: 10;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			height: 2.5rem;
+			width: 2.5rem;
+			border: none;
+			border-radius: 999px;
+			cursor: pointer;
+			background: rgb(255 255 255 / 0.1);
+			color: #fff;
+			transition: background 200ms ease;
+		}
+		.diary-lightbox-close:hover {
+			background: rgb(255 255 255 / 0.2);
+		}
+		.diary-lightbox-img {
+			max-height: 90vh;
+			max-width: 90vw;
+			border-radius: 10px;
+			object-fit: contain;
+			box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+		}
+
+		@media (max-width: 639px) {
+			.diary-hero-title {
+				font-size: 1.25rem;
+			}
+		}
+	</style>
+
+	<script is:inline>
+	(function () {
+		var MOOD_MAP = {
+			"super-happy": { label: "炒鸡开心", emoji: "🤩" },
+			happy: { label: "开心", emoji: "😊" },
+			neutral: { label: "平平淡淡", emoji: "😐" },
+			unhappy: { label: "不开心", emoji: "😔" },
+			sad: { label: "伤心难过", emoji: "😭" },
+		};
+		var UNLOCK_KEY = "aemeath-diary-unlocked";
+		var DIARY_PASSWORD = "2299";
+
+		var lightbox = document.getElementById("diary-lightbox");
+		var lightboxImg = document.getElementById("diary-lightbox-img");
+		var lightboxClose = document.getElementById("diary-lightbox-close");
+
+		if (lightbox) {
+			// 灯箱移到 body 下，避免父级 transform 让 fixed 定位失效；
+			// 顺带清理跨页面导航后可能残留在 body 下的同名旧节点
+			document.querySelectorAll("#diary-lightbox").forEach(function (n) {
+				if (n !== lightbox) n.remove();
+			});
+			document.body.appendChild(lightbox);
+
+			function closeLightbox() {
+				lightbox.hidden = true;
+			}
+			lightboxClose.addEventListener("click", closeLightbox);
+			lightbox.addEventListener("click", function (e) {
+				if (e.target === lightbox) closeLightbox();
+			});
+			document.addEventListener("keydown", function (e) {
+				if (e.key === "Escape" && !lightbox.hidden) closeLightbox();
+			});
+		}
+
+		/* 点击照片看大图 */
+		function bindLightbox() {
+			document.querySelectorAll(".diary-img").forEach(function (img) {
+				img.addEventListener("click", function () {
+					lightboxImg.src = img.dataset.src || img.src;
+					lightbox.hidden = false;
+				});
+			});
+		}
+		bindLightbox();
+
+		/* 私密日记：已解锁则拉取内容渲染，否则等输入密码 */
+		var lockedBox = document.getElementById("diary-locked");
+		if (!lockedBox) return;
+		var slug = lockedBox.dataset.slug;
+		var btn = document.getElementById("diary-locked-btn");
+		var unlocked = false;
+		try {
+			unlocked = sessionStorage.getItem(UNLOCK_KEY) === "1";
+		} catch (e) {}
+
+		function formatDate(dateStr) {
+			var d = new Date(dateStr);
+			if (isNaN(d.getTime())) return dateStr;
+			return (
+				d.getFullYear() +
+				"年" +
+				String(d.getMonth() + 1).padStart(2, "0") +
+				"月" +
+				String(d.getDate()).padStart(2, "0") +
+				"日"
+			);
+		}
+
+		function formatChineseTime(dateStr) {
+			var d = new Date(dateStr);
+			if (isNaN(d.getTime())) return "";
+			var h = d.getHours();
+			var m = String(d.getMinutes()).padStart(2, "0");
+			var period = "凌晨";
+			if (h >= 5 && h < 8) period = "早上";
+			else if (h >= 8 && h < 11) period = "上午";
+			else if (h >= 11 && h < 13) period = "中午";
+			else if (h >= 13 && h < 17) period = "下午";
+			else if (h >= 17 && h < 19) period = "傍晚";
+			else if (h >= 19 && h < 23) period = "晚上";
+			else if (h >= 23) period = "深夜";
+			var h12 = h % 12 || 12;
+			return period + " " + h12 + ":" + m;
+		}
+
+		function escapeHtml(str) {
+			var div = document.createElement("div");
+			div.textContent = str == null ? "" : String(str);
+			return div.innerHTML;
+		}
+
+		/* 与服务端同款的详情结构渲染（封面 → 照片 → 正文） */
+		function renderPrivate(entry) {
+			var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
+			var imgs = entry.images || [];
+			var cover = imgs.length ? imgs[0].url : null;
+			var rest = imgs.slice(1);
+
+			var metaHtml =
+				'<div class="diary-hero-meta">' +
+				'<span class="diary-hero-date">' + formatDate(entry.date) + " · " + formatChineseTime(entry.date) + "</span>" +
+				(mood ? '<span class="diary-hero-pill">' + mood.emoji + " " + mood.label + "</span>" : "") +
+				(entry.tags || [])
+					.map(function (tag) {
+						return '<span class="diary-hero-tag">' + escapeHtml(tag) + "</span>";
+					})
+					.join("") +
+				"</div>";
+
+			var html = "";
+			if (cover) {
+				html +=
+					'<div class="diary-hero relative w-full overflow-hidden">' +
+					'<img src="' + cover + '" alt="" class="diary-hero-img diary-img" data-src="' + cover + '" draggable="false">' +
+					'<div class="diary-hero-fade"></div>' +
+					'<div class="diary-hero-head"><h1 class="diary-hero-title">' + escapeHtml(entry.title || "无题") + "</h1>" + metaHtml + "</div>" +
+					"</div>";
+			} else {
+				html +=
+					'<div class="px-5 sm:px-7 pt-5 sm:pt-6">' +
+					'<h1 class="diary-title">' +
+					escapeHtml(entry.title || "无题") +
+					(mood ? ' <span class="diary-title-mood">' + mood.emoji + "</span>" : "") +
+					"</h1>" +
+					'<div class="diary-meta">' +
+					'<span class="diary-hero-date">' + formatDate(entry.date) + " · " + formatChineseTime(entry.date) + "</span>" +
+					(mood ? '<span class="diary-hero-pill">' + mood.emoji + " " + mood.label + "</span>" : "") +
+					(entry.tags || [])
+						.map(function (tag) {
+							return '<span class="diary-hero-tag">' + escapeHtml(tag) + "</span>";
+						})
+						.join("") +
+					"</div></div>";
+			}
+
+			if (rest.length) {
+				html +=
+					'<div class="diary-imgs px-5 sm:px-7 pt-5' + (rest.length === 1 ? " is-single" : "") + '">';
+				rest.forEach(function (img) {
+					html += '<img src="' + img.url + '" alt="" class="diary-img" data-src="' + img.url + '" loading="lazy" draggable="false">';
+				});
+				html += "</div>";
+			}
+
+			html += '<div class="diary-text px-5 sm:px-7 pb-6 pt-4">' + escapeHtml(entry.content || "") + "</div>";
+
+			var wrap = document.createElement("div");
+			wrap.innerHTML = html;
+			lockedBox.replaceWith(wrap);
+			bindLightbox();
+		}
+
+		function loadAndRender() {
+			fetch("/diary/index.json")
+				.then(function (r) {
+					return r.json();
+				})
+				.then(function (list) {
+					var entry = list.find(function (e) {
+						return e.slug === slug;
+					});
+					if (entry) renderPrivate(entry);
+				})
+				.catch(function (err) {
+					console.error("Failed to load diary:", err);
+				});
+		}
+
+		if (unlocked) {
+			loadAndRender();
+		} else if (btn) {
+			btn.addEventListener("click", function () {
+				var pwd = prompt("这是一篇私密日记，请输入密码：");
+				if (pwd === DIARY_PASSWORD) {
+					try {
+						sessionStorage.setItem(UNLOCK_KEY, "1");
+					} catch (e) {}
+					loadAndRender();
+				} else if (pwd !== null) {
+					alert("密码错误");
+				}
+			});
+		}
+	})();
+	</script>
+</MainGridLayout>

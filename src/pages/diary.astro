@@ -48,28 +48,9 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			<!-- 底部提示 -->
 			<div class="diary-board-hint flex items-center justify-center gap-1.5 pt-3 text-xs text-neutral-400 dark:text-neutral-500">
 				<Icon is:inline name="material-symbols:open-in-new-rounded" class="text-sm" />
-				<span>点击纸片查看详情，按住可随意拖动摆放</span>
+				<span>点击纸片查看完整日记，按住可随意拖动摆放</span>
 			</div>
 		</div>
-	</div>
-
-	<!-- 日记详情弹窗 -->
-	<div id="diary-modal" class="diary-modal" hidden>
-		<div id="diary-modal-mask" class="diary-modal-mask"></div>
-		<div class="diary-modal-panel" role="dialog" aria-modal="true">
-			<button type="button" id="diary-modal-close" class="diary-modal-close" aria-label="关闭">
-				<Icon is:inline name="material-symbols:close" class="text-lg" />
-			</button>
-			<div id="diary-modal-body" class="diary-modal-body"></div>
-		</div>
-	</div>
-
-	<!-- 图片灯箱 -->
-	<div id="diary-lightbox" class="diary-lightbox" hidden>
-		<button type="button" id="diary-lightbox-close" class="diary-lightbox-close" aria-label="关闭">
-			<Icon is:inline name="material-symbols:close" class="text-2xl" />
-		</button>
-		<img id="diary-lightbox-img" src="" alt="" class="diary-lightbox-img" />
 	</div>
 
 	<style is:global>
@@ -323,247 +304,6 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			text-align: center;
 		}
 
-		/* ===================== 详情弹窗 ===================== */
-		.diary-modal {
-			position: fixed;
-			inset: 0;
-			z-index: 9998;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			padding: 1rem;
-			animation: diary-fade-in 0.25s ease;
-		}
-		.diary-modal[hidden] {
-			display: none;
-		}
-		.diary-modal-mask {
-			position: absolute;
-			inset: 0;
-			background: rgb(0 0 0 / 0.55);
-			backdrop-filter: blur(6px);
-			-webkit-backdrop-filter: blur(6px);
-		}
-		.diary-modal-panel {
-			position: relative;
-			width: 100%;
-			max-width: 620px;
-			max-height: min(86vh, 760px);
-			display: flex;
-			flex-direction: column;
-			overflow: hidden;
-			border-radius: 20px;
-			border: 1px solid var(--line-divider);
-			background: var(--card-bg);
-			box-shadow:
-				0 30px 80px rgb(0 0 0 / 0.35),
-				0 6px 24px rgb(0 0 0 / 0.16);
-			animation: diary-pop-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-		}
-		.diary-modal-close {
-			position: absolute;
-			top: 0.7rem;
-			right: 0.7rem;
-			z-index: 10;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			height: 2.1rem;
-			width: 2.1rem;
-			border: none;
-			border-radius: 999px;
-			cursor: pointer;
-			background: color-mix(in srgb, var(--card-bg) 65%, transparent);
-			color: var(--deep-text);
-			box-shadow: 0 0 0 1px color-mix(in srgb, var(--deep-text) 12%, transparent);
-			backdrop-filter: blur(8px);
-			-webkit-backdrop-filter: blur(8px);
-			transition: transform 200ms ease, box-shadow 200ms ease;
-		}
-		.diary-modal-close:hover {
-			transform: scale(1.06);
-			box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent);
-		}
-		.diary-modal-body {
-			display: flex;
-			flex-direction: column;
-			flex: 1 1 auto;
-			min-height: 0;
-		}
-		.diary-modal-scroll {
-			flex: 1 1 auto;
-			min-height: 0;
-			overflow-y: auto;
-			padding: 1.5rem 1.6rem 1.6rem;
-		}
-
-		/* 封面图（有图日记）：标题与信息压在封面上 */
-		.diary-modal-cover {
-			position: relative;
-			flex: none;
-			aspect-ratio: 21 / 10;
-			min-height: 170px;
-			overflow: hidden;
-		}
-		.diary-modal-cover > img {
-			position: absolute;
-			inset: 0;
-			width: 100%;
-			height: 100%;
-			object-fit: cover;
-		}
-		.diary-modal-cover-fade {
-			position: absolute;
-			inset: 0;
-			background: linear-gradient(
-				180deg,
-				rgb(0 0 0 / 0.18) 0%,
-				rgb(0 0 0 / 0) 32%,
-				rgb(0 0 0 / 0.62) 100%
-			);
-		}
-		.diary-modal-cover-head {
-			position: absolute;
-			left: 0;
-			right: 0;
-			bottom: 0;
-			padding: 1rem 1.5rem 1.05rem;
-			color: #fff;
-		}
-		.diary-modal-cover-head h2 {
-			margin: 0 0 0.45rem;
-			font-size: 1.35rem;
-			font-weight: 700;
-			line-height: 1.35;
-			text-shadow: 0 2px 10px rgb(0 0 0 / 0.45);
-			word-break: break-all;
-		}
-		.diary-modal-cover .diary-modal-meta {
-			color: rgb(255 255 255 / 0.88);
-		}
-		.diary-modal-cover .diary-modal-pill,
-		.diary-modal-cover .diary-modal-tag {
-			background: rgb(255 255 255 / 0.16);
-			color: #fff;
-			border-color: rgb(255 255 255 / 0.28);
-		}
-
-		/* 无封面时的标题区 */
-		.diary-modal-title {
-			margin: 0 2.2rem 0.55rem 0;
-			font-size: 1.35rem;
-			font-weight: 700;
-			line-height: 1.4;
-			color: var(--deep-text);
-			word-break: break-all;
-		}
-		.diary-modal-mood {
-			font-size: 1.2rem;
-		}
-		.diary-modal-meta {
-			display: flex;
-			flex-wrap: wrap;
-			align-items: center;
-			gap: 0.45rem;
-			font-size: 0.75rem;
-			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
-			margin-bottom: 1rem;
-		}
-		.diary-modal-pill,
-		.diary-modal-tag {
-			display: inline-flex;
-			align-items: center;
-			border-radius: 999px;
-			padding: 0.14rem 0.55rem;
-			border: 1px solid var(--line-divider);
-			background: var(--btn-regular-bg);
-			color: var(--btn-content);
-		}
-
-		.diary-detail-content {
-			white-space: pre-wrap;
-			word-break: break-word;
-			line-height: 1.9;
-			font-size: 0.94rem;
-			color: var(--deep-text);
-		}
-
-		/* 详情内其余图片：统一尺寸裁剪，点击看大图 */
-		.diary-modal-imgs {
-			margin-top: 1.2rem;
-			display: grid;
-			grid-template-columns: repeat(2, 1fr);
-			gap: 0.6rem;
-		}
-		.diary-modal-imgs.is-single {
-			grid-template-columns: 1fr;
-		}
-		.diary-detail-img {
-			display: block;
-			width: 100%;
-			aspect-ratio: 16 / 9;
-			object-fit: cover;
-			border-radius: 10px;
-			border: 1px solid var(--line-divider);
-			cursor: zoom-in;
-			transition: transform 0.25s ease;
-		}
-		.diary-detail-img:hover {
-			transform: scale(1.02);
-		}
-
-		@keyframes diary-fade-in {
-			from { opacity: 0; }
-			to { opacity: 1; }
-		}
-		@keyframes diary-pop-in {
-			from { opacity: 0; transform: translateY(24px) scale(0.96); }
-			to { opacity: 1; transform: translateY(0) scale(1); }
-		}
-
-		/* ===================== 图片灯箱 ===================== */
-		.diary-lightbox {
-			position: fixed;
-			inset: 0;
-			z-index: 9999;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			background: rgb(0 0 0 / 0.82);
-			backdrop-filter: blur(6px);
-			-webkit-backdrop-filter: blur(6px);
-		}
-		.diary-lightbox[hidden] {
-			display: none;
-		}
-		.diary-lightbox-close {
-			position: absolute;
-			top: 1rem;
-			right: 1rem;
-			z-index: 10;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			height: 2.5rem;
-			width: 2.5rem;
-			border: none;
-			border-radius: 999px;
-			cursor: pointer;
-			background: rgb(255 255 255 / 0.1);
-			color: #fff;
-			transition: background 200ms ease;
-		}
-		.diary-lightbox-close:hover {
-			background: rgb(255 255 255 / 0.2);
-		}
-		.diary-lightbox-img {
-			max-height: 90vh;
-			max-width: 90vw;
-			border-radius: 10px;
-			object-fit: contain;
-			box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
-		}
-
 		/* ===================== 移动端微调：流式排列 ===================== */
 		@media (max-width: 639px) {
 			.diary-board.is-flow {
@@ -587,9 +327,6 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			.diary-board.is-flow .diary-paper {
 				max-width: 320px;
 			}
-			.diary-modal-scroll {
-				padding: 1.2rem 1.15rem 1.3rem;
-			}
 		}
 	</style>
 
@@ -608,22 +345,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		var DRAG_THRESHOLD = 6; // 拖动超过该像素才算拖动，否则视为点击
 
 		var board = document.getElementById("diary-board");
-		var modal = document.getElementById("diary-modal");
-		var modalMask = document.getElementById("diary-modal-mask");
-		var modalBody = document.getElementById("diary-modal-body");
-		var modalClose = document.getElementById("diary-modal-close");
-		var lightbox = document.getElementById("diary-lightbox");
-		var lightboxImg = document.getElementById("diary-lightbox-img");
-		var lightboxClose = document.getElementById("diary-lightbox-close");
 		var shuffleBtn = document.getElementById("diary-shuffle");
-
-		// 弹窗、灯箱移到 body 下，避免父级 transform 让 fixed 定位失效；
-		// 顺带清理跨页面导航后可能残留在 body 下的同名旧节点，防止重复堆积
-		document.querySelectorAll("#diary-modal, #diary-lightbox").forEach(function (n) {
-			if (n !== modal && n !== lightbox) n.remove();
-		});
-		document.body.appendChild(modal);
-		document.body.appendChild(lightbox);
 
 		var entries = [];
 		var unlocked = false;
@@ -659,23 +381,6 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			var div = document.createElement("div");
 			div.textContent = str == null ? "" : String(str);
 			return div.innerHTML;
-		}
-
-		function formatChineseTime(dateStr) {
-			var d = new Date(dateStr);
-			if (isNaN(d.getTime())) return "";
-			var h = d.getHours();
-			var m = String(d.getMinutes()).padStart(2, "0");
-			var period = "凌晨";
-			if (h >= 5 && h < 8) period = "早上";
-			else if (h >= 8 && h < 11) period = "上午";
-			else if (h >= 11 && h < 13) period = "中午";
-			else if (h >= 13 && h < 17) period = "下午";
-			else if (h >= 17 && h < 19) period = "傍晚";
-			else if (h >= 19 && h < 23) period = "晚上";
-			else if (h >= 23) period = "深夜";
-			var h12 = h % 12 || 12;
-			return period + " " + h12 + ":" + m;
 		}
 
 		function formatDate(dateStr) {
@@ -888,7 +593,19 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			});
 		}
 
-		/* ---------- 点击纸片：详情 / 解锁 ---------- */
+		/* ---------- 跳转详情页（走 Swup 站内平滑过渡，不整页跳转） ---------- */
+		function gotoDiary(slug) {
+			var url = "/diary/" + slug;
+			try {
+				if (window.swup && typeof window.swup.navigate === "function") {
+					window.swup.navigate(url);
+					return;
+				}
+			} catch (e) {}
+			window.location.href = url;
+		}
+
+		/* ---------- 点击纸片：跳转详情 / 解锁 ---------- */
 		function handleEntryClick(entry) {
 			if (isLocked(entry)) {
 				var pwd = prompt("这是一篇私密日记，请输入密码：");
@@ -898,13 +615,13 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 					} catch (e) {}
 					unlocked = true;
 					renderBoard();
-					openModal(entry);
+					gotoDiary(entry.slug);
 				} else if (pwd !== null) {
 					alert("密码错误");
 				}
 				return;
 			}
-			openModal(entry);
+			gotoDiary(entry.slug);
 		}
 
 		/* ---------- 纸片拖动（全程可拖） ---------- */
@@ -955,91 +672,12 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				try {
 					el.releasePointerCapture(e.pointerId);
 				} catch (err) {}
-				// 没怎么动 → 视为点击，打开详情
-				if (!moved) handleEntryClick(entry);
-			}
-			el.addEventListener("pointerup", endDrag);
-			el.addEventListener("pointercancel", endDrag);
+				// 没怎么动 → 视为点击，跳转详情页
+			if (!moved) handleEntryClick(entry);
 		}
-
-		/* ---------- 详情弹窗 ---------- */
-		function openModal(entry) {
-			var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
-			var imgs = entry.images || [];
-			var cover = imgs.length ? imgs[0].url : null;
-			var rest = imgs.length ? imgs.slice(1) : [];
-
-			var metaHtml =
-				'<div class="diary-modal-meta">' +
-				"<span>" + formatDate(entry.date) + " · " + formatChineseTime(entry.date) + "</span>" +
-				(mood ? '<span class="diary-modal-pill">' + mood.emoji + " " + mood.label + "</span>" : "") +
-				(entry.tags || [])
-					.map(function (tag) {
-						return '<span class="diary-modal-tag">' + escapeHtml(tag) + "</span>";
-					})
-					.join("") +
-				"</div>";
-
-			var html = "";
-			if (cover) {
-				// 有图日记：首图做封面横幅，标题与信息压在封面底部
-				html +=
-					'<div class="diary-modal-cover">' +
-					'<img src="' + cover + '" alt="" draggable="false">' +
-					'<div class="diary-modal-cover-fade"></div>' +
-					'<div class="diary-modal-cover-head"><h2>' + escapeHtml(entry.title || "无题") + "</h2>" + metaHtml + "</div>" +
-					"</div>";
-			}
-
-			html += '<div class="diary-modal-scroll">';
-			if (!cover) {
-				html +=
-					'<h2 class="diary-modal-title">' +
-					escapeHtml(entry.title || "无题") +
-					(mood ? ' <span class="diary-modal-mood">' + mood.emoji + "</span>" : "") +
-					"</h2>" +
-					metaHtml;
-			}
-			html += '<div class="diary-detail-content">' + escapeHtml(entry.content || "") + "</div>";
-			if (rest.length) {
-				html += '<div class="diary-modal-imgs' + (rest.length === 1 ? " is-single" : "") + '">';
-				rest.forEach(function (img) {
-					html += '<img src="' + img.url + '" alt="" class="diary-detail-img" data-src="' + img.url + '" loading="lazy" draggable="false">';
-				});
-				html += "</div>";
-			}
-			html += "</div>";
-
-			modalBody.innerHTML = html;
-			modal.hidden = false;
-
-			modalBody.querySelectorAll(".diary-detail-img").forEach(function (img) {
-				img.addEventListener("click", function () {
-					lightboxImg.src = img.dataset.src;
-					lightbox.hidden = false;
-				});
-			});
-		}
-
-		function closeModal() {
-			modal.hidden = true;
-		}
-
-		function closeLightbox() {
-			lightbox.hidden = true;
-		}
-
-		modalClose.addEventListener("click", closeModal);
-		modalMask.addEventListener("click", closeModal);
-		lightboxClose.addEventListener("click", closeLightbox);
-		lightbox.addEventListener("click", function (e) {
-			if (e.target === lightbox) closeLightbox();
-		});
-		document.addEventListener("keydown", function (e) {
-			if (e.key !== "Escape") return;
-			if (!lightbox.hidden) closeLightbox();
-			else if (!modal.hidden) closeModal();
-		});
+		el.addEventListener("pointerup", endDrag);
+		el.addEventListener("pointercancel", endDrag);
+	}
 
 		shuffleBtn.addEventListener("click", function () {
 			shuffleSeed = (shuffleSeed + 1) % 997;
