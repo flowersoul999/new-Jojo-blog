@@ -22,12 +22,24 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 ---
 
 <style is:global>
-	/* ---- 内嵌软木面板整体：有边界、排浏览下方、不铺满全屏 ---- */
+	/* ---- 画布模式：打开生活碎片后隐藏左右侧栏，让画布独占当前屏幕成一个大矩形 ---- */
+	body.ab-canvas-open #left-sidebar-wrapper,
+	body.ab-canvas-open #left-sidebar-dynamic,
+	body.ab-canvas-open #right-sidebar-static,
+	body.ab-canvas-open #right-sidebar-dynamic,
+	body.ab-canvas-open #category-bar-wrapper,
+	body.ab-canvas-open #mobile-bottom-sidebar {
+		display: none !important;
+	}
+
+	/* 内嵌软木面板：近满屏的矩形画布（保留导航栏、非全屏遮罩），照片内部滚动 */
 	.ab-panel {
 		display: none;
 		flex-direction: column;
 		width: 100%;
-		max-height: min(68vh, 720px);
+		height: calc(100dvh - 128px);
+		min-height: 460px;
+		max-height: 1000px;
 		margin-top: 1.25rem;
 		overflow: hidden;
 		border-radius: var(--radius-large, 1rem);
@@ -494,12 +506,18 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 			if (titleEl && data.name) titleEl.textContent = data.name;
 			panel.classList.add("ab-open");
 			panel.setAttribute("aria-hidden", "false");
-			requestAnimationFrame(() => render(data));
+			// 隐藏左右侧栏，让画布占据当前屏幕；并把画布滚到视野内
+			document.body.classList.add("ab-canvas-open");
+			panel.scrollIntoView({ block: "start", behavior: "smooth" });
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => render(data));
+			});
 		}
 
 		function close() {
 			panel.classList.remove("ab-open");
 			panel.setAttribute("aria-hidden", "true");
+			document.body.classList.remove("ab-canvas-open");
 			clearStage();
 		}
 
