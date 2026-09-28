@@ -91,6 +91,58 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		video.src = urlList[currentIndex];
 		video.load();
 
+		// 手机端（≤767px）点击播放时进入横屏全屏播放
+		function isMobileViewport() {
+			return window.matchMedia("(max-width: 767px)").matches;
+		}
+
+		function enterMobileFullscreen() {
+			if (!isMobileViewport()) return;
+			// 全屏时显示系统控制条，方便手机端暂停/退出
+			video.setAttribute("controls", "controls");
+			try {
+				// iOS Safari：webkitEnterFullscreen 原生横屏全屏，自带系统控制条
+				if (typeof video.webkitEnterFullscreen === "function") {
+					video.webkitEnterFullscreen();
+					return;
+				}
+				// Android Chrome：requestFullscreen 后锁定横屏方向
+				if (typeof video.requestFullscreen === "function") {
+					var p = video.requestFullscreen();
+					if (p && p.then) {
+						p.then(function () {
+							if (screen.orientation && screen.orientation.lock) {
+								screen.orientation.lock("landscape").catch(function () {});
+							}
+						}).catch(function () {});
+					}
+				}
+			} catch (_) {
+				// 全屏失败时保持页面内播放
+			}
+		}
+
+		function exitMobileFullscreen() {
+			if (!isMobileViewport()) return;
+			video.removeAttribute("controls");
+			// 退出全屏即停止播放，恢复页面原状
+			if (isPlaying) {
+				isPlaying = false;
+				video.pause();
+				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
+				syncAttr();
+			}
+		}
+
+		document.addEventListener("fullscreenchange", function () {
+			if (!document.fullscreenElement) exitMobileFullscreen();
+		});
+		document.addEventListener("webkitfullscreenchange", function () {
+			if (!document.webkitFullscreenElement) exitMobileFullscreen();
+		});
+		// iOS Safari 视频全屏结束事件
+		video.addEventListener("webkitendfullscreen", exitMobileFullscreen);
+
 		function showToast() {
 			if (!toast) return;
 			toast.classList.remove("opacity-0");
@@ -155,8 +207,9 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				if (currentIndex >= urlList.length) currentIndex = 0;
 				syncAttr();
 				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
-				// changeSrc=false：直接播放已预加载的视频，实现点击秒开
-				requestAnimationFrame(function () { doPlay(false); });
+				doPlay(false);
+				// 手机端：在用户手势内同步请求横屏全屏播放
+				enterMobileFullscreen();
 			} else {
 				video.pause();
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
@@ -171,6 +224,11 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			} else {
 				isPlaying = false;
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
+				// 手机端全屏播放结束时退出全屏
+				video.removeAttribute("controls");
+				if (document.fullscreenElement) {
+					document.exitFullscreen().catch(function () {});
+				}
 				syncAttr();
 			}
 		}
