@@ -5,7 +5,7 @@ import type { AstroCookies } from "astro";
 // GitHub 仓库配置
 export const GITHUB_REPO = {
 	owner: "flowersoul999",
-	name: "Jojo-blog",
+	name: "new-Jojo-blog",
 	branch: "main",
 } as const;
 
