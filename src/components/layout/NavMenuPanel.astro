@@ -1,9 +1,7 @@
 ---
 import { Icon } from "astro-icon/components";
 import NavAccount from "@/components/features/NavAccount.svelte";
-import { backgroundWallpaper, siteConfig } from "@/config";
-import I18nKey from "@/i18n/i18nKey";
-import { i18n } from "@/i18n/translation";
+import { siteConfig } from "@/config";
 import type { NavBarLink } from "@/types/config";
 import { url } from "@/utils/url-utils";
 
@@ -79,19 +77,6 @@ const getLinkIcon = (item: NavBarLink, fallback: string) =>
 		</header>
 
 		<p class="mobile-nav-eyebrow">MENU</p>
-		{backgroundWallpaper.playerEnable && backgroundWallpaper.mode !== "none" && (
-			<!-- 背景视频：手机端点击后横屏全屏播放 -->
-			<button
-				type="button"
-				class="mobile-link mobile-video-toggle"
-				id="mobile-bg-player-toggle"
-				data-i18n-play={i18n(I18nKey.videoPlay)}
-				data-i18n-pause={i18n(I18nKey.videoPause)}
-			>
-				<Icon is:inline name="material-symbols:play-arrow-rounded" class="mobile-nav-item-icon" id="mobile-bg-player-icon" />
-				<span class="mobile-nav-item-text" id="mobile-bg-player-label">{i18n(I18nKey.videoPlay)}</span>
-			</button>
-		)}
 		<nav class="mobile-links" aria-label="移动端主导航">
 			{mobileGroups.map((group) =>
 				group.children ? (
@@ -183,40 +168,6 @@ const getLinkIcon = (item: NavBarLink, fallback: string) =>
 		menuBtn?.setAttribute("aria-expanded", "false");
 		document.body.style.overflow = "";
 	}
-
-	function initMobileBgPlayer() {
-		const btn = document.getElementById("mobile-bg-player-toggle");
-		if (!btn || btn.getAttribute("data-video-init")) return;
-		btn.setAttribute("data-video-init", "true");
-
-		const icon = document.getElementById("mobile-bg-player-icon");
-		const label = document.getElementById("mobile-bg-player-label");
-		const i18nPlay = btn.getAttribute("data-i18n-play") ?? "";
-		const i18nPause = btn.getAttribute("data-i18n-pause") ?? "";
-
-		btn.onclick = function () {
-			// 关闭抽屉后由 BackgroundPlayer 接管（手机端自动横屏全屏播放）
-			window.dispatchEvent(new CustomEvent("bg-player-toggle"));
-		};
-
-		const PLAY_ICON =
-			'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 17.175V6.825q0-.425.3-.713t.7-.287q.125 0 .263.037t.262.113l8.15 5.175q.225.15.338.375t.112.475t-.112.475t-.338.375l-8.15 5.175q-.125.075-.262.113T9 18.175q-.4 0-.7-.288t-.3-.712"/></svg>';
-		const PAUSE_ICON =
-			'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M16 19q-.825 0-1.412-.587T14 17V7q0-.825.588-1.412T16 5t1.413.588T18 7v10q0 .825-.587 1.413T16 19m-8 0q-.825 0-1.412-.587T6 17V7q0-.825.588-1.412T8 5t1.413.588T10 7v10q0 .825-.587 1.413T8 19"/></svg>';
-
-		function syncState() {
-			const playing =
-				document.documentElement.hasAttribute("data-bg-video-playing");
-			if (icon) icon.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
-			if (label) label.textContent = playing ? i18nPause : i18nPlay;
-		}
-
-		window.addEventListener("bg-player-state-change", syncState);
-		document.addEventListener("astro:page-load", syncState);
-		document.addEventListener("swup:contentReplaced", syncState);
-	}
-
-	initMobileBgPlayer();
 
 	document.addEventListener("click", function(event) {
 		const target = event.target;
