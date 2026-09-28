@@ -130,10 +130,12 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			if (changeSrc !== false) {
 				video.src = urlList[currentIndex];
 			}
-			video.muted = true;
-			video.play()
-				.then(function () { setTimeout(function () { if (video) video.muted = false; }, 100); })
-				.catch(function () { isPlaying = false; syncAttr(); });
+			// 播放按钮点击本身属于用户手势，直接带声音播放，避免"先静音再解除"在部分浏览器下失效导致无声
+			// 若被浏览器自动播放策略拦截（play 返回 NotAllowedError），则回退为静音播放保证画面可用
+			video.play().catch(function () {
+				video.muted = true;
+				video.play().catch(function () { isPlaying = false; syncAttr(); });
+			});
 		}
 
 		function switchTrack(index) {
