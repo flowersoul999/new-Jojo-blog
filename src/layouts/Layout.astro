@@ -1097,6 +1097,21 @@ function disableAnimation() {
     onlyIfAtTop = false,
   ) => {
     const scheduleId = ++pageScrollScheduleId;
+
+    // 页面 0（首屏）的目标位置恒为顶部 0，不会随图片/字号等异步加载而漂移，
+    // 校正一次即可。若仍用 5 次延迟校正，每次都会把页面向首屏硬拉，
+    // 在横幅/英雄图尚未定格时会表现为「进文章后反复跳回首屏」。
+    // 页面 1 的目标是主内容区偏移量，需在布局逐渐定格后多次校准，才保留延迟校正。
+    if (isPageZeroPath(pathname)) {
+      window.setTimeout(() => {
+        if (scheduleId !== pageScrollScheduleId) return;
+        if (!pathsEqual(window.location.pathname, pathname) || window.location.hash) return;
+        if (onlyIfAtTop && window.scrollY > 1) return;
+        scrollToPage(pathname, behavior);
+      }, 0);
+      return;
+    }
+
     const delays = [0, 80, 220, 500, 900];
 
     delays.forEach((delay, index) => {
