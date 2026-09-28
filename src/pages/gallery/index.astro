@@ -1,11 +1,16 @@
 ---
 import { Icon } from "astro-icon/components";
+import AlbumBoard from "@/components/pages/gallery/AlbumBoard.astro";
 import AlbumCard from "@/components/pages/gallery/AlbumCard.astro";
 import { galleryConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
-import { getAlbumCover, scanAlbumPhotos } from "@/utils/gallery-utils";
+import {
+	getAlbumCover,
+	scanAlbumPhotoItems,
+	scanAlbumPhotos,
+} from "@/utils/gallery-utils";
 
 // 检查页面是否启用
 if (!siteConfig.pages.gallery) {
@@ -24,6 +29,22 @@ const albums = galleryConfig.albums.map((album) => {
 
 // 收集所有标签用于筛选
 const allTags = [...new Set(albums.flatMap((a) => a.tags || []))].sort();
+
+// 内联软木板数据：点击卡片时原位展开（不跳转），只对非加密相册启用
+const boardAlbums = galleryConfig.albums
+	.filter((a) => !a.password)
+	.map((album) => ({
+		id: album.id,
+		name: album.name,
+		tags: album.tags || [],
+		photos: scanAlbumPhotoItems(album.id).map((photo) => ({
+			src: photo.src,
+			description: photo.description || "",
+			date: photo.date || "",
+			tags: photo.tags || [],
+		})),
+	}));
+const boardPayload = JSON.stringify(boardAlbums);
 ---
 
 <MainGridLayout title={title} description={description}>
@@ -117,7 +138,34 @@ const allTags = [...new Set(albums.flatMap((a) => a.tags || []))].sort();
         </div>
       )}
     </div>
+
+    <!-- 内联软木板：点击非加密相册卡片时原位展开，不跳转新页面 -->
+    <AlbumBoard title="" emptyText={i18n(I18nKey.galleryNoAlbums)} />
   </div>
+
+  <script is:inline define:vars={{ boardPayload }}>
+    (() => {
+      // 拦截非加密相册卡片的点击，改为原位展开软木板
+      const getBoard = () => window.__albumBoard;
+      let data = [];
+      try {
+        data = JSON.parse(boardPayload || "[]");
+      } catch {
+        data = [];
+      }
+
+      document.addEventListener("click", (e) => {
+        const target = e.target.closest("[data-album-id]");
+        if (!target) return;
+        if (target.dataset.albumEncrypted === "true") return; // 加密相册仍走独立页
+        e.preventDefault();
+        e.stopPropagation();
+        const album = data.find((a) => a.id === target.dataset.albumId);
+        if (!album || !getBoard()) return;
+        getBoard().open(album);
+      });
+    })();
+  </script>
 
   <script slot="head" is:inline>
     if (!customElements.get("gallery-filter")) {

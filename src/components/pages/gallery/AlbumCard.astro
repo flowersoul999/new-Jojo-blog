@@ -35,6 +35,8 @@ const lqipProps = cover ? getLqipProps(cover, undefined, true) : { style: "" };
 <a
   href={url(`/gallery/${id}/`)}
   data-tags={tags?.join(",") || ""}
+  data-album-id={id}
+  data-album-encrypted={encrypted ? "true" : "false"}
   class="album-card group relative block overflow-hidden rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
 >
   <!-- Cover Image -->
