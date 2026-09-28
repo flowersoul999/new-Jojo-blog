@@ -88,9 +88,8 @@ function formatChineseTime(dateStr: string) {
 	return period + " " + h12 + ":" + m;
 }
 
+// 标题不再用封面配图，全部图片都放到正文里展示
 const images = entry.images || [];
-const cover = images.length ? images[0].url : null;
-const rest = images.slice(1);
 const mood = entry.mood ? MOOD_MAP[entry.mood] : null;
 const tags = entry.tags || [];
 const pageTitle = entry.title || "日记";
@@ -113,25 +112,8 @@ const pageTitle = entry.title || "日记";
 				</button>
 			</div>
 		) : (
-			<>
-				{cover ? (
-					<!-- 封面大图：标题与信息压在封面上 -->
-					<div class="diary-hero relative w-full overflow-hidden">
-						<img src={cover} alt="" class="diary-hero-img diary-img" data-src={cover} draggable="false" />
-						<div class="diary-hero-fade"></div>
-						<div class="diary-hero-head">
-							<h1 class="diary-hero-title">{entry.title || "无题"}</h1>
-							<div class="diary-hero-meta">
-								<span class="diary-hero-date">{formatDate(entry.date)} · {formatChineseTime(entry.date)}</span>
-								{mood && <span class="diary-hero-pill">{mood.emoji} {mood.label}</span>}
-								{tags.map((tag) => (
-									<span class="diary-hero-tag">{tag}</span>
-								))}
-							</div>
-						</div>
-					</div>
-				) : (
-					<!-- 无图日记：标题区 -->
+				<>
+					<!-- 标题区：不放封面配图 -->
 					<div class="px-5 sm:px-7 pt-5 sm:pt-6">
 						<h1 class="diary-title">
 							{entry.title || "无题"}
@@ -145,21 +127,20 @@ const pageTitle = entry.title || "日记";
 							))}
 						</div>
 					</div>
-				)}
 
-				{rest.length > 0 && (
-					<!-- 其余照片统一放在文章上方 -->
-					<div class={"diary-imgs px-5 sm:px-7 pt-5" + (rest.length === 1 ? " is-single" : "")}>
-						{rest.map((img) => (
-							<img src={img.url} alt="" class="diary-img" data-src={img.url} loading="lazy" draggable="false" />
-						))}
-					</div>
-				)}
+					{images.length > 0 && (
+						<!-- 全部照片统一放在正文里 -->
+						<div class={"diary-imgs px-5 sm:px-7 pt-5" + (images.length === 1 ? " is-single" : "")}>
+							{images.map((img) => (
+								<img src={img.url} alt="" class="diary-img" data-src={img.url} loading="lazy" draggable="false" />
+							))}
+						</div>
+					)}
 
-				<!-- 正文 -->
-				<div class="diary-text px-5 sm:px-7 pb-6 pt-4">{entry.content || ""}</div>
-			</>
-		)}
+					<!-- 正文 -->
+					<div class="diary-text px-5 sm:px-7 pb-6 pt-4">{entry.content || ""}</div>
+				</>
+			)}
 	</div>
 
 	<!-- 图片灯箱：点击照片看大图 -->
@@ -171,65 +152,6 @@ const pageTitle = entry.title || "日记";
 	</div>
 
 	<style is:global>
-		/* ===================== 封面大图 ===================== */
-		.diary-hero {
-			aspect-ratio: 21 / 10;
-			min-height: 180px;
-		}
-		.diary-hero-img {
-			position: absolute;
-			inset: 0;
-			width: 100%;
-			height: 100%;
-			object-fit: cover;
-			cursor: zoom-in;
-		}
-		.diary-hero-fade {
-			position: absolute;
-			inset: 0;
-			background: linear-gradient(
-				180deg,
-				rgb(0 0 0 / 0.18) 0%,
-				rgb(0 0 0 / 0) 32%,
-				rgb(0 0 0 / 0.62) 100%
-			);
-			pointer-events: none;
-		}
-		.diary-hero-head {
-			position: absolute;
-			left: 0;
-			right: 0;
-			bottom: 0;
-			padding: 1rem 1.5rem 1.1rem;
-			color: #fff;
-		}
-		.diary-hero-title {
-			margin: 0 0 0.5rem;
-			font-size: 1.6rem;
-			font-weight: 700;
-			line-height: 1.3;
-			text-shadow: 0 2px 10px rgb(0 0 0 / 0.45);
-			word-break: break-all;
-		}
-		.diary-hero-meta {
-			display: flex;
-			flex-wrap: wrap;
-			align-items: center;
-			gap: 0.45rem;
-			font-size: 0.8rem;
-			color: rgb(255 255 255 / 0.9);
-		}
-		.diary-hero-pill,
-		.diary-hero-tag {
-			display: inline-flex;
-			align-items: center;
-			border-radius: 999px;
-			padding: 0.14rem 0.55rem;
-			border: 1px solid rgb(255 255 255 / 0.28);
-			background: rgb(255 255 255 / 0.16);
-			color: #fff;
-		}
-
 		/* ===================== 无图时的标题区 ===================== */
 		.diary-title {
 			margin: 0;
@@ -250,6 +172,16 @@ const pageTitle = entry.title || "日记";
 			gap: 0.45rem;
 			font-size: 0.8rem;
 			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+		}
+		.diary-meta .diary-hero-pill,
+		.diary-meta .diary-hero-tag {
+			display: inline-flex;
+			align-items: center;
+			border-radius: 999px;
+			padding: 0.14rem 0.55rem;
+			border: 1px solid var(--line-divider);
+			background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+			color: color-mix(in srgb, var(--deep-text) 75%, transparent);
 		}
 
 		/* ===================== 照片（放在文章上方） ===================== */
@@ -320,19 +252,13 @@ const pageTitle = entry.title || "日记";
 			background: rgb(255 255 255 / 0.2);
 		}
 		.diary-lightbox-img {
-			max-height: 90vh;
-			max-width: 90vw;
-			border-radius: 10px;
-			object-fit: contain;
-			box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
-		}
-
-		@media (max-width: 639px) {
-			.diary-hero-title {
-				font-size: 1.25rem;
+				max-height: 90vh;
+				max-width: 90vw;
+				border-radius: 10px;
+				object-fit: contain;
+				box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
 			}
-		}
-	</style>
+		</style>
 
 	<script is:inline>
 	(function () {
@@ -427,15 +353,13 @@ const pageTitle = entry.title || "日记";
 			return div.innerHTML;
 		}
 
-		/* 与服务端同款的详情结构渲染（封面 → 照片 → 正文） */
+		/* 与服务端同款的详情结构渲染（标题 → 照片 → 正文） */
 		function renderPrivate(entry) {
 			var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
 			var imgs = entry.images || [];
-			var cover = imgs.length ? imgs[0].url : null;
-			var rest = imgs.slice(1);
 
 			var metaHtml =
-				'<div class="diary-hero-meta">' +
+				'<div class="diary-meta">' +
 				'<span class="diary-hero-date">' + formatDate(entry.date) + " · " + formatChineseTime(entry.date) + "</span>" +
 				(mood ? '<span class="diary-hero-pill">' + mood.emoji + " " + mood.label + "</span>" : "") +
 				(entry.tags || [])
@@ -445,36 +369,17 @@ const pageTitle = entry.title || "日记";
 					.join("") +
 				"</div>";
 
-			var html = "";
-			if (cover) {
-				html +=
-					'<div class="diary-hero relative w-full overflow-hidden">' +
-					'<img src="' + cover + '" alt="" class="diary-hero-img diary-img" data-src="' + cover + '" draggable="false">' +
-					'<div class="diary-hero-fade"></div>' +
-					'<div class="diary-hero-head"><h1 class="diary-hero-title">' + escapeHtml(entry.title || "无题") + "</h1>" + metaHtml + "</div>" +
-					"</div>";
-			} else {
-				html +=
-					'<div class="px-5 sm:px-7 pt-5 sm:pt-6">' +
-					'<h1 class="diary-title">' +
-					escapeHtml(entry.title || "无题") +
-					(mood ? ' <span class="diary-title-mood">' + mood.emoji + "</span>" : "") +
-					"</h1>" +
-					'<div class="diary-meta">' +
-					'<span class="diary-hero-date">' + formatDate(entry.date) + " · " + formatChineseTime(entry.date) + "</span>" +
-					(mood ? '<span class="diary-hero-pill">' + mood.emoji + " " + mood.label + "</span>" : "") +
-					(entry.tags || [])
-						.map(function (tag) {
-							return '<span class="diary-hero-tag">' + escapeHtml(tag) + "</span>";
-						})
-						.join("") +
-					"</div></div>";
-			}
+			var html =
+				'<div class="px-5 sm:px-7 pt-5 sm:pt-6">' +
+				'<h1 class="diary-title">' +
+				escapeHtml(entry.title || "无题") +
+				(mood ? ' <span class="diary-title-mood">' + mood.emoji + "</span>" : "") +
+				"</h1>" + metaHtml + "</div>";
 
-			if (rest.length) {
+			if (imgs.length) {
 				html +=
-					'<div class="diary-imgs px-5 sm:px-7 pt-5' + (rest.length === 1 ? " is-single" : "") + '">';
-				rest.forEach(function (img) {
+					'<div class="diary-imgs px-5 sm:px-7 pt-5' + (imgs.length === 1 ? " is-single" : "") + '">';
+				imgs.forEach(function (img) {
 					html += '<img src="' + img.url + '" alt="" class="diary-img" data-src="' + img.url + '" loading="lazy" draggable="false">';
 				});
 				html += "</div>";
