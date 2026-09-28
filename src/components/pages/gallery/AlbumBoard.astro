@@ -1,15 +1,15 @@
 ---
 /**
- * 内联软木照片板（点击相册卡片后原位展开，不跳转新页面）
+ * 内嵌软木照片板（点击相册卡片后原位展开，不跳转新页面）
  *
- * 与全屏 PhotoScatter 细节页不同，这里把照片墙直接嵌在相册列表页里：
+ * 有边界的照片板：在相册列表下方展开一块带边框与阴影的软木板，
+ * 不铺满全屏；照片按顺序从上往下排列，面板可上下滚动。
  * - 淡黄色布料软木板背景 + 胶带/图钉把拍立得照片固定在板上
- * - 每张照片可拖动，拖动后的位置按 相册+图片 维度持久化到 localStorage
  * - 单击照片放大居中，旁边出现彩色便签，显示标签 / 日期 / 描述
  * - 再次单击照片或 ESC 还原；点击右上角「收起」回到相册列表
  *
  * 页面数据：相册列表页在 `<galleryIndex>` 里埋 `data-albums-json`，
- * 点击卡片时读取对应相册数据并 call 本组件的 open()。
+ * 点击卡片时读取对应相册数据并调用本组件的 open()。
  */
 
 interface Props {
@@ -22,685 +22,497 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 ---
 
 <style is:global>
-  /* ---- 内联软木面板整体 ---- */
-  .ab-panel {
-    position: absolute;
-    inset: 0;
-    z-index: 60;
-    display: none;
-    flex-direction: column;
-    overflow: hidden;
-    border-radius: var(--radius-large, 1rem);
-    font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
-  }
-  .ab-panel.ab-open {
-    display: flex;
-  }
+	/* ---- 内嵌软木面板整体：有边界、排浏览下方、不铺满全屏 ---- */
+	.ab-panel {
+		display: none;
+		flex-direction: column;
+		width: 100%;
+		max-height: min(68vh, 720px);
+		margin-top: 1.25rem;
+		overflow: hidden;
+		border-radius: var(--radius-large, 1rem);
+		border: 1px solid rgba(150, 118, 52, 0.3);
+		box-shadow: 0 18px 44px rgba(90, 66, 20, 0.18);
+		font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+		animation: ab-panel-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+	}
+	.ab-panel.ab-open {
+		display: flex;
+	}
 
-  /* 淡黄色布料软木板：底色 + 经纬织纹 + 布面起伏明暗 */
-  .ab-board-bg {
-    position: absolute;
-    inset: 0;
-    background-color: #f6e8c1;
-    background-image:
-      repeating-linear-gradient(
-        0deg,
-        rgba(150, 118, 52, 0.06) 0 1px,
-        rgba(150, 118, 52, 0) 1px 4px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        rgba(150, 118, 52, 0.06) 0 1px,
-        rgba(150, 118, 52, 0) 1px 4px
-      ),
-      radial-gradient(120% 90% at 18% 12%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%),
-      radial-gradient(130% 110% at 88% 92%, rgba(168, 132, 54, 0.28), rgba(168, 132, 54, 0) 62%),
-      linear-gradient(160deg, #fdf5da 0%, #f7e9c2 48%, #eedcac 100%);
-    background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
-    background-size: 4px 4px, 4px 4px, 100% 100%, 100% 100%, 100% 100%;
-  }
-  .ab-noise {
-    position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    pointer-events: none;
-  }
+	@keyframes ab-panel-in {
+		from {
+			opacity: 0;
+			transform: translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
 
-  /* 标题栏 */
-  .ab-head {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex: 0 0 auto;
-    padding: 0.7rem 1rem;
-    color: rgba(92, 68, 24, 0.9);
-    background: rgba(255, 253, 244, 0.72);
-    border-bottom: 1px solid rgba(150, 118, 52, 0.2);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    z-index: 2;
-  }
-  .ab-head-title {
-    font-weight: 700;
-    font-size: 0.95rem;
-    margin: 0;
-  }
-  .ab-head-spacer {
-    flex: 1 1 auto;
-  }
-  .ab-close {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    height: 34px;
-    padding: 0 12px;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    color: rgba(92, 68, 24, 0.9);
-    background: rgba(255, 253, 244, 0.9);
-    border: 1px solid rgba(150, 118, 52, 0.24);
-    cursor: pointer;
-    transition: transform 0.18s ease, background 0.18s ease;
-  }
-  .ab-close:hover {
-    transform: scale(1.04);
-  }
+	/* 淡黄色布料软木板：底色 + 经纬织纹 + 布面起伏明暗 */
+	.ab-board-bg {
+		position: absolute;
+		inset: 0;
+		background-color: #f6e8c1;
+		background-image:
+			repeating-linear-gradient(
+				0deg,
+				rgba(150, 118, 52, 0.06) 0 1px,
+				rgba(150, 118, 52, 0) 1px 4px
+			),
+			repeating-linear-gradient(
+				90deg,
+				rgba(150, 118, 52, 0.06) 0 1px,
+				rgba(150, 118, 52, 0) 1px 4px
+			),
+			radial-gradient(120% 90% at 18% 12%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%),
+			radial-gradient(130% 110% at 88% 92%, rgba(168, 132, 54, 0.28), rgba(168, 132, 54, 0) 62%),
+			linear-gradient(160deg, #fdf5da 0%, #f7e9c2 48%, #eedcac 100%);
+		background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
+		background-size: 4px 4px, 4px 4px, 100% 100%, 100% 100%, 100% 100%;
+	}
+	.ab-noise {
+		position: absolute;
+		inset: 0;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E");
+		background-repeat: repeat;
+		pointer-events: none;
+	}
 
-  /* 舞台：照片在里面拖动，超出部分隐藏 */
-  .ab-stage {
-    position: relative;
-    flex: 1 1 auto;
-    overflow: hidden;
-    min-height: 260px;
-    touch-action: none;
-  }
+	/* 标题栏 */
+	.ab-head {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex: 0 0 auto;
+		padding: 0.7rem 1rem;
+		color: rgba(92, 68, 24, 0.9);
+		background: rgba(255, 253, 244, 0.88);
+		border-bottom: 1px solid rgba(150, 118, 52, 0.24);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		z-index: 2;
+	}
+	.ab-head-title {
+		font-weight: 700;
+		font-size: 0.95rem;
+		margin: 0;
+	}
+	.ab-head-spacer {
+		flex: 1 1 auto;
+	}
+	.ab-close {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		height: 34px;
+		padding: 0 12px;
+		border-radius: 999px;
+		font-size: 0.8rem;
+		color: rgba(92, 68, 24, 0.9);
+		background: rgba(255, 253, 244, 0.95);
+		border: 1px solid rgba(150, 118, 52, 0.24);
+		cursor: pointer;
+		transition: transform 0.18s ease, background 0.18s ease;
+	}
+	.ab-close:hover {
+		transform: scale(1.04);
+	}
 
-  /* 拍立得卡片 */
-  .ab-card {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: var(--w, 160px);
-    height: var(--h, 160px);
-    transform: translate(calc(-50% + var(--ox, 0px)), calc(-50% + var(--oy, 0px)))
-      rotate(var(--rot, 0deg));
-    cursor: grab;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-    will-change: transform;
-    animation: ab-pop 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) both;
-    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .ab-card.is-dragging {
-    transition: none;
-    cursor: grabbing;
-    z-index: 30;
-  }
-  .ab-card.is-zoomed {
-    transform: translate(-50%, -50%) rotate(0deg);
-    z-index: 40;
-  }
+	/* 可滚动舞台：照片在 padding 内按顺序从上往下铺，超出部分面板内滚动 */
+	.ab-stage {
+		position: relative;
+		flex: 1 1 auto;
+		overflow-y: auto;
+		overflow-x: hidden;
+		min-height: 0;
+		padding: 1.25rem;
+		touch-action: pan-y;
+		scrollbar-width: thin;
+	}
+	.ab-flow {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr));
+		align-content: start;
+		gap: 1.1rem;
+	}
 
-  .ab-frame {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    padding: 8px 8px 0;
-    background: #fff;
-    box-shadow:
-      0 10px 30px rgba(0, 0, 0, 0.24),
-      0 2px 8px rgba(0, 0, 0, 0.12);
-  }
-  .ab-card:not(.is-zoomed):hover .ab-frame {
-    box-shadow:
-      0 14px 38px rgba(0, 0, 0, 0.3),
-      0 2px 8px rgba(0, 0, 0, 0.14);
-  }
-  .ab-frame img {
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-    object-fit: cover;
-    background: #e9e9ee;
-    -webkit-user-drag: none;
-    user-select: none;
-  }
-  .ab-strip {
-    flex: 0 0 22px;
-    background: #fff;
-  }
+	/* 拍立得卡片：流式排列（不再是 absolute 散落） */
+	.ab-card {
+		position: relative;
+		cursor: zoom-in;
+		user-select: none;
+		-webkit-user-select: none;
+		touch-action: pan-y;
+		animation: ab-pop 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+		transition:
+			box-shadow 0.2s ease,
+			transform 0.28s ease;
+	}
+	.ab-card:hover {
+		transform: translateY(-3px) rotate(var(--tilt, 0deg));
+	}
 
-  /* 胶带：贴在拍立得上方一条半透明胶带，营造"挂上去"的手工感 */
-  .ab-tape {
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    width: 70px;
-    height: 24px;
-    transform: translateX(-50%) rotate(var(--tape-rot, -3deg));
-    background: rgba(255, 235, 150, 0.5);
-    box-shadow: 0 1px 2px rgba(120, 90, 20, 0.12);
-    border-left: 1px dashed rgba(140, 110, 40, 0.18);
-    border-right: 1px dashed rgba(140, 110, 40, 0.18);
-    z-index: 1;
-    pointer-events: none;
-  }
-  .ab-tack {
-    position: absolute;
-    bottom: -7px;
-    right: 14px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #d3452b, #8f2613 70%);
-    box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.35), 0 2px 3px rgba(0, 0, 0, 0.3);
-    z-index: 1;
-    pointer-events: none;
-  }
+	.ab-card.is-zoomed {
+		position: fixed;
+		left: 50%;
+		top: 50%;
+		z-index: 45;
+		transform: translate(-50%, -50%) rotate(0deg);
+		z-index: 45;
+		cursor: zoom-out;
+	}
 
-  /* 大图便签 */
-  .ab-note {
-    position: absolute;
-    z-index: 41;
-    width: 210px;
-    min-height: 96px;
-    padding: 14px 16px;
-    color: #3a3530;
-    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
-    display: none;
-  }
-  .ab-note.is-visible {
-    display: block;
-    animation: ab-note-in 0.35s cubic-bezier(0.22, 1.3, 0.36, 1) both;
-  }
-  .ab-note-date {
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    color: rgba(58, 53, 48, 0.6);
-    margin-bottom: 6px;
-  }
-  .ab-note-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    margin-bottom: 8px;
-  }
-  .ab-note-tag {
-    font-size: 0.68rem;
-    padding: 1px 9px;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.12);
-    color: rgba(58, 53, 48, 0.85);
-  }
-  .ab-note-desc {
-    font-size: 0.86rem;
-    line-height: 1.6;
-    word-break: break-word;
-  }
+	.ab-frame {
+		position: relative;
+		padding: 8px 8px 0;
+		background: #fff;
+		box-shadow:
+			0 10px 30px rgba(0, 0, 0, 0.24),
+			0 2px 8px rgba(0, 0, 0, 0.12);
+	}
+	.ab-card:hover .ab-frame {
+		box-shadow:
+			0 14px 38px rgba(0, 0, 0, 0.3),
+			0 2px 8px rgba(0, 0, 0, 0.14);
+	}
+	.ab-frame img {
+		display: block;
+		width: 100%;
+		aspect-ratio: 1 / 1;
+		object-fit: cover;
+		background: #e9e9ee;
+		-webkit-user-drag: none;
+		user-select: none;
+	}
+	.ab-strip {
+		height: 22px;
+		background: #fff;
+	}
 
-  /* 空状态 */
-  .ab-empty {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    color: rgba(92, 68, 24, 0.6);
-    font-size: 0.9rem;
-  }
+	/* 胶带：贴在拍立得上方一条半透明胶带 */
+	.ab-tape {
+		position: absolute;
+		top: -12px;
+		left: 50%;
+		width: 70px;
+		height: 24px;
+		transform: translateX(-50%) rotate(var(--tape-rot, -3deg));
+		background: rgba(255, 235, 150, 0.6);
+		box-shadow: 0 1px 2px rgba(120, 90, 20, 0.12);
+		border-left: 1px dashed rgba(140, 110, 40, 0.18);
+		border-right: 1px dashed rgba(140, 110, 40, 0.18);
+		z-index: 1;
+		pointer-events: none;
+	}
+	.ab-tack {
+		position: absolute;
+		bottom: -7px;
+		right: 14px;
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: radial-gradient(circle at 35% 30%, #d3452b, #8f2613 70%);
+		box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.35), 0 2px 3px rgba(0, 0, 0, 0.3);
+		z-index: 1;
+		pointer-events: none;
+	}
 
-  @keyframes ab-pop {
-    from {
-      opacity: 0;
-      transform: translate(calc(-50% + var(--ox, 0px)), calc(-50% + var(--oy, 0px)))
-        scale(0.6) rotate(var(--rot, 0deg));
-    }
-    to {
-      opacity: 1;
-      transform: translate(calc(-50% + var(--ox, 0px)), calc(-50% + var(--oy, 0px)))
-        scale(1) rotate(var(--rot, 0deg));
-    }
-  }
-  @keyframes ab-note-in {
-    from {
-      opacity: 0;
-      transform: scale(0.5) rotate(-3deg);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) rotate(0);
-    }
-  }
+	/* 大图便签 */
+	.ab-note {
+		position: fixed;
+		z-index: 46;
+		width: 210px;
+		min-height: 96px;
+		padding: 14px 16px;
+		color: #3a3530;
+		box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
+		display: none;
+	}
+	.ab-note.is-visible {
+		display: block;
+		animation: ab-note-in 0.35s cubic-bezier(0.22, 1.3, 0.36, 1) both;
+	}
+	.ab-note-date {
+		font-size: 0.68rem;
+		letter-spacing: 0.08em;
+		color: rgba(58, 53, 48, 0.6);
+		margin-bottom: 6px;
+	}
+	.ab-note-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+		margin-bottom: 8px;
+	}
+	.ab-note-tag {
+		font-size: 0.68rem;
+		padding: 1px 9px;
+		border-radius: 999px;
+		background: rgba(0, 0, 0, 0.12);
+		color: rgba(58, 53, 48, 0.85);
+	}
+	.ab-note-desc {
+		font-size: 0.86rem;
+		line-height: 1.6;
+		word-break: break-word;
+	}
+
+	/* 空状态 */
+	.ab-empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.6rem;
+		min-height: 200px;
+		color: rgba(92, 68, 24, 0.6);
+		font-size: 0.9rem;
+		text-align: center;
+	}
+
+	@media (min-width: 768px) {
+		.ab-note {
+			right: 5%;
+		}
+	}
+	@media (max-width: 767.98px) {
+		.ab-note {
+			left: 14px;
+			right: 14px;
+			width: auto;
+			bottom: 26px;
+		}
+		.ab-flow {
+			grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
+		}
+	}
+
+	@keyframes ab-pop {
+		from {
+			opacity: 0;
+			transform: scale(0.6) rotate(var(--tilt, 0deg));
+		}
+		to {
+			opacity: 1;
+			transform: scale(1) rotate(var(--tilt, 0deg));
+		}
+	}
+	@keyframes ab-note-in {
+		from {
+			opacity: 0;
+			transform: scale(0.5) rotate(-3deg);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1) rotate(0);
+		}
+	}
 </style>
 
 <div class="ab-panel" data-ab-panel>
-  <div class="ab-board-bg"></div>
-  <div class="ab-noise"></div>
+	<div class="ab-board-bg"></div>
+	<div class="ab-noise"></div>
 
-  <div class="ab-head">
-    <span class="ab-head-title" data-ab-title>{title}</span>
-    <span class="ab-head-spacer"></span>
-    <button type="button" class="ab-close" data-ab-close>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-      收起
-    </button>
-  </div>
+	<div class="ab-head">
+		<span class="ab-head-title" data-ab-title>{title}</span>
+		<span class="ab-head-spacer"></span>
+		<button type="button" class="ab-close" data-ab-close>
+			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+			收起
+		</button>
+	</div>
 
-  <div class="ab-stage" data-ab-stage>
-    <div class="ab-empty" data-ab-empty hidden>📷 {emptyText}</div>
-  </div>
+	<div class="ab-stage" data-ab-stage>
+		<div class="ab-flow" data-ab-flow></div>
+		<div class="ab-empty" data-ab-empty hidden>📷 {emptyText}</div>
+	</div>
 
-  <div class="ab-note" data-ab-note></div>
+	<div class="ab-note" data-ab-note></div>
 </div>
 
 <script>
-  (() => {
-    const panelEl = document.querySelector<HTMLElement>("[data-ab-panel]");
-    if (!panelEl) return;
-    const panel = panelEl;
+	(() => {
+		const panelEl = document.querySelector<HTMLElement>("[data-ab-panel]");
+		if (!panelEl) return;
+		const panel = panelEl;
 
-    const NOTE_COLORS = ["#fff3b0", "#ffd6e0", "#cdeffd", "#d8f3dc", "#f3d9fa", "#ffe5c2"];
+		const NOTE_COLORS = ["#fff3b0", "#ffd6e0", "#cdeffd", "#d8f3dc", "#f3d9fa", "#ffe5c2"];
 
-    type Photo = { src: string; description?: string; date?: string; tags?: string[] };
-    type Payload = {
-      id: string;
-      name?: string;
-      tags?: string[];
-      photos: Photo[];
-    };
+		type Photo = { src: string; description?: string; date?: string; tags?: string[] };
+		type Payload = {
+			id: string;
+			name?: string;
+			tags?: string[];
+			photos: Photo[];
+		};
 
-    const stage = panel.querySelector<HTMLElement>("[data-ab-stage]");
-    const noteEl = panel.querySelector<HTMLElement>("[data-ab-note]");
-    const closeBtn = panel.querySelector<HTMLButtonElement>("[data-ab-close]");
-    const titleEl = panel.querySelector<HTMLElement>("[data-ab-title]");
-    const emptyEl = panel.querySelector<HTMLElement>("[data-ab-empty]");
+		const flow = panel.querySelector<HTMLElement>("[data-ab-flow]");
+		const noteEl = panel.querySelector<HTMLElement>("[data-ab-note]");
+		const closeBtn = panel.querySelector<HTMLButtonElement>("[data-ab-close]");
+		const titleEl = panel.querySelector<HTMLElement>("[data-ab-title]");
+		const emptyEl = panel.querySelector<HTMLElement>("[data-ab-empty]");
 
-    type Card = {
-      el: HTMLElement;
-      img: HTMLImageElement;
-      meta: Photo;
-      x: number;
-      y: number;
-      rot: number;
-      baseW: number;
-      baseH: number;
-      noteColor: string;
-    };
-    type Drag = {
-      card: Card;
-      pointerId: number;
-      startX: number;
-      startY: number;
-      origX: number;
-      origY: number;
-      moved: boolean;
-      downAt: number;
-    };
+		type Card = {
+			el: HTMLElement;
+			img: HTMLImageElement;
+			meta: Photo;
+			noteColor: string;
+			tilt: number;
+		};
 
-    let payload: Payload | null = null;
-    let cards: Card[] = [];
-    let zoomed: Card | null = null;
-    let zTop = 10;
-    let drag: Drag | null = null;
-    let boardRect: { l: number; t: number; r: number; b: number } | null = null;
+		let payload: Payload | null = null;
+		let zoomed: Card | null = null;
 
-    function hashStr(s: string): number {
-      let h = 0;
-      for (let i = 0; i < s.length; i++) {
-        h = (h << 5) - h + s.charCodeAt(i);
-        h &= h;
-      }
-      return Math.abs(h);
-    }
+		function hashStr(s: string): number {
+			let h = 0;
+			for (let i = 0; i < s.length; i++) {
+				h = (h << 5) - h + s.charCodeAt(i);
+				h &= h;
+			}
+			return Math.abs(h);
+		}
 
-    function boardSize() {
-      // 重新测量舞台尺寸（去掉标题栏后的可用区域）
-      const s = stage;
-      const r = s!.getBoundingClientRect();
-      boardRect = {
-        l: r.left,
-        t: r.top,
-        r: r.right,
-        b: r.bottom,
-      };
-      return { w: r.width, h: r.height };
-    }
+		function unzoom() {
+			if (!zoomed) return;
+			zoomed.el.classList.remove("is-zoomed");
+			zoomed = null;
+			noteEl?.classList.remove("is-visible");
+		}
 
-    /** 基于图片地址生成稳定的黄金角螺旋落点，铺满整块板 + 随机旋转 */
-    function stablePosition(uniqueId: string, w: number, h: number, baseW: number) {
-      const seed = hashStr(uniqueId) % 10000;
-      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-      const t = (seed % 1000) / 1000;
-      const radius = Math.pow(t, 0.72);
-      const angle = seed * goldenAngle;
-      const spreadHw = Math.max(0, w / 2 - baseW * 0.85);
-      const spreadHh = Math.max(0, h / 2 - baseW * 1.05);
-      return {
-        x: radius * Math.cos(angle) * spreadHw,
-        y: radius * Math.sin(angle) * spreadHh,
-        rot: ((seed * 13) % 36) - 18,
-      };
-    }
+		function zoom(card: Card) {
+			if (zoomed === card) {
+				unzoom();
+				return;
+			}
+			if (zoomed) unzoom();
+			zoomed = card;
+			card.el.classList.add("is-zoomed");
 
-    function offsetKey(albumId: string, src: string) {
-      return `album-board-offset:${albumId}:${src}`;
-    }
-    function loadOffset(albumId: string, src: string) {
-      try {
-        const raw = localStorage.getItem(offsetKey(albumId, src));
-        if (raw) {
-          const p = JSON.parse(raw);
-          return { x: Number(p.x) || 0, y: Number(p.y) || 0 };
-        }
-      } catch { /* ignore */ }
-      return { x: 0, y: 0 };
-    }
-    function saveOffset(albumId: string, src: string, x: number, y: number) {
-      try {
-        localStorage.setItem(offsetKey(albumId, src), JSON.stringify({ x, y }));
-      } catch { /* ignore */ }
-    }
+			// 放大到视口内的合适尺寸（保持图片比例）
+			const naturalW = card.img.naturalWidth || 4;
+			const naturalH = card.img.naturalHeight || 3;
+			const isMobile = window.innerWidth < 768;
+			const maxW = window.innerWidth - (isMobile ? 36 : 120);
+			const maxH = window.innerHeight - (isMobile ? 260 : 140);
+			const scale = Math.min(maxW / naturalW, maxH / naturalH, 1.25);
+			card.el.style.width = `${Math.round(naturalW * scale)}px`;
 
-    function applyTransform(card: Card) {
-      card.el.style.setProperty("--ox", `${card.x}px`);
-      card.el.style.setProperty("--oy", `${card.y}px`);
-      card.el.style.setProperty("--rot", `${card.rot}deg`);
-    }
+			if (!noteEl) return;
+			const tags = card.meta.tags?.length ? card.meta.tags : payload?.tags || [];
+			const date = card.meta.date || "";
+			const desc = card.meta.description || "";
+			noteEl.style.backgroundColor = card.noteColor;
+			noteEl.innerHTML = `
+				${date ? `<div class="ab-note-date"></div>` : ""}
+				${tags.length > 0 ? `<div class="ab-note-tags"></div>` : ""}
+				${desc ? `<div class="ab-note-desc"></div>` : ""}
+			`;
+			const dEl = noteEl.querySelector(".ab-note-date");
+			if (dEl) dEl.textContent = date;
+			const tgEl = noteEl.querySelector(".ab-note-tags");
+			if (tgEl) {
+				for (const t of tags) {
+					const chip = document.createElement("span");
+					chip.className = "ab-note-tag";
+					chip.textContent = `# ${t}`;
+					tgEl.appendChild(chip);
+				}
+			}
+			const dsEl = noteEl.querySelector(".ab-note-desc");
+			if (dsEl) dsEl.textContent = desc;
 
-    function halfExtents(card: Card) {
-      const rad = (card.rot * Math.PI) / 180;
-      const c = Math.abs(Math.cos(rad));
-      const s = Math.abs(Math.sin(rad));
-      return {
-        hw: (card.baseW * c + card.baseH * s) / 2,
-        hh: (card.baseW * s + card.baseH * c) / 2,
-      };
-    }
+			if (!date && tags.length === 0 && !desc) {
+				noteEl.classList.remove("is-visible");
+			} else {
+				noteEl.classList.remove("is-visible");
+				void noteEl.offsetWidth;
+				noteEl.classList.add("is-visible");
+			}
+		}
 
-    /** 把卡片拉回软木板范围内（局部坐标，以舞台中心为原点） */
-    function clampCard(card: Card) {
-      const rect = boardRect!;
-      const { w, h } = { w: rect.r - rect.l, h: rect.b - rect.t };
-      const { hw, hh } = halfExtents(card);
-      // 顶部标题栏约 50px 由 stage 自身尺寸扣掉，这里以舞台中心为原点
-      const minX = -w / 2 + hw;
-      const maxX = w / 2 - hw;
-      const minY = -h / 2 + hh;
-      const maxY = h / 2 - hh;
-      card.x =
-        maxX <= minX ? 0 : Math.min(Math.max(card.x, minX), maxX);
-      card.y =
-        maxY <= minY ? 0 : Math.min(Math.max(card.y, minY), maxY);
-    }
+		function clearStage() {
+			if (!flow) return;
+			flow.innerHTML = "";
+			zoomed = null;
+			noteEl?.classList.remove("is-visible");
+		}
 
-    function unzoom() {
-      if (!zoomed) return;
-      const card = zoomed;
-      zoomed = null;
-      card.el.classList.remove("is-zoomed");
-      card.el.style.setProperty("--w", `${card.baseW}px`);
-      card.el.style.setProperty("--h", `${card.baseH}px`);
-      noteEl?.classList.remove("is-visible");
-    }
+		function render(data: Payload) {
+			clearStage();
+			payload = data;
 
-    function zoom(card: Card) {
-      if (!payload) return;
-      if (zoomed === card) {
-        unzoom();
-        return;
-      }
-      if (zoomed) unzoom();
-      zoomed = card;
-      card.el.style.zIndex = String(++zTop);
+			const photos = data.photos || [];
+			if (emptyEl) emptyEl.hidden = photos.length !== 0;
+			if (photos.length === 0 || !flow) return;
 
-      const naturalW = card.img.naturalWidth || 4;
-      const naturalH = card.img.naturalHeight || 3;
-      const isMobile = window.innerWidth < 768;
-      const maxW = (boardRect!.r - boardRect!.l) - (isMobile ? 28 : 80);
-      const maxH = (boardRect!.b - boardRect!.t) - (isMobile ? 200 : 80);
-      const scale = Math.min(maxW / naturalW, maxH / naturalH, 1.25);
-      card.el.style.setProperty("--w", `${Math.round(naturalW * scale)}px`);
-      card.el.style.setProperty("--h", `${Math.round(naturalH * scale)}px`);
-      card.el.classList.add("is-zoomed");
+			photos.forEach((meta, index) => {
+				const tilt = ((hashStr(meta.src || String(index)) * 7) % 6) - 3;
+				const el = document.createElement("div");
+				el.className = "ab-card";
+				el.style.setProperty("--tilt", `${tilt}deg`);
+				el.style.setProperty("--tape-rot", `${((hashStr(meta.src || String(index)) * 7) % 14) - 7}deg`);
+				el.style.animationDelay = `${Math.min(index * 55, 600)}ms`;
 
-      if (!noteEl) return;
-      const tags = card.meta.tags?.length ? card.meta.tags : payload.tags || [];
-      const date = card.meta.date || "";
-      const desc = card.meta.description || "";
-      noteEl.style.backgroundColor = card.noteColor;
-      noteEl.innerHTML = `
-        ${date ? `<div class="ab-note-date"></div>` : ""}
-        ${tags.length > 0 ? `<div class="ab-note-tags"></div>` : ""}
-        ${desc ? `<div class="ab-note-desc"></div>` : ""}
-      `;
-      const dEl = noteEl.querySelector(".ab-note-date");
-      if (dEl) dEl.textContent = date;
-      const tgEl = noteEl.querySelector(".ab-note-tags");
-      if (tgEl) {
-        for (const t of tags) {
-          const chip = document.createElement("span");
-          chip.className = "ab-note-tag";
-          chip.textContent = `# ${t}`;
-          tgEl.appendChild(chip);
-        }
-      }
-      const dsEl = noteEl.querySelector(".ab-note-desc");
-      if (dsEl) dsEl.textContent = desc;
+				const frame = document.createElement("div");
+				frame.className = "ab-frame";
 
-      if (!date && tags.length === 0 && !desc) {
-        noteEl.classList.remove("is-visible");
-      } else {
-        noteEl.classList.remove("is-visible");
-        void noteEl.offsetWidth;
-        noteEl.classList.add("is-visible");
-      }
-    }
+				const tape = document.createElement("div");
+				tape.className = "ab-tape";
+				const tack = document.createElement("div");
+				tack.className = "ab-tack";
 
-    function clearStage() {
-      if (!stage) return;
-      stage.querySelectorAll(".ab-card").forEach((el) => el.remove());
-      cards = [];
-      zoomed = null;
-      drag = null;
-      noteEl?.classList.remove("is-visible");
-    }
+				const img = document.createElement("img");
+				img.src = meta.src;
+				img.alt = meta.description || `照片 ${index + 1}`;
+				img.draggable = false;
+				img.decoding = "async";
 
-    function render(data: Payload) {
-      clearStage();
-      payload = data;
+				const strip = document.createElement("div");
+				strip.className = "ab-strip";
 
-      const photos = data.photos || [];
-      if (photos.length === 0) {
-        if (emptyEl) emptyEl.hidden = false;
-        return;
-      }
-      if (emptyEl) emptyEl.hidden = true;
+				frame.append(img, strip);
+				el.append(tape, tack, frame);
+				flow.appendChild(el);
 
-      const { w, h } = boardSize();
-      if (!stage) return;
-      const baseW = w < 640 ? 132 : w < 1024 ? 158 : 182;
-      zTop = 10 + photos.length;
-      cards = [];
+				const card: Card = {
+					el,
+					img,
+					meta,
+					noteColor: NOTE_COLORS[index % NOTE_COLORS.length],
+					tilt,
+				};
 
-      photos.forEach((meta, index) => {
-        const el = document.createElement("div");
-        el.className = "ab-card";
-        el.style.setProperty("--w", `${baseW}px`);
-        el.style.setProperty("--h", `${baseW}px`);
-        el.style.setProperty("--tape-rot", `${((hashStr(meta.src || String(index)) * 7) % 14) - 7}deg`);
+				el.addEventListener("click", () => zoom(card));
+			});
+		}
 
-        const frame = document.createElement("div");
-        frame.className = "ab-frame";
-        el.style.animationDelay = `${Math.min(index * 60, 600)}ms`;
+		function open(data: Payload) {
+			if (titleEl && data.name) titleEl.textContent = data.name;
+			panel.classList.add("ab-open");
+			panel.setAttribute("aria-hidden", "false");
+			requestAnimationFrame(() => render(data));
+		}
 
-        const tape = document.createElement("div");
-        tape.className = "ab-tape";
-        const tack = document.createElement("div");
-        tack.className = "ab-tack";
+		function close() {
+			panel.classList.remove("ab-open");
+			panel.setAttribute("aria-hidden", "true");
+			clearStage();
+		}
 
-        const img = document.createElement("img");
-        img.src = meta.src;
-        img.alt = meta.description || `照片 ${index + 1}`;
-        img.draggable = false;
+		closeBtn?.addEventListener("click", close);
 
-        const strip = document.createElement("div");
-        strip.className = "ab-strip";
+		document.addEventListener("keydown", (e) => {
+			if (e.key !== "Escape" || !panel.classList.contains("ab-open")) return;
+			e.preventDefault();
+			if (zoomed) unzoom();
+			else close();
+		});
 
-        frame.append(img, strip);
-        el.append(tape, tack, frame);
-        stage.appendChild(el);
-
-        const pos = stablePosition(meta.src || String(index), w, h, baseW);
-        const offset = loadOffset(data.id, meta.src);
-        const card: Card = {
-          el,
-          img,
-          meta,
-          x: pos.x + offset.x,
-          y: pos.y + offset.y,
-          rot: pos.rot,
-          baseW,
-          baseH: baseW,
-          noteColor: NOTE_COLORS[index % NOTE_COLORS.length],
-        };
-        // 关键：stage 是 absolute 内层，子元素手动规划。
-        // clamp 需要在卡片插入后、测量可用区域后进行。
-        // 这里用 stage 自身尺寸做局部坐标（以中心为原点）。
-        applyTransform(card);
-        cards.push(card);
-
-        const applyNaturalSize = () => {
-          const ratio = img.naturalWidth / img.naturalHeight || 1;
-          const clamped = Math.min(Math.max(ratio, 2 / 3), 3 / 2);
-          card.baseH = Math.round(baseW / clamped);
-          if (!el.classList.contains("is-zoomed")) {
-            el.style.setProperty("--w", `${card.baseW}px`);
-            el.style.setProperty("--h", `${card.baseH}px`);
-            clampCard(card);
-            applyTransform(card);
-          }
-        };
-        if (img.complete && img.naturalWidth) applyNaturalSize();
-        img.addEventListener("load", applyNaturalSize);
-
-        bindCard(el, card);
-      });
-
-      // 初始排版 + 限制在板内
-      requestAnimationFrame(() => {
-        if (!stage) return;
-        for (const c of cards) clampCard(c);
-      });
-    }
-
-    function bindCard(el: HTMLElement, card: Card) {
-      let downAt = 0;
-      el.addEventListener("pointerdown", (e) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        if (zoomed) {
-          downAt = e.timeStamp;
-          return;
-        }
-        e.preventDefault();
-        el.style.zIndex = String(++zTop);
-        el.classList.add("is-dragging");
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch { /* ignore */ }
-        drag = {
-          card,
-          pointerId: e.pointerId,
-          startX: e.clientX,
-          startY: e.clientY,
-          origX: card.x,
-          origY: card.y,
-          moved: false,
-          downAt: e.timeStamp,
-        };
-      });
-
-      el.addEventListener("pointermove", (e) => {
-        if (!drag || drag.card !== card || drag.pointerId !== e.pointerId) return;
-        const dx = e.clientX - drag.startX;
-        const dy = e.clientY - drag.startY;
-        if (Math.abs(dx) + Math.abs(dy) > 6) drag.moved = true;
-        card.x = drag.origX + dx;
-        card.y = drag.origY + dy;
-        clampCard(card);
-        applyTransform(card);
-      });
-
-      el.addEventListener("pointerup", (e) => {
-        if (zoomed && downAt) {
-          zoom(card);
-          downAt = 0;
-          return;
-        }
-        if (!drag || drag.card !== card || drag.pointerId !== e.pointerId) return;
-        el.classList.remove("is-dragging");
-        try {
-          el.releasePointerCapture(e.pointerId);
-        } catch { /* ignore */ }
-        const state = drag;
-        drag = null;
-        if (state.moved) {
-          if (payload) saveOffset(payload.id, metaSrc(card), card.x, card.y);
-        } else if (e.timeStamp - state.downAt < 300) {
-          zoom(card);
-        }
-      });
-
-      el.addEventListener("pointercancel", () => {
-        el.classList.remove("is-dragging");
-        drag = null;
-      });
-    }
-
-    function metaSrc(card: Card) {
-      return card.meta.src;
-    }
-
-    function open(data: Payload) {
-      if (titleEl && data.name) titleEl.textContent = data.name;
-      panel.classList.add("ab-open");
-      panel.setAttribute("aria-hidden", "false");
-      // 收藏时让背景不滚动，避免照片板被视口挤走
-      requestAnimationFrame(render.bind(null, data));
-    }
-
-    function close() {
-      panel.classList.remove("ab-open");
-      panel.setAttribute("aria-hidden", "true");
-      clearStage();
-    }
-
-    closeBtn?.addEventListener("click", close);
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || !panel.classList.contains("ab-open")) return;
-      e.preventDefault();
-      if (zoomed) unzoom();
-      else close();
-    };
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", () => {
-      if (!panel.classList.contains("ab-open")) return;
-      if (zoomed) return;
-      boardSize();
-      for (const c of cards) clampCard(c);
-    });
-
-    // 对外暴露：相册列表页点击卡片时调用
-    (window as any).__albumBoard = { open, close };
-
-    // 供 Astro 外部调用：页面 div 上放 data-ab-panel，
-    // 由类型定义 window.__albumBoard
-  })();
+		// 对外暴露：相册列表页点击卡片时调用
+		(window as any).__albumBoard = { open, close };
+	})();
 </script>
