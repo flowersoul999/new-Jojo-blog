@@ -1054,16 +1054,15 @@ body:has(#wallpaper-wrapper) #navbar.firefly-navbar.navbar-sticky-shadow > .fire
         gap: 0.18rem;
     }
 
-    #navbar.firefly-navbar #music-player-switch,
-    #navbar.firefly-navbar #bg-player-toggle {
-        display: none !important;
-    }
+    #navbar.firefly-navbar #music-player-switch {
+		display: none !important;
+	}
 
-    #navbar.firefly-navbar .nav-actions > button,
-    #navbar.firefly-navbar .nav-actions > a {
-        width: 34px;
-        height: 34px;
-    }
+	#navbar.firefly-navbar .nav-actions > button,
+	#navbar.firefly-navbar .nav-actions > a {
+		width: 34px;
+		height: 34px;
+	}
 
     #navbar.firefly-navbar .menu-btn {
         padding: 8px;
