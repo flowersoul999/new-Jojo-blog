@@ -15,7 +15,7 @@ const title = "日记";
 const description = "记录生活，碎碎念。纸片随意拖动摆放，点击查看详情。";
 ---
 
-<MainGridLayout title={title} description={description}>
+<MainGridLayout title={title} description={description} hideSidebars>
 	<div class="card-base z-10 relative w-full overflow-hidden">
 		<div class="px-4 sm:px-6 md:px-9 py-4 sm:py-6 relative">
 			<!-- 页面标题 -->
@@ -33,12 +33,22 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 					<Icon is:inline name="material-symbols:shuffle-rounded" class="text-base" />
 					<span>换个摆法</span>
 				</button>
+				<button
+					type="button"
+					id="diary-compose-btn"
+					class="hidden items-center gap-1.5 rounded-lg bg-(--primary) px-3 py-1.5 text-sm text-white dark:text-black/70 transition-opacity hover:opacity-90"
+					aria-label="写日记"
+					hidden
+				>
+					<Icon is:inline name="material-symbols:edit-rounded" class="text-base" />
+					<span>写日记</span>
+				</button>
 			</div>
 			<p class="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
 				{description}
 			</p>
 
-			<!-- 漂浮板：纸片散落，往下滑浏览全部 -->
+			<!-- 漂浮板：固定高度长方形画布，纸片只在画布内散布与拖动，超出部分在画布内滚动 -->
 			<div id="diary-board" class="diary-board relative w-full">
 				<div class="diary-board-tip">
 					<div class="animate-pulse">纸片飞扬中...</div>
@@ -53,37 +63,310 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		</div>
 	</div>
 
+	<!-- 写日记弹窗（登录后可用，写入 public/diary/index.json） -->
+	<div id="diary-compose" class="diary-compose" hidden>
+		<div id="diary-compose-mask" class="diary-compose-mask"></div>
+		<div class="diary-compose-panel" role="dialog" aria-modal="true" aria-label="写日记">
+			<div class="diary-compose-head">
+				<div class="flex items-center gap-2">
+					<Icon is:inline name="material-symbols:edit-rounded" class="text-lg text-(--primary)" />
+					<h2 class="text-base font-bold text-neutral-900 dark:text-neutral-100">写日记</h2>
+				</div>
+				<button type="button" id="diary-compose-close" class="diary-compose-close" aria-label="关闭">
+					<Icon is:inline name="material-symbols:close" class="text-lg" />
+				</button>
+			</div>
+
+			<div class="diary-compose-body">
+				<input
+					type="text"
+					id="diary-compose-title"
+					class="diary-compose-input"
+					placeholder="标题（可留空）"
+					maxlength="60"
+				/>
+				<textarea
+					id="diary-compose-content"
+					class="diary-compose-input diary-compose-textarea"
+					placeholder="今天想记点什么..."
+				></textarea>
+
+				<div class="diary-compose-row">
+					<span class="diary-compose-label">心情</span>
+					<div id="diary-compose-moods" class="diary-compose-moods"></div>
+				</div>
+
+				<div class="diary-compose-row">
+					<span class="diary-compose-label">图片</span>
+					<textarea
+						id="diary-compose-images"
+						class="diary-compose-input diary-compose-images"
+						placeholder="图片链接，一行一个（可留空）"
+					></textarea>
+				</div>
+
+				<label class="diary-compose-private">
+					<input type="checkbox" id="diary-compose-private" class="accent-(--primary)" />
+					<span>私密日记（需要密码才能查看）</span>
+				</label>
+			</div>
+
+			<div class="diary-compose-foot">
+				<span id="diary-compose-status" class="diary-compose-status"></span>
+				<button type="button" id="diary-compose-submit" class="diary-compose-submit">
+					<Icon is:inline name="material-symbols:send-rounded" class="text-base" />
+					<span>发表</span>
+				</button>
+			</div>
+		</div>
+	</div>
+
 	<style is:global>
-		/* ===================== 漂浮板 ===================== */
-		.diary-board {
-			min-height: 480px;
-			position: relative;
-			overflow: hidden;
-			border-radius: 1rem;
-			background: color-mix(in srgb, var(--deep-text) 2.5%, transparent);
-			border: 1px solid var(--line-divider);
-		}
-		/* 淡淡圆点底纹，像软木桌面 */
-		.diary-board::before {
-			content: "";
-			position: absolute;
+		/* ===================== 写日记弹窗 ===================== */
+		.diary-compose {
+			position: fixed;
 			inset: 0;
-			pointer-events: none;
-			opacity: 0.55;
-			background-image: radial-gradient(
-				color-mix(in srgb, var(--deep-text) 9%, transparent) 1.1px,
-				transparent 1.1px
-			);
-			background-size: 26px 26px;
-		}
-		.diary-board-tip {
-			height: 100%;
-			min-height: 480px;
+			z-index: 9998;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			color: color-mix(in srgb, var(--deep-text) 45%, transparent);
+			padding: 1rem;
 		}
+		.diary-compose[hidden] {
+			display: none;
+		}
+		.diary-compose-mask {
+			position: absolute;
+			inset: 0;
+			background: rgb(0 0 0 / 0.55);
+			backdrop-filter: blur(6px);
+			-webkit-backdrop-filter: blur(6px);
+			animation: diary-compose-fade 0.25s ease;
+		}
+		.diary-compose-panel {
+			position: relative;
+			width: 100%;
+			max-width: 30rem;
+			max-height: min(86vh, 44rem);
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+			border-radius: 1.25rem;
+			border: 1px solid var(--line-divider);
+			background: var(--card-bg);
+			box-shadow:
+				0 30px 80px rgb(0 0 0 / 0.35),
+				0 6px 24px rgb(0 0 0 / 0.16);
+			animation: diary-compose-pop 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+		}
+		.diary-compose-head {
+			flex: none;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 0.9rem 1.1rem;
+			border-bottom: 1px solid var(--line-divider);
+		}
+		.diary-compose-close {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			height: 2rem;
+			width: 2rem;
+			border: none;
+			border-radius: 999px;
+			cursor: pointer;
+			background: var(--btn-regular-bg);
+			color: var(--btn-content);
+			transition: background 200ms ease;
+		}
+		.diary-compose-close:hover {
+			background: var(--btn-regular-bg-hover);
+		}
+		.diary-compose-body {
+			flex: 1 1 auto;
+			min-height: 0;
+			overflow-y: auto;
+			display: flex;
+			flex-direction: column;
+			gap: 0.85rem;
+			padding: 1rem 1.1rem;
+		}
+		.diary-compose-input {
+			width: 100%;
+			border-radius: 0.65rem;
+			border: 1px solid var(--line-divider);
+			background: color-mix(in srgb, var(--deep-text) 3%, transparent);
+			padding: 0.55rem 0.75rem;
+			font-size: 0.875rem;
+			color: var(--deep-text);
+			outline: none;
+			transition: border-color 200ms ease;
+		}
+		.diary-compose-input:focus {
+			border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+		}
+		.diary-compose-input::placeholder {
+			color: color-mix(in srgb, var(--deep-text) 40%, transparent);
+		}
+		.diary-compose-textarea {
+			min-height: 8rem;
+			resize: vertical;
+			line-height: 1.7;
+		}
+		.diary-compose-images {
+			min-height: 3.4rem;
+			resize: vertical;
+			font-size: 0.8rem;
+		}
+		.diary-compose-row {
+			display: flex;
+			align-items: flex-start;
+			gap: 0.65rem;
+		}
+		.diary-compose-label {
+			flex: none;
+			padding-top: 0.3rem;
+			font-size: 0.8rem;
+			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+		}
+		.diary-compose-moods {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.4rem;
+		}
+		.diary-compose-mood {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.25rem;
+			border: 1px solid var(--line-divider);
+			border-radius: 999px;
+			background: transparent;
+			padding: 0.28rem 0.65rem;
+			font-size: 0.78rem;
+			color: var(--deep-text);
+			cursor: pointer;
+			transition:
+				border-color 200ms ease,
+				background 200ms ease;
+		}
+		.diary-compose-mood:hover {
+			border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+		}
+		.diary-compose-mood.is-active {
+			border-color: var(--primary);
+			background: color-mix(in srgb, var(--primary) 12%, transparent);
+		}
+		.diary-compose-private {
+			display: flex;
+			align-items: center;
+			gap: 0.45rem;
+			font-size: 0.8rem;
+			color: color-mix(in srgb, var(--deep-text) 70%, transparent);
+			cursor: pointer;
+		}
+		.diary-compose-foot {
+			flex: none;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.75rem;
+			padding: 0.8rem 1.1rem;
+			border-top: 1px solid var(--line-divider);
+		}
+		.diary-compose-status {
+			font-size: 0.75rem;
+			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+		}
+		.diary-compose-status.is-error {
+			color: #ef4444;
+		}
+		.diary-compose-submit {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.375rem;
+			border: none;
+			border-radius: 0.65rem;
+			background: var(--primary);
+			color: #fff;
+			padding: 0.5rem 1.1rem;
+			font-size: 0.85rem;
+			cursor: pointer;
+			transition: opacity 200ms ease;
+		}
+		:root.dark .diary-compose-submit {
+			color: rgba(0, 0, 0, 0.7);
+		}
+		.diary-compose-submit:hover {
+			opacity: 0.9;
+		}
+		.diary-compose-submit:disabled {
+			opacity: 0.55;
+			cursor: not-allowed;
+		}
+
+		/* 轻提示 */
+		.diary-toast {
+			position: fixed;
+			left: 50%;
+			bottom: 2rem;
+			z-index: 9999;
+			transform: translateX(-50%);
+			border-radius: 999px;
+			background: var(--card-bg);
+			color: var(--deep-text);
+			border: 1px solid var(--line-divider);
+			box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+			padding: 0.55rem 1.1rem;
+			font-size: 0.82rem;
+			animation: diary-compose-pop 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+		}
+		@keyframes diary-compose-fade {
+			from { opacity: 0; }
+			to { opacity: 1; }
+		}
+		@keyframes diary-compose-pop {
+			from { opacity: 0; transform: translateY(16px) scale(0.97); }
+			to { opacity: 1; transform: translateY(0) scale(1); }
+		}
+	</style>
+
+	<style is:global>
+			/* ===================== 漂浮板：固定高度长方形画布 ===================== */
+			.diary-board {
+				position: relative;
+				height: min(70vh, 42rem);
+				min-height: 30rem;
+				overflow-y: auto;
+				overflow-x: hidden;
+				border-radius: 1rem;
+				background: color-mix(in srgb, var(--deep-text) 2.5%, transparent);
+				border: 1px solid var(--line-divider);
+				/* 细滚动条，避免在画布内滚动时显得突兀 */
+				scrollbar-width: thin;
+				scrollbar-color: color-mix(in srgb, var(--deep-text) 25%, transparent) transparent;
+			}
+			/* 淡淡圆点底纹，像软木桌面 */
+			.diary-board::before {
+				content: "";
+				position: absolute;
+				inset: 0;
+				pointer-events: none;
+				opacity: 0.55;
+				background-image: radial-gradient(
+					color-mix(in srgb, var(--deep-text) 9%, transparent) 1.1px,
+					transparent 1.1px
+				);
+				background-size: 26px 26px;
+			}
+			.diary-board-tip {
+				height: 100%;
+				min-height: 30rem;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: color-mix(in srgb, var(--deep-text) 45%, transparent);
+			}
 
 		/* 定位层：负责位置，全程可拖动 */
 		.diary-paper-pos {
@@ -346,6 +629,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 
 		var board = document.getElementById("diary-board");
 		var shuffleBtn = document.getElementById("diary-shuffle");
+		var composeBtn = document.getElementById("diary-compose-btn");
 
 		var entries = [];
 		var unlocked = false;
@@ -483,17 +767,22 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				return new Date(b.date).getTime() - new Date(a.date).getTime();
 			});
 
-			// 板面高度按行估算：让所有纸片都有空间，页面自然变长，往下滑即可浏览全部
+			// 板面内容高度按行估算：让所有纸片都有散布空间；
+			// 画布可视高度由 CSS 固定（.diary-board height: min(70vh, 42rem)），
+			// 内容超出可视部分靠画布内部的滚动条浏览，纸片始终被限制在画布内。
 			var cols = isMobile ? 1 : w >= 1100 ? 4 : w >= 800 ? 3 : 2;
 			var rows = Math.ceil(sorted.length / cols);
 			var cellH = isMobile ? 230 : 280;
 			var boardH = Math.max(rows * cellH + 72, 480);
+			// 拖动时允许纸片移动到内容区（含画布内可滚动到的区域）
+			var contentH = Math.max(boardH, board.clientHeight);
 
 			board.classList.toggle("is-flow", isMobile);
 			if (isMobile) {
 				board.style.height = "";
 			} else {
-				board.style.height = boardH + "px";
+				// 高度交给 CSS，不再覆盖，保证画布固定高度长方形
+				board.style.height = "";
 			}
 
 			var placed = [];
@@ -523,13 +812,13 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 						top = sp.y;
 					} else {
 						var rnd = mulberry32((hashStr(entry.slug) + shuffleSeed * 1013904223) >>> 0);
-						var rect = scatterPlace(pw, ph, w, boardH, placed, rnd);
+						var rect = scatterPlace(pw, ph, w, contentH, placed, rnd);
 						left = rect.x;
 						top = rect.y;
 					}
-					// 限制在板面范围内
+					// 限制在画布范围内（含画布内可滚动到的内容区）
 					left = Math.max(8, Math.min(left, w - pw - 8));
-					top = Math.max(16, Math.min(top, boardH - ph - 16));
+					top = Math.max(16, Math.min(top, contentH - ph - 16));
 				}
 
 				html += '<div class="diary-paper-pos" style="left:' + left.toFixed(1) + "px;top:" + top.toFixed(1) + 'px;width:' + pw.toFixed(0) + 'px" data-slug="' + entry.slug + '">';
@@ -655,11 +944,11 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				if (!moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
 				moved = true;
 				var w = board.clientWidth;
-				var h = board.clientHeight;
 				var pw = el.offsetWidth || 200;
 				var ph = el.offsetHeight || 160;
 				var nx = Math.max(8, Math.min(origX + dx, w - pw - 8));
-				var ny = Math.max(8, Math.min(origY + dy, h - ph - 8));
+				// 垂直方向允许拖到画布内容区（含滚动区域），仍被限制在画布内
+				var ny = Math.max(8, Math.min(origY + dy, contentH - ph - 8));
 				el.style.left = nx + "px";
 				el.style.top = ny + "px";
 				savedPos[entry.slug] = { x: nx, y: ny };
@@ -690,6 +979,198 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			clearTimeout(resizeTimer);
 			resizeTimer = setTimeout(renderBoard, 200);
 		});
+
+		/* ---------- 写日记（登录后可用） ---------- */
+		var composeModal = document.getElementById("diary-compose");
+		var composeMask = document.getElementById("diary-compose-mask");
+		var composeClose = document.getElementById("diary-compose-close");
+		var composeSubmit = document.getElementById("diary-compose-submit");
+		var composeStatus = document.getElementById("diary-compose-status");
+		var composeTitle = document.getElementById("diary-compose-title");
+		var composeContent = document.getElementById("diary-compose-content");
+		var composeImages = document.getElementById("diary-compose-images");
+		var composePrivate = document.getElementById("diary-compose-private");
+		var composeMoods = document.getElementById("diary-compose-moods");
+		var composeMood = "neutral";
+		var composeSaving = false;
+		var DIARY_JSON_PATH = "public/diary/index.json";
+
+		// 渲染心情选项（默认选中"平平淡淡"）
+		Object.keys(MOOD_MAP).forEach(function (key) {
+			var m = MOOD_MAP[key];
+			var btn = document.createElement("button");
+			btn.type = "button";
+			btn.className = "diary-compose-mood" + (key === composeMood ? " is-active" : "");
+			btn.dataset.mood = key;
+			btn.innerHTML = "<span>" + m.emoji + "</span><span>" + m.label + "</span>";
+			btn.addEventListener("click", function () {
+				composeMood = key;
+				composeMoods.querySelectorAll(".diary-compose-mood").forEach(function (el) {
+					el.classList.toggle("is-active", el.dataset.mood === key);
+				});
+			});
+			composeMoods.appendChild(btn);
+		});
+
+		function showToast(msg) {
+			var old = document.querySelector(".diary-toast");
+			if (old) old.remove();
+			var toast = document.createElement("div");
+			toast.className = "diary-toast";
+			toast.textContent = msg;
+			document.body.appendChild(toast);
+			setTimeout(function () {
+				toast.remove();
+			}, 3200);
+		}
+
+		function setComposeStatus(msg, isError) {
+			composeStatus.textContent = msg || "";
+			composeStatus.classList.toggle("is-error", !!isError);
+		}
+
+		function openCompose() {
+			setComposeStatus("");
+			composeModal.hidden = false;
+			composeContent.focus();
+		}
+
+		function closeCompose() {
+			composeModal.hidden = true;
+		}
+
+		// 生成 slug：diary-YYYYMMDD-xxxxxx（与现有数据格式一致）
+		function genSlug() {
+			var d = new Date();
+			var ymd =
+				d.getFullYear() +
+				String(d.getMonth() + 1).padStart(2, "0") +
+				String(d.getDate()).padStart(2, "0");
+			var rand = Math.random().toString(36).slice(2, 8);
+			return "diary-" + ymd + "-" + rand;
+		}
+
+		// 生成与现有数据一致的本地时间格式：YYYY-MM-DDTHH:mm
+		function localDateStr() {
+			var d = new Date();
+			return (
+				d.getFullYear() +
+				"-" +
+				String(d.getMonth() + 1).padStart(2, "0") +
+				"-" +
+				String(d.getDate()).padStart(2, "0") +
+				"T" +
+				String(d.getHours()).padStart(2, "0") +
+				":" +
+				String(d.getMinutes()).padStart(2, "0")
+			);
+		}
+
+		function submitCompose() {
+			if (composeSaving) return;
+			var content = composeContent.value.trim();
+			if (!content) {
+				setComposeStatus("内容不能为空", true);
+				return;
+			}
+			var imageUrls = composeImages.value
+				.split("\n")
+				.map(function (s) {
+					return s.trim();
+				})
+				.filter(function (s) {
+					return !!s;
+				});
+
+			var entry = {
+				slug: genSlug(),
+				title: composeTitle.value.trim(),
+				content: content,
+				date: localDateStr(),
+				tags: [],
+				images: imageUrls.map(function (url) {
+					return { url: url };
+				}),
+				isPrivate: composePrivate.checked,
+				mood: composeMood,
+			};
+
+			composeSaving = true;
+			composeSubmit.disabled = true;
+			setComposeStatus("正在保存...");
+
+			// 先读最新文件内容和 sha（GitHub Contents API 更新时必须带 sha），避免覆盖别处的新改动
+			fetch("/api/content/read/?path=" + encodeURIComponent(DIARY_JSON_PATH))
+				.then(function (r) {
+					if (!r.ok) throw new Error("读取日记数据失败");
+					return r.json();
+				})
+				.then(function (file) {
+					var arr;
+					try {
+						arr = JSON.parse(file.content || "[]");
+					} catch (e) {
+						arr = [];
+					}
+					if (!Array.isArray(arr)) arr = [];
+					arr.unshift(entry);
+					return fetch("/api/content/write/", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							path: DIARY_JSON_PATH,
+							content: JSON.stringify(arr, null, 2) + "\n",
+							sha: file.sha,
+							message: "新增日记: " + (entry.title || entry.slug),
+						}),
+					});
+				})
+				.then(function (r) {
+					return r.json().then(function (data) {
+						if (!r.ok) throw new Error(data.error || "保存失败");
+						// 立即更新本地数据并重渲染，无需等部署
+						entries.unshift(entry);
+						renderBoard();
+						closeCompose();
+						composeTitle.value = "";
+						composeContent.value = "";
+						composeImages.value = "";
+						composePrivate.checked = false;
+						showToast("日记已发表，全站生效约需 1-2 分钟（等待重新部署）");
+					});
+				})
+				.catch(function (err) {
+					setComposeStatus(err.message || "保存失败", true);
+				})
+				.finally(function () {
+					composeSaving = false;
+					composeSubmit.disabled = false;
+				});
+		}
+
+		composeBtn.addEventListener("click", openCompose);
+		composeClose.addEventListener("click", closeCompose);
+		composeMask.addEventListener("click", closeCompose);
+		composeSubmit.addEventListener("click", submitCompose);
+		document.addEventListener("keydown", function (e) {
+			if (e.key === "Escape" && !composeModal.hidden) closeCompose();
+		});
+
+		/* ---------- 登录状态：已登录则显示「写日记」按钮 ---------- */
+		fetch("/api/auth/status/", { credentials: "same-origin" })
+			.then(function (r) {
+				return r.json();
+			})
+			.then(function (data) {
+				if (data.authenticated) {
+					composeBtn.hidden = false;
+					composeBtn.classList.remove("hidden");
+					composeBtn.classList.add("inline-flex");
+				}
+			})
+			.catch(function () {
+				/* 未登录则保持隐藏 */
+			});
 
 		/* ---------- 加载数据 ---------- */
 		fetch("/diary/index.json")

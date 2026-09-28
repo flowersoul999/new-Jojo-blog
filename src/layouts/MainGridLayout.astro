@@ -74,6 +74,8 @@ interface Props {
 			href?: string;
 		}>;
 	};
+	// 设为 true 时隐藏左右侧边栏（如日记页全宽画布场景）
+	hideSidebars?: boolean;
 }
 
 const backgroundImages = getBackgroundImages();
@@ -96,6 +98,7 @@ const {
 	bannerPostMeta,
 	bannerPostAiSummary,
 	bannerPageAiRecommendation,
+	hideSidebars = false,
 } = Astro.props;
 
 // 检查背景壁纸模式和是否允许切换
@@ -224,14 +227,17 @@ const shouldAddLeftSidebar: boolean =
 
 const effectiveIsBothSidebars: boolean =
 	sidebarConfig.isBothSidebars || shouldShowBothSidebarsOnPostPage;
+// hideSidebars 时强制不渲染左右侧边栏（网格退化为单列）
 const effectiveHasRightComponents: boolean =
-	sidebarConfig.hasRightComponents ||
-	(shouldAddRightSidebar &&
-		sidebarLayoutConfig.rightComponents.some((comp) => comp.enable));
+	!hideSidebars &&
+	(sidebarConfig.hasRightComponents ||
+		(shouldAddRightSidebar &&
+			sidebarLayoutConfig.rightComponents.some((comp) => comp.enable)));
 const effectiveHasLeftComponents: boolean =
-	sidebarConfig.hasLeftComponents ||
-	(shouldAddLeftSidebar &&
-		sidebarLayoutConfig.leftComponents.some((comp) => comp.enable));
+	!hideSidebars &&
+	(sidebarConfig.hasLeftComponents ||
+		(shouldAddLeftSidebar &&
+			sidebarLayoutConfig.leftComponents.some((comp) => comp.enable)));
 
 // 使用effective值重新生成网格类
 // 当position为right且文章页临时显示左侧栏时，tabletSidebar应为right（保持显示主侧栏）
@@ -1074,7 +1080,7 @@ const hasMultipleImages =
             )}
 
             {/* 移动端底部组件 - 768px及以下显示 */}
-            {enabledMobileBottomComponents.length > 0 && (
+            {!hideSidebars && enabledMobileBottomComponents.length > 0 && (
                 <div
                     id="mobile-bottom-sidebar"
                     class:list={[
@@ -1085,7 +1091,7 @@ const hasMultipleImages =
                     ]}
                     data-hide-mobile-bottom-on-post={hideMobileBottomOnPostPage ? "true" : "false"}
                 >
-					<SideBar side="bottom" headings={headings}></SideBar>
+						<SideBar side="bottom" headings={headings}></SideBar>
                 </div>
             )}
 
