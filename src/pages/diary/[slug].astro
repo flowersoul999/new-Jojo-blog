@@ -1,9 +1,10 @@
 ---
+import fs from "node:fs";
+import { join } from "node:path";
 // 日记详情页：点击纸片后走站内平滑跳转到此页（不再弹窗）
 // 布局：封面大图 + 标题信息 → 其余照片（放在文章上方）→ 正文
 // 私密日记：静态页不渲染内容，仅显示锁定卡片，密码验证后由前端拉取渲染
 import { Icon } from "astro-icon/components";
-import fs from "node:fs";
 import { siteConfig } from "@/config";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
 
@@ -21,7 +22,14 @@ interface DiaryEntry {
 	content?: string;
 	date: string;
 	tags?: string[];
-	images?: { id: string; name: string; url: string; width: number; height: number; size: number }[];
+	images?: {
+		id: string;
+		name: string;
+		url: string;
+		width: number;
+		height: number;
+		size: number;
+	}[];
 	mood?: string;
 	isPrivate?: boolean;
 }
@@ -31,10 +39,17 @@ interface Props {
 }
 
 // 为每篇日记生成静态详情页
+// 注意：不要用 `new URL("../../public/...", import.meta.url)` 相对定位，
+// 生产构建时该组件被打包进 dist，import.meta.url 指向 dist 内 chunk，
+// 相对路径会解析成 dist/public/... 导致 ENOENT 构建失败。
+// 改用项目根目录锚定，开发与构建环境都稳定可读。
 export function getStaticPaths() {
-	const file = new URL("../../../public/diary/index.json", import.meta.url);
+	const file = join(process.cwd(), "public", "diary", "index.json");
 	const diaries = JSON.parse(fs.readFileSync(file, "utf-8")) as DiaryEntry[];
-	return diaries.map((d) => ({ params: { slug: d.slug }, props: { entry: d } }));
+	return diaries.map((d) => ({
+		params: { slug: d.slug },
+		props: { entry: d },
+	}));
 }
 
 const { entry } = Astro.props;
