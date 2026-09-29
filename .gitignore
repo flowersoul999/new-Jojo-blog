@@ -65,3 +65,7 @@ Firefly-master/
 /waline/
 /vercel.json
 /wrangler.jsonc
+/.wrangler/
+# 一次性脚本：封面图生成/应用
+/apply-covers.mjs
+/generate-covers.mjs
