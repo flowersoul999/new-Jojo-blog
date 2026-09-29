@@ -877,7 +877,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 						handleEntryClick(entry);
 					});
 				} else {
-					bindDrag(el, entry);
+					bindDrag(el, entry, contentH);
 				}
 			});
 		}
@@ -914,7 +914,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		}
 
 		/* ---------- 纸片拖动（全程可拖） ---------- */
-		function bindDrag(el, entry) {
+		function bindDrag(el, entry, contentH) {
 			var startX = 0,
 				startY = 0,
 				origX = 0,
@@ -962,11 +962,11 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 					el.releasePointerCapture(e.pointerId);
 				} catch (err) {}
 				// 没怎么动 → 视为点击，跳转详情页
-			if (!moved) handleEntryClick(entry);
+				if (!moved) handleEntryClick(entry);
+			}
+			el.addEventListener("pointerup", endDrag);
+			el.addEventListener("pointercancel", endDrag);
 		}
-		el.addEventListener("pointerup", endDrag);
-		el.addEventListener("pointercancel", endDrag);
-	}
 
 		shuffleBtn.addEventListener("click", function () {
 			shuffleSeed = (shuffleSeed + 1) % 997;
