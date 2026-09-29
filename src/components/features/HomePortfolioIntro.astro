@@ -586,11 +586,11 @@ const initialStyle = initialHome
 	}
 
 	.home-portfolio-intro__band {
-		z-index: 4;
+		z-index: 6;
 		top: 50%;
 		bottom: auto;
 		height: var(--intro-band-height);
-		/* This is only a positioning layer for the two words, not a visible banner. */
+		/* This is only a positioning layer for the words, not a visible banner. */
 		background: transparent;
 		border: 0;
 		box-shadow: none;
@@ -782,13 +782,6 @@ const initialStyle = initialHome
 		.home-portfolio-intro__word {
 			font-size: clamp(3.25rem, 16.5vw, 5.8rem);
 			letter-spacing: 0;
-		}
-
-		.home-portfolio-intro__character {
-			left: 50%;
-			/* 留出中央标题的安全区，避免角色立绘压住居中的颜文字标题。 */
-			max-width: 72vw;
-			height: min(49svh, 32rem);
 		}
 	}
 
