@@ -156,53 +156,12 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				syncAttr();
 				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
 				doPlay(false);
-				// 手机端：在用户手势内对整个播放容器请求全屏，铺满屏幕无黑边。
-				// 全屏整个 overlay 而非 video 本身，这样电脑端全屏 API 也走同一条路径，
-				// 且退出全屏后视频仍保留在页面内继续播放。
-				enterMobileFullscreen();
 			} else {
 				video.pause();
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
 				syncAttr();
 			}
 		}
-
-		function isMobileViewport() {
-			return window.matchMedia("(max-width: 767px)").matches;
-		}
-
-		function enterMobileFullscreen() {
-			if (!isMobileViewport() || !overlay) return;
-			try {
-				var req =
-					overlay.requestFullscreen ||
-					overlay.webkitRequestFullscreen;
-				if (typeof req === "function") {
-					var p = req.call(overlay);
-					if (p && typeof p.catch === "function") {
-						p.then(function () {
-							// 全屏成功后尝试锁定横屏：手机横过来画面正对、占满屏幕。
-							// iOS Safari 不支持 orientation.lock，静默失败则保持系统默认方向。
-							if (screen.orientation && screen.orientation.lock) {
-								screen.orientation.lock("landscape").catch(function () {});
-							}
-						}).catch(function () {});
-					}
-				}
-			} catch (_) {
-				// 全屏失败时保持页面内播放
-			}
-		}
-
-		// 用户按系统返回/手势退出全屏时：解除方向锁，视频留在页面内继续播放（不暂停）
-		function onFullscreenChange() {
-			var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-			if (!isFs && screen.orientation && screen.orientation.unlock) {
-				try { screen.orientation.unlock(); } catch (_) {}
-			}
-		}
-		document.addEventListener("fullscreenchange", onFullscreenChange);
-		document.addEventListener("webkitfullscreenchange", onFullscreenChange);
 
 		function onEnded() {
 			if (isMultiple) {
@@ -306,29 +265,6 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		transition: opacity 0.5s ease;
 	}
 
-	/* 手机端（≤767px）：与电脑一致在当前页面横幅区内联播放，
-	   不进系统全屏、不锁横屏，页面可正常下滑，滑回继续播放。
-	   contain 保证横屏视频完整画面不被裁剪，黑底承接信箱留白 */
-	@media (max-width: 767px) {
-		:global(#bg-player-overlay) {
-			background: #000;
-		}
-
-		:global(#bg-player-video) {
-			object-fit: contain;
-		}
-	}
-
-	/* 手机端全屏播放：铺满整个手机屏幕，无黑边（cover 裁剪超出部分） */
-	@media (max-width: 767px) {
-		:global(#bg-player-overlay:fullscreen),
-		:global(#bg-player-overlay:-webkit-full-screen) {
-			background: #000;
-		}
-
-		:global(#bg-player-overlay:fullscreen #bg-player-video),
-		:global(#bg-player-overlay:-webkit-full-screen #bg-player-video) {
-			object-fit: cover;
-		}
-	}
+	/* 手机端（≤767px）：不额外设置样式 —— 视频默认 object-fit: cover，
+	   铺满整个壁纸横幅（无黑边），页面内联播放、可正常下滑，不做系统全屏。 */
 </style>
