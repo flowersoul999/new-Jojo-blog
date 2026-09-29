@@ -211,6 +211,35 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			}
 		});
 
+		// 标签页切到后台时暂停视频解码（减少 GPU/带宽占用），回到前台若原本在播放则恢复
+		var pausedByVisibility = false;
+		document.addEventListener("visibilitychange", function () {
+			if (document.hidden) {
+				pausedByVisibility = isPlaying;
+				if (isPlaying) {
+					isPlaying = false;
+					video.pause();
+					if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
+					syncAttr();
+				}
+			} else if (pausedByVisibility) {
+				pausedByVisibility = false;
+				isPlaying = true;
+				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
+				syncAttr();
+				var resumeSrc = changedIndexGuard(currentIndex);
+				if (resumeSrc !== null) video.src = resumeSrc;
+				video.play().catch(function () { isPlaying = false; syncAttr(); });
+			}
+		});
+
+		// 恢复播放时若当前 src 已被重设则避免重复设置，简单封装取回当前视频地址
+		function changedIndexGuard(idx) {
+			var cur = video.getAttribute("src");
+			var target = urlList[idx];
+			return cur && cur.indexOf(target) !== -1 ? null : target;
+		}
+
 		// 动态控制 prev/next 按钮显示
 		if (!isMultiple) {
 			if (prevBtn) prevBtn.style.display = "none";

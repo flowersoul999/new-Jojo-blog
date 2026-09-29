@@ -666,6 +666,21 @@ const hasMultipleImages =
                 }
             }
 
+            // 标签页隐藏时暂停轮播推进（后台的 CSS 过渡已被合成器自动暂停，
+            // 这里主要避免隐藏期间仍每 interval 触发定时切换）；回到前台若原本在自动播放则恢复
+            appState._pausedByVisibility = false;
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    if (appState.autoPlayTimer) {
+                        appState._pausedByVisibility = true;
+                        stopAutoPlay();
+                    }
+                } else if (appState._pausedByVisibility) {
+                    appState._pausedByVisibility = false;
+                    startAutoPlay();
+                }
+            });
+
             // 键盘控制
             document.addEventListener('keydown', function(e) {
                 var target = e.target;
