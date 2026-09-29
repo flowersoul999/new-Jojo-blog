@@ -91,71 +91,6 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		video.src = urlList[currentIndex];
 		video.load();
 
-		// 手机端（≤767px）点击播放时进入横屏全屏播放
-		function isMobileViewport() {
-			return window.matchMedia("(max-width: 767px)").matches;
-		}
-
-		function enterMobileFullscreen() {
-			if (!isMobileViewport()) return;
-			// 全屏时显示系统控制条，方便手机端暂停/退出
-			video.setAttribute("controls", "controls");
-			try {
-				// iOS Safari：webkitEnterFullscreen 原生播放器，自动按视频比例显示完整画面
-				if (typeof video.webkitEnterFullscreen === "function") {
-					video.webkitEnterFullscreen();
-					return;
-				}
-				// Android Chrome：requestFullscreen 进入全屏，
-				// 横屏锁定与完整画面在 onFullscreenChange 中统一处理
-				if (typeof video.requestFullscreen === "function") {
-					video.requestFullscreen().catch(function () {
-						video.removeAttribute("controls");
-					});
-				}
-			} catch (_) {
-				// 全屏失败时保持页面内播放
-			}
-		}
-
-		function onFullscreenChange() {
-			var isFs = !!(
-				document.fullscreenElement ||
-				document.webkitFullscreenElement
-			);
-			if (isFs && isMobileViewport()) {
-				// 全屏已生效：切换为完整画面（contain 不裁剪），并锁定横屏方向。
-				// orientation.lock 必须在全屏成功后再调用，否则会静默失败
-				video.style.objectFit = "contain";
-				video.style.background = "#000";
-				if (screen.orientation && screen.orientation.lock) {
-					screen.orientation.lock("landscape").catch(function () {});
-				}
-			} else {
-				exitMobileFullscreen();
-			}
-		}
-
-		function exitMobileFullscreen() {
-			if (!isMobileViewport()) return;
-			video.removeAttribute("controls");
-			// 恢复页面内背景视频样式（cover 填充）
-			video.style.objectFit = "";
-			video.style.background = "";
-			// 退出全屏即停止播放，恢复页面原状
-			if (isPlaying) {
-				isPlaying = false;
-				video.pause();
-				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
-				syncAttr();
-			}
-		}
-
-		document.addEventListener("fullscreenchange", onFullscreenChange);
-		document.addEventListener("webkitfullscreenchange", onFullscreenChange);
-		// iOS Safari 视频全屏结束事件
-		video.addEventListener("webkitendfullscreen", exitMobileFullscreen);
-
 		function showToast() {
 			if (!toast) return;
 			toast.classList.remove("opacity-0");
@@ -220,9 +155,9 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				if (currentIndex >= urlList.length) currentIndex = 0;
 				syncAttr();
 				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
+				// 手机端与电脑端一致：直接在当前页面横幅区内联播放，
+				// 不进系统全屏、不锁方向，页面可自由滚动，滑回来继续播放
 				doPlay(false);
-				// 手机端：在用户手势内同步请求横屏全屏播放
-				enterMobileFullscreen();
 			} else {
 				video.pause();
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
@@ -237,11 +172,6 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			} else {
 				isPlaying = false;
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
-				// 手机端全屏播放结束时退出全屏
-				video.removeAttribute("controls");
-				if (document.fullscreenElement) {
-					document.exitFullscreen().catch(function () {});
-				}
 				syncAttr();
 			}
 		}
@@ -306,5 +236,28 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 	:global([data-bg-video-playing] #wallpaper-gradient) {
 		opacity: 0 !important;
 		transition: opacity 0.5s ease;
+	}
+
+	/* 手机端（≤767px）：与电脑一致在当前页面横幅区内联播放，
+	   不进系统全屏、不锁横屏，页面可正常下滑，滑回继续播放。
+	   contain 保证横屏视频完整画面不被裁剪，黑底承接信箱留白 */
+	@media (max-width: 767px) {
+		:global(#bg-player-overlay) {
+			background: #000;
+		}
+
+		:global(#bg-player-video) {
+			object-fit: contain;
+		}
+	}
+
+	/* 竖屏时横幅高 65vh，直接铺满会上下大片黑边；
+	   播放层收缩为顶部 16:9 画带（未播放时遮罩透明，不影响观感），
+	   下方仍显示壁纸 */
+	@media (max-width: 767px) and (orientation: portrait) {
+		:global(#bg-player-overlay) {
+			inset: 0 0 auto 0;
+			height: 56.25vw;
+		}
 	}
 </style>
