@@ -95,7 +95,7 @@ const tags = entry.tags || [];
 const pageTitle = entry.title || "日记";
 ---
 
-<MainGridLayout title={pageTitle} description="日记详情">
+<MainGridLayout title={pageTitle} description="日记详情" hideSidebars>
 	<div class="card-base z-10 relative w-full overflow-hidden">
 		{entry.isPrivate ? (
 			<!-- 私密日记：静态页不输出内容，由前端验证密码后渲染 -->
