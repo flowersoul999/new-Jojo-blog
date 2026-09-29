@@ -229,6 +229,9 @@ const config = sakuraConfig;
 				// 监听窗口大小变化
 				this._boundHandleResize = this.handleResize.bind(this);
 				window.addEventListener('resize', this._boundHandleResize);
+				// 监听标签页可见性：切后台停止绘制、回前台恢复，降低主线程占用
+				this._boundHandleVisibility = this.handleVisibility.bind(this);
+				document.addEventListener('visibilitychange', this._boundHandleVisibility);
 			}
 
 			// 创建樱花列表
@@ -279,6 +282,13 @@ const config = sakuraConfig;
 				const animate = () => {
 					if (!this.ctx || !this.canvas || !this.sakuraList) return;
 
+					// 标签页隐藏时停止这一帧的绘制与调度，等待 visibilitychange 恢复，
+					// 避免后台仍以满帧占用 CPU/GPU（对多标签页/笔记本场景收益明显）。
+					if (document.hidden) {
+						this.animationId = null;
+						return;
+					}
+
 					this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 					this.sakuraList.update();
 					this.sakuraList.draw(this.ctx);
@@ -295,6 +305,13 @@ const config = sakuraConfig;
 				if (this.canvas) {
 					this.canvas.width = windowWidth;
 					this.canvas.height = windowHeight;
+				}
+			}
+
+			// 回到前台时恢复动画（若动画仍在运行中且未被设置面板暂停）
+			handleVisibility() {
+				if (!document.hidden && !this.animationId && this.isRunning && !this.isPaused) {
+					this.startAnimation();
 				}
 			}
 
@@ -333,6 +350,11 @@ const config = sakuraConfig;
 				if (this._boundHandleResize) {
 					window.removeEventListener('resize', this._boundHandleResize);
 					this._boundHandleResize = null;
+				}
+
+				if (this._boundHandleVisibility) {
+					document.removeEventListener('visibilitychange', this._boundHandleVisibility);
+					this._boundHandleVisibility = null;
 				}
 				this.isRunning = false;
 				this.isPaused = false;
@@ -395,10 +417,13 @@ const config = sakuraConfig;
 			
 			// 初始化樱花特效的函数
 			const setupSakura = () => {
-				if (window.sakuraInitialized) return;
-				// 检查用户是否在设置中关闭了樱花特效
-				var storedEnabled = localStorage.getItem("sakuraEnabled");
-				var isEnabled = storedEnabled !== null ? storedEnabled === "true" : sakuraConfig.enable;
+					if (window.sakuraInitialized) return;
+					// 尊重系统"减弱动态效果"偏好：默认不自动运行樱花特效，避免在高刷新率/低性能设备上卡顿。
+					// 用户仍可在设置面板中手动开启（manager 仍会创建，toggle 可正常启动）。
+					var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+					// 检查用户是否在设置中关闭了樱花特效
+					var storedEnabled = localStorage.getItem("sakuraEnabled");
+					var isEnabled = (storedEnabled !== null ? storedEnabled === "true" : sakuraConfig.enable) && !reducedMotion;
 				// 创建管理器并根据用户偏好决定是否启动
 				var cfg = Object.assign({}, sakuraConfig, { enable: isEnabled });
 				initSakura(cfg);

@@ -631,8 +631,9 @@ const canonicalUrl = new URL(
     <FancyboxManager />
     <WalineManager />
 
-    <!-- 内容编辑器：GitHub 登录后可在网页上直接编辑文章和配置 -->
-    <ContentEditor client:load />
+    <!-- 内容编辑器：GitHub 登录后可在网页上直接编辑文章和配置。
+         延迟到浏览器空闲期水合，避免编辑器脚本阻塞首屏关键路径 -->
+    <ContentEditor client:idle />
 
     <!-- Tab 径向轮盘：按住 Tab 呼出快速导航 -->
     <TabRadialMenu client:load />
