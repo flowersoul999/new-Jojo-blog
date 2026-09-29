@@ -155,15 +155,54 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				if (currentIndex >= urlList.length) currentIndex = 0;
 				syncAttr();
 				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
-				// 手机端与电脑端一致：直接在当前页面横幅区内联播放，
-				// 不进系统全屏、不锁方向，页面可自由滚动，滑回来继续播放
 				doPlay(false);
+				// 手机端：在用户手势内对整个播放容器请求全屏，铺满屏幕无黑边。
+				// 全屏整个 overlay 而非 video 本身，这样电脑端全屏 API 也走同一条路径，
+				// 且退出全屏后视频仍保留在页面内继续播放。
+				enterMobileFullscreen();
 			} else {
 				video.pause();
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
 				syncAttr();
 			}
 		}
+
+		function isMobileViewport() {
+			return window.matchMedia("(max-width: 767px)").matches;
+		}
+
+		function enterMobileFullscreen() {
+			if (!isMobileViewport() || !overlay) return;
+			try {
+				var req =
+					overlay.requestFullscreen ||
+					overlay.webkitRequestFullscreen;
+				if (typeof req === "function") {
+					var p = req.call(overlay);
+					if (p && typeof p.catch === "function") {
+						p.then(function () {
+							// 全屏成功后尝试锁定横屏：手机横过来画面正对、占满屏幕。
+							// iOS Safari 不支持 orientation.lock，静默失败则保持系统默认方向。
+							if (screen.orientation && screen.orientation.lock) {
+								screen.orientation.lock("landscape").catch(function () {});
+							}
+						}).catch(function () {});
+					}
+				}
+			} catch (_) {
+				// 全屏失败时保持页面内播放
+			}
+		}
+
+		// 用户按系统返回/手势退出全屏时：解除方向锁，视频留在页面内继续播放（不暂停）
+		function onFullscreenChange() {
+			var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+			if (!isFs && screen.orientation && screen.orientation.unlock) {
+				try { screen.orientation.unlock(); } catch (_) {}
+			}
+		}
+		document.addEventListener("fullscreenchange", onFullscreenChange);
+		document.addEventListener("webkitfullscreenchange", onFullscreenChange);
 
 		function onEnded() {
 			if (isMultiple) {
@@ -280,25 +319,16 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		}
 	}
 
-	/* 竖屏播放时：把横屏视频顺时针旋转 90° 铺满整个壁纸区（65vh），
-	   手机保持竖着拿即可看到占满屏幕的画面（画面内容侧躺，横头即可正对）。
-	   旋转后宽高互换：以壁纸区高作为视频宽、壁纸区宽作为视频高，居中铺满。
-	   object-fit: cover 进一步保证不留黑边。 */
-	@media (max-width: 767px) and (orientation: portrait) {
-		:global([data-bg-video-playing] #bg-player-overlay) {
+	/* 手机端全屏播放：铺满整个手机屏幕，无黑边（cover 裁剪超出部分） */
+	@media (max-width: 767px) {
+		:global(#bg-player-overlay:fullscreen),
+		:global(#bg-player-overlay:-webkit-full-screen) {
 			background: #000;
 		}
 
-		:global([data-bg-video-playing] #bg-player-video) {
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			width: 65vh;
-			height: 100vw;
-			max-width: none;
+		:global(#bg-player-overlay:fullscreen #bg-player-video),
+		:global(#bg-player-overlay:-webkit-full-screen #bg-player-video) {
 			object-fit: cover;
-			transform: translate(-50%, -50%) rotate(90deg);
-			transform-origin: center center;
 		}
 	}
 </style>
