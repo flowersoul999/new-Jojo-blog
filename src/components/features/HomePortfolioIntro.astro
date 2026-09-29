@@ -84,8 +84,7 @@ const initialStyle = initialHome
 	</div>
 	<div class="home-portfolio-intro__band">
 		<div class="home-portfolio-intro__title" aria-hidden="true">
-			<span class="home-portfolio-intro__word home-portfolio-intro__word--left">鸣潮</span>
-			<span class="home-portfolio-intro__word home-portfolio-intro__word--right">往复</span>
+			<span class="home-portfolio-intro__word home-portfolio-intro__word--kaomoji">(｡•ᴗ•｡)</span>
 		</div>
 	</div>
 	<img
@@ -602,7 +601,7 @@ const initialStyle = initialHome
 	.home-portfolio-intro__title {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: center;
 		height: 100%;
 		padding: 0 clamp(1.5rem, 6vw, 5.5rem);
 		white-space: nowrap;
@@ -626,12 +625,10 @@ const initialStyle = initialHome
 		opacity: 0;
 	}
 
-	.home-portfolio-intro__word--left {
-		transform: translate3d(-24vw, 0, 0) rotate(-2deg);
-	}
-
-	.home-portfolio-intro__word--right {
-		transform: translate3d(24vw, 0, 0) rotate(2deg);
+	/* 颜文字标题：居中呈现，入场带轻微的「往复」摇摆 */
+	.home-portfolio-intro__word--kaomoji {
+		line-height: 1.05;
+		transform: translate3d(0, -2vw, 0) rotate(-2deg);
 	}
 
 	.home-portfolio-intro__character {
@@ -669,12 +666,8 @@ const initialStyle = initialHome
 		animation: home-portfolio-intro-character 2s cubic-bezier(0.18, 0.76, 0.2, 1) both;
 	}
 
-	.home-portfolio-intro.is-playing .home-portfolio-intro__word--left {
-		animation: home-portfolio-intro-word-left var(--intro-strip-duration) var(--intro-strip-delay) cubic-bezier(0.16, 0.82, 0.22, 1) both;
-	}
-
-	.home-portfolio-intro.is-playing .home-portfolio-intro__word--right {
-		animation: home-portfolio-intro-word-right var(--intro-strip-duration) var(--intro-strip-delay) cubic-bezier(0.16, 0.82, 0.22, 1) both;
+	.home-portfolio-intro.is-playing .home-portfolio-intro__word--kaomoji {
+		animation: home-portfolio-intro-word var(--intro-strip-duration) var(--intro-strip-delay) cubic-bezier(0.16, 0.82, 0.22, 1) both;
 	}
 
 	.home-portfolio-intro.is-playing .home-portfolio-intro__vignette {
@@ -697,14 +690,10 @@ const initialStyle = initialHome
 		to { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); }
 	}
 
-	@keyframes home-portfolio-intro-word-left {
-		0% { opacity: 0; transform: translate3d(-24vw, 0, 0) rotate(-5deg) scale(0.9); }
-		100% { opacity: 1; transform: translate3d(0, 0, 0) rotate(-1.5deg) scale(1); }
-	}
-
-	@keyframes home-portfolio-intro-word-right {
-		0% { opacity: 0; transform: translate3d(24vw, 0, 0) rotate(5deg) scale(0.9); }
-		100% { opacity: 1; transform: translate3d(0, 0, 0) rotate(1.5deg) scale(1); }
+	@keyframes home-portfolio-intro-word {
+		0% { opacity: 0; transform: translate3d(0, -7vh, 0) rotate(-6deg) scale(0.9); }
+		55% { opacity: 1; transform: translate3d(0, 0, 0) rotate(3deg) scale(1); }
+		100% { opacity: 1; transform: translate3d(0, 0, 0) rotate(-2deg) scale(1); }
 	}
 
 	@keyframes home-portfolio-intro-lift {
@@ -797,7 +786,7 @@ const initialStyle = initialHome
 
 		.home-portfolio-intro__character {
 			left: 50%;
-			/* 留出中央标题的安全区，避免角色立绘压住“鸣潮 / 往复”。 */
+			/* 留出中央标题的安全区，避免角色立绘压住居中的颜文字标题。 */
 			max-width: 72vw;
 			height: min(49svh, 32rem);
 		}
