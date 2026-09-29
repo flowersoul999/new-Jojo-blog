@@ -14,6 +14,9 @@ import { collectUsedFontCssVars, toPublicPath } from "../src/utils/fontHelper";
 
 const DIST_DIR = "dist";
 const OUTPUT_DIR = "dist/_astro/fonts";
+// 字符集缓存：键为 src/content 内容 hash，值为收集到的字符集。
+// 入库保存，构建时若内容没变则跳过扫描 dist 下全部 HTML。
+const CHARS_CACHE_FILE = "src/constants/subset-chars-cache.json";
 
 // ─── 字体配置解析 ────────────────────────────────────────
 
@@ -125,6 +128,64 @@ async function collectChars(): Promise<string> {
 	return [...charSet].join("");
 }
 
+// ─── 字符集缓存（基于 src/content 内容 hash） ─────────────
+
+/**
+ * 计算 src/content 目录下所有文件内容的组合 hash。
+ * 内容（文章）没变 → hash 不变 → 字符集可复用。
+ */
+async function hashContentDir(): Promise<string> {
+	const files = (await glob("src/content/**/*.{md,mdx}")).sort();
+	const hash = crypto.createHash("sha256");
+	for (const file of files) {
+		const buf = await fs.readFile(file);
+		hash.update(file);
+		hash.update(buf);
+	}
+	return hash.digest("hex").slice(0, 16);
+}
+
+type CharsCache = Record<string, string>;
+
+async function readCharsCache(): Promise<CharsCache> {
+	try {
+		const raw = await fs.readFile(CHARS_CACHE_FILE, "utf-8");
+		return JSON.parse(raw) as CharsCache;
+	} catch {
+		return {};
+	}
+}
+
+async function writeCharsCache(cache: CharsCache): Promise<void> {
+	// 只保留最近几条，避免文件无限增长
+	const entries = Object.entries(cache).slice(-5);
+	await fs.mkdir(path.dirname(CHARS_CACHE_FILE), { recursive: true });
+	await fs.writeFile(
+		CHARS_CACHE_FILE,
+		JSON.stringify(Object.fromEntries(entries), null, 2) + "\n",
+		"utf-8",
+	);
+}
+
+/**
+ * 获取页面字符集：优先命中缓存，未命中才扫描 dist 并写回缓存。
+ */
+async function getPageChars(): Promise<string> {
+	const contentKey = await hashContentDir();
+	const cache = await readCharsCache();
+	const hit = cache[contentKey];
+	if (hit) {
+		console.log(`   ⚡ Chars cache hit (content ${contentKey}), skipping dist scan.`);
+		return hit;
+	}
+
+	console.log("🔍 Collecting characters from dist/...");
+	const chars = await collectChars();
+	cache[contentKey] = chars;
+	await writeCharsCache(cache);
+	return chars;
+}
+
 // ─── 子集生成 ────────────────────────────────────────────
 
 function contentHash(buffer: Buffer): string {
@@ -191,9 +252,8 @@ async function main() {
 		`   Found ${localSubsetFonts.length} font(s) to subset: ${localSubsetFonts.map((f) => f.id).join(", ")}`,
 	);
 
-	// 2. 收集页面字符
-	console.log("🔍 Collecting characters from dist/...");
-	const pageChars = await collectChars();
+	// 2. 收集页面字符（优先命中缓存，避免每次全量扫描 dist HTML）
+	const pageChars = await getPageChars();
 	console.log(`   Collected ${pageChars.length} unique characters.`);
 
 	if (pageChars.length === 0) {
