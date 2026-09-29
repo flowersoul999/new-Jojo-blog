@@ -280,13 +280,25 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		}
 	}
 
-	/* 竖屏时横幅高 65vh，直接铺满会上下大片黑边；
-	   播放层收缩为顶部 16:9 画带（未播放时遮罩透明，不影响观感），
-	   下方仍显示壁纸 */
+	/* 竖屏播放时：把横屏视频顺时针旋转 90° 铺满整个壁纸区（65vh），
+	   手机保持竖着拿即可看到占满屏幕的画面（画面内容侧躺，横头即可正对）。
+	   旋转后宽高互换：以壁纸区高作为视频宽、壁纸区宽作为视频高，居中铺满。
+	   object-fit: cover 进一步保证不留黑边。 */
 	@media (max-width: 767px) and (orientation: portrait) {
-		:global(#bg-player-overlay) {
-			inset: 0 0 auto 0;
-			height: 56.25vw;
+		:global([data-bg-video-playing] #bg-player-overlay) {
+			background: #000;
+		}
+
+		:global([data-bg-video-playing] #bg-player-video) {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 65vh;
+			height: 100vw;
+			max-width: none;
+			object-fit: cover;
+			transform: translate(-50%, -50%) rotate(90deg);
+			transform-origin: center center;
 		}
 	}
 </style>
