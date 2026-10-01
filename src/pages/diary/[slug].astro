@@ -208,13 +208,14 @@ const pageTitle = entry.title || "日记";
 		}
 
 		/* ===================== 正文 ===================== */
-		.diary-text {
-			white-space: pre-wrap;
-			word-break: break-word;
-			line-height: 1.9;
-			font-size: 0.95rem;
-			color: var(--deep-text);
-		}
+	.diary-text {
+		white-space: pre-wrap;
+		word-break: break-word;
+		line-height: 2;
+		/* 手机 16px → 桌面 18px 平滑过渡，阅读不费眼 */
+		font-size: clamp(1rem, 0.94rem + 0.32vw, 1.125rem);
+		color: var(--deep-text);
+	}
 
 		/* ===================== 图片灯箱 ===================== */
 		.diary-lightbox {
