@@ -25,8 +25,8 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	// 歌词颜色方案：past=已演唱, current=当前演唱高亮, future=未演唱
 	lyricsColors: {
 		future: "#94a3b8", // 未演唱文本颜色（slate-400）
-		current: "#fb7185", // 当前演唱高亮色（rose-400）
-		past: "#e11d48", // 已演唱文本颜色（rose-600）
+		current: "#38bdf8", // 当前演唱高亮色（sky-400，蓝色系更醒目）
+		past: "#3b82f6", // 已演唱文本颜色（blue-500）
 	},
 
 	// Meting API 配置
