@@ -1,0 +1,506 @@
+---
+// 日志时间线页：仿 flowersink.com/life 的月度时间线排版
+// 单列居中 + 按月分组，每条日志展示「心情/标签/标题/摘要/首图/日期」
+// 点击卡片走站内平滑跳转到详情页 /diary/[slug]，私密日记锁定态需密码
+import fs from "node:fs";
+import { join } from "node:path";
+import { Icon } from "astro-icon/components";
+import { siteConfig } from "@/config";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+if (!siteConfig.pages.diary) {
+	return Astro.redirect("/404/");
+}
+
+const MOOD_MAP: Record<string, { label: string; emoji: string }> = {
+	"super-happy": { label: "炒鸡开心", emoji: "🤩" },
+	happy: { label: "开心", emoji: "😊" },
+	neutral: { label: "平平淡淡", emoji: "😐" },
+	unhappy: { label: "不开心", emoji: "😔" },
+	sad: { label: "伤心难过", emoji: "😭" },
+};
+
+interface RawEntry {
+	slug: string;
+	title?: string;
+	content?: string;
+	date: string;
+	tags?: string[];
+	images?: { url: string }[];
+	mood?: string;
+	isPrivate?: boolean;
+}
+
+// 读取日记数据（与画布页 /diary/ 共用同一份数据源）
+const file = join(process.cwd(), "public", "diary", "index.json");
+let rawEntries: RawEntry[] = [];
+try {
+	rawEntries = JSON.parse(fs.readFileSync(file, "utf-8")) as RawEntry[];
+} catch (e) {
+	rawEntries = [];
+}
+
+// 按时间倒序排列
+const entries = [...rawEntries].sort(
+	(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+);
+
+// 按月分组：Map<'2026年10月', RawEntry[]>
+const monthGroups: { key: string; items: RawEntry[] }[] = [];
+for (const e of entries) {
+	const d = new Date(e.date);
+	const key = d.getFullYear() + "年" + (d.getMonth() + 1) + "月";
+	const last = monthGroups[monthGroups.length - 1];
+	if (last && last.key === key) {
+		last.items.push(e);
+	} else {
+		monthGroups.push({ key, items: [e] });
+	}
+}
+
+function formatDate(dateStr: string) {
+	const d = new Date(dateStr);
+	if (isNaN(d.getTime())) return dateStr;
+	return (
+		d.getFullYear() +
+		"年" +
+		String(d.getMonth() + 1).padStart(2, "0") +
+		"月" +
+		String(d.getDate()).padStart(2, "0") +
+		"日"
+	);
+}
+
+function excerpt(content?: string, len = 96) {
+	const s = (content || "").trim().replace(/\s+/g, " ");
+	return s.length > len ? s.slice(0, len) + "…" : s;
+}
+
+function thumbnail(e: RawEntry) {
+	return e.images && e.images.length ? e.images[0].url : null;
+}
+
+const title = "日志";
+const description = "记录生活的细节点滴，按月份整理成时间线。";
+---
+
+<MainGridLayout title={title} description={description} hideSidebars>
+	<div class="card-base z-10 relative w-full overflow-hidden">
+		<div class="px-4 sm:px-6 md:px-9 py-4 sm:py-6 relative">
+			<!-- 页面标题区 -->
+			<div class="flex items-center gap-3 mb-2">
+				<div
+					class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-(--primary) text-white dark:text-black/70"
+				>
+					<Icon is:inline name="material-symbols:timeline" class="text-[1.5rem]" />
+				</div>
+				<div class="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">
+					{title}
+				</div>
+				<a
+					href="/diary/"
+					id="life-to-canvas"
+					class="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-sm text-(--btn-content) transition-colors hover:bg-(--btn-regular-bg-hover)"
+				>
+					<Icon is:inline name="material-symbols:apps" class="text-base" />
+					<span>画布模式</span>
+				</a>
+			</div>
+			<p class="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
+				{description}
+			</p>
+
+			<!-- 月份筛选 -->
+			{monthGroups.length > 0 && (
+				<div id="life-month-filter" class="life-filter">
+					<button type="button" data-month="all" class="life-filter-pill is-active">全部</button>
+					{monthGroups.map((g) => (
+						<button type="button" data-month={g.key} class="life-filter-pill">
+							{g.key}
+						</button>
+					))}
+				</div>
+			)}
+
+			<!-- 时间线主体 -->
+			<div id="life-timeline" class="life-timeline">
+				{entries.length === 0 ? (
+					<div class="life-empty">
+						<div class="text-4xl mb-2">🍃</div>
+						<p>还没有记录生活点滴</p>
+					</div>
+				) : (
+					monthGroups.map((g) => (
+						<section class="life-month" data-month={g.key}>
+							<h2 class="life-month-title">
+								<span class="life-month-dot"></span>
+								{g.key}
+							</h2>
+							<div class="life-month-items">
+								{g.items.map((e) => (
+									<a
+										href={e.isPrivate ? undefined : `/diary/${e.slug}/`}
+										class="life-entry"
+										data-months={g.key}
+										data-slug={e.slug}
+										data-locked={e.isPrivate ? "1" : "0"}
+									>
+										{(() => {
+											const mood = e.mood ? MOOD_MAP[e.mood] : null;
+											const img = e.isPrivate ? null : thumbnail(e);
+											return (
+												<article class="life-card">
+													{e.isPrivate ? (
+														// 私密日记锁定态
+														<div class="flex items-center gap-2">
+															<span class="life-lock">🔒</span>
+															<h3 class="life-title">私密日记</h3>
+														</div>
+													) : (
+														<>
+															{(mood || (e.tags && e.tags.length > 0)) && (
+																<div class="life-chips">
+																	{mood && (
+																		<span class="life-chip life-chip-mood" title={mood.label}>
+																			{mood.emoji} {mood.label}
+																		</span>
+																	)}
+																	{(e.tags || []).map((t) => (
+																		<span class="life-chip">{t}</span>
+																	))}
+																</div>
+															)}
+															<h3 class="life-title">{e.title || "无题"}</h3>
+															{img && (
+																<div class="life-thumb">
+																	<img
+																		src={img}
+																		alt=""
+																		loading="lazy"
+																		draggable="false"
+																	/>
+																</div>
+															)}
+															{(e.content || "").trim() && (
+																<p class="life-excerpt" data-excerpt>{excerpt(e.content)}</p>
+															)}
+														</>
+													)}
+													<div class="life-meta">
+														<span class="life-date">
+															<Icon is:inline name="material-symbols:calendar-today-rounded" class="text-sm" />
+															{formatDate(e.date)}
+														</span>
+														<Icon is:inline name="material-symbols:chevron-right" class="text-base life-arrow" />
+													</div>
+												</article>
+											);
+										})()}
+									</a>
+								))}
+							</div>
+						</section>
+					))
+				)}
+			</div>
+
+			<!-- 底部提示 -->
+			<div class="flex items-center justify-center gap-1.5 pt-4 text-xs text-neutral-400 dark:text-neutral-500">
+				<Icon is:inline name="material-symbols:open-in-new-rounded" class="text-sm" />
+				<span>点击卡片查看完整日记，或切换到画布模式自由摆放</span>
+			</div>
+		</div>
+	</div>
+
+	<style is:global>
+		/* ===================== 月份筛选 ===================== */
+		.life-filter {
+			display: flex;
+			flex-wrap: nowrap;
+			gap: 0.5rem;
+			overflow-x: auto;
+			padding: 0.25rem 0 0.75rem;
+			margin-bottom: 0.5rem;
+			scrollbar-width: none;
+			-ms-overflow-style: none;
+		}
+		.life-filter::-webkit-scrollbar {
+			display: none;
+		}
+		.life-filter-pill {
+			flex: none;
+			display: inline-flex;
+			align-items: center;
+			border: 1px solid var(--line-divider);
+			border-radius: 999px;
+			background: transparent;
+			padding: 0.35rem 0.9rem;
+			font-size: 0.82rem;
+			color: color-mix(in srgb, var(--deep-text) 72%, transparent);
+			cursor: pointer;
+			transition: all 200ms ease;
+		}
+		.life-filter-pill:hover {
+			border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+		}
+		.life-filter-pill.is-active {
+			border-color: var(--primary);
+			background: color-mix(in srgb, var(--primary) 14%, transparent);
+			color: var(--primary);
+			font-weight: 600;
+		}
+
+		/* ===================== 时间线主体 ===================== */
+		.life-timeline {
+			display: flex;
+			flex-direction: column;
+			gap: 2rem;
+		}
+		.life-month {
+			display: flex;
+			flex-direction: column;
+			gap: 0.9rem;
+		}
+		.life-month-title {
+			margin: 0;
+			display: flex;
+			align-items: center;
+			gap: 0.55rem;
+			font-size: 1.25rem;
+			font-weight: 800;
+			letter-spacing: 0.02em;
+			color: color-mix(in srgb, var(--deep-text) 88%, transparent);
+		}
+		.life-month-title::after {
+			content: "";
+			flex: 1;
+			height: 1px;
+			background: linear-gradient(
+				to right,
+				color-mix(in srgb, var(--primary) 40%, transparent),
+				transparent
+			);
+		}
+		.life-month-dot {
+			flex: none;
+			width: 0.6rem;
+			height: 0.6rem;
+			border-radius: 999px;
+			background: var(--primary);
+			box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+		}
+		.life-month-items {
+			display: flex;
+			flex-direction: column;
+			gap: 0.9rem;
+		}
+
+		/* ===================== 日志卡片 ===================== */
+		.life-entry {
+			display: block;
+			text-decoration: none;
+			cursor: pointer;
+			transition: transform 0.25s ease;
+		}
+		.life-card {
+			position: relative;
+			display: flex;
+			flex-direction: column;
+			gap: 0.6rem;
+			padding: 1.05rem 1.25rem;
+			border-radius: 20px;
+			border: 1px solid var(--line-divider);
+			background: var(--card-bg);
+			box-shadow:
+				var(--card-shadow, 0 2px 12px rgb(0 0 0 / 0.06)),
+				0 1px 3px rgb(0 0 0 / 0.05);
+			transition:
+				transform 0.25s ease,
+				box-shadow 0.25s ease,
+				border-color 0.25s ease;
+		}
+		.life-entry:hover {
+			transform: translateY(-3px);
+		}
+		.life-entry:hover .life-card {
+			border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+			box-shadow:
+				0 18px 42px rgb(0 0 0 / 0.12),
+				0 4px 12px rgb(0 0 0 / 0.08);
+		}
+		.life-entry:hover .life-arrow {
+			transform: translateX(3px);
+		}
+
+		.life-chips {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.35rem;
+		}
+		.life-chip {
+			display: inline-flex;
+			align-items: center;
+			border-radius: 999px;
+			padding: 0.12rem 0.6rem;
+			font-size: 0.72rem;
+			font-weight: 600;
+			border: 1px solid var(--line-divider);
+			background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+			color: color-mix(in srgb, var(--deep-text) 72%, transparent);
+		}
+		.life-chip-mood {
+			border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+			background: color-mix(in srgb, var(--primary) 10%, transparent);
+			color: var(--primary);
+		}
+		.life-lock {
+			font-size: 1.3rem;
+			line-height: 1;
+		}
+
+		.life-title {
+			margin: 0;
+			font-size: 1.05rem;
+			font-weight: 700;
+			line-height: 1.45;
+			color: var(--deep-text);
+			word-break: break-all;
+		}
+
+		.life-thumb {
+			width: 100%;
+			max-width: 20rem;
+			border-radius: 12px;
+			overflow: hidden;
+			border: 1px solid var(--line-divider);
+		}
+		.life-thumb img {
+			display: block;
+			width: 100%;
+			aspect-ratio: 16 / 10;
+			object-fit: cover;
+			pointer-events: none;
+		}
+
+		.life-excerpt {
+			margin: 0;
+			font-size: 0.88rem;
+			line-height: 1.75;
+			color: color-mix(in srgb, var(--deep-text) 68%, transparent);
+			display: -webkit-box;
+			-webkit-line-clamp: 3;
+			-webkit-box-orient: vertical;
+			overflow: hidden;
+			white-space: pre-wrap;
+			word-break: break-word;
+		}
+
+		.life-meta {
+			margin-top: 0.2rem;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.5rem;
+			font-size: 0.78rem;
+			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+		}
+		.life-date {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.3rem;
+		}
+		.life-arrow {
+			transition: transform 0.25s ease;
+			color: color-mix(in srgb, var(--primary) 70%, transparent);
+		}
+
+		/* 隐藏被筛选掉的月份 */
+		.life-month.is-hidden {
+			display: none;
+		}
+
+		/* 空状态 */
+		.life-empty {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 0.3rem;
+			padding: 3.5rem 1rem;
+			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+		}
+
+		/* 移动端微调：单列自然堆叠 */
+		@media (max-width: 639px) {
+			.life-card {
+				padding: 0.95rem 1rem;
+			}
+		}
+	</style>
+
+	<script is:inline>
+		(function () {
+			// 私密日记密码（与画布页/详情页一致）
+			var DIARY_PASSWORD = "2299";
+			var UNLOCK_KEY = "aemeath-diary-unlocked";
+			var unlocked = false;
+			try {
+				unlocked = sessionStorage.getItem(UNLOCK_KEY) === "1";
+			} catch (e) {}
+
+			// 走站内平滑跳转（与画布页一致）
+			function gotoDiary(slug) {
+				// 站点 trailingSlash: always，详情页 URL 需带尾部斜杠避免 404
+				var url = "/diary/" + slug + "/";
+				try {
+					if (window.swup && typeof window.swup.navigate === "function") {
+						window.swup.navigate(url);
+						return;
+					}
+				} catch (e) {}
+				window.location.href = url;
+			}
+
+			// 月份筛选
+			var filter = document.getElementById("life-month-filter");
+			if (filter) {
+				var pills = filter.querySelectorAll(".life-filter-pill");
+				pills.forEach(function (pill) {
+					pill.addEventListener("click", function () {
+						pills.forEach(function (p) {
+							p.classList.remove("is-active");
+						});
+						pill.classList.add("is-active");
+						var month = pill.dataset.month;
+						document.querySelectorAll(".life-month").forEach(function (sec) {
+							var show = month === "all" || sec.dataset.month === month;
+							sec.style.display = show ? "" : "none";
+						});
+					});
+				});
+			}
+
+			// 私密日记点击解锁（卡片本身不带链接，直接跳详情解锁流程）
+			document.querySelectorAll(".life-entry[data-locked='1']").forEach(function (el) {
+				el.addEventListener("click", function (e) {
+					// 已解锁则直接访问
+					if (unlocked) {
+						gotoDiary(el.dataset.slug);
+						return;
+					}
+					e.preventDefault();
+					var pwd = prompt("这是一篇私密日记，请输入密码：");
+					if (pwd === DIARY_PASSWORD) {
+						try {
+							sessionStorage.setItem(UNLOCK_KEY, "1");
+						} catch (err) {}
+						unlocked = true;
+						gotoDiary(el.dataset.slug);
+					} else if (pwd !== null) {
+						alert("密码错误");
+					}
+				});
+			});
+		})();
+	</script>
+</MainGridLayout>

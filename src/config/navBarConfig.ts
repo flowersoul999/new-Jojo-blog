@@ -207,10 +207,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		pageKey: "anime",
 	},
 	Diary: {
-		name: "日记",
-		url: "/diary/",
-		icon: "material-symbols:edit-note",
+		name: "日志",
+		url: "/life/",
+		icon: "material-symbols:timeline",
 		pageKey: "diary",
+		activePaths: ["/diary/", "/life/"],
 	},
 	Memories: {
 		name: "回忆",

@@ -49,6 +49,9 @@ const mobileGroups = processedLinks.map((link) => ({
 		link.url && link.url !== "#" && !link.external
 			? normalizePath(link.url)
 			: null,
+		...(link.activePaths ?? [])
+			.filter((p) => p && p !== "#")
+			.map((p) => normalizePath(p)),
 		...(link.children
 			?.filter((child) => !child.external && child.url && child.url !== "#")
 			.map((child) => normalizePath(child.url)) ?? []),

@@ -20,19 +20,27 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		<div class="px-4 sm:px-6 md:px-9 py-4 sm:py-6 relative">
 			<!-- 页面标题 -->
 			<div class="flex items-center gap-3 mb-2">
-				<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-(--primary) text-white dark:text-black/70">
-					<Icon is:inline name="material-symbols:edit-note" class="text-[1.5rem]" />
-				</div>
-				<div class="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">{title}</div>
-				<button
-					type="button"
-					id="diary-shuffle"
-					class="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-sm text-(--btn-content) transition-colors hover:bg-(--btn-regular-bg-hover)"
-					aria-label="换个摆法"
-				>
-					<Icon is:inline name="material-symbols:shuffle-rounded" class="text-base" />
-					<span>换个摆法</span>
-				</button>
+					<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-(--primary) text-white dark:text-black/70">
+						<Icon is:inline name="material-symbols:edit-note" class="text-[1.5rem]" />
+					</div>
+					<div class="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">{title}</div>
+					<a
+						href="/life/"
+						class="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-sm text-(--btn-content) transition-colors hover:bg-(--btn-regular-bg-hover)"
+						aria-label="时间线视图"
+					>
+						<Icon is:inline name="material-symbols:timeline" class="text-base" />
+						<span>时间线</span>
+					</a>
+					<button
+						type="button"
+						id="diary-shuffle"
+						class="inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-sm text-(--btn-content) transition-colors hover:bg-(--btn-regular-bg-hover)"
+						aria-label="换个摆法"
+					>
+						<Icon is:inline name="material-symbols:shuffle-rounded" class="text-base" />
+						<span>换个摆法</span>
+					</button>
 				<button
 					type="button"
 					id="diary-compose-btn"

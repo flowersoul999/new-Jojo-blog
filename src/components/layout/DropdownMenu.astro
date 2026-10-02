@@ -75,6 +75,9 @@ const activePaths = [
 	processedLink.url && processedLink.url !== "#" && !processedLink.external
 		? normalizePath(processedLink.url)
 		: null,
+	...(processedLink.activePaths ?? [])
+		.filter((p) => p && p !== "#")
+		.map((p) => normalizePath(p)),
 	...(processedLink.children
 		?.filter((child) => !child.external && child.url && child.url !== "#")
 		.map((child) => normalizePath(child.url)) ?? []),
