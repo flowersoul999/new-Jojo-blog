@@ -26,7 +26,7 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				id="bg-player-overlay"
 				class="absolute inset-0 z-15 overflow-hidden pointer-events-none transition-opacity duration-500 ease-in-out opacity-0"
 			>
-				<video id="bg-player-video" preload="auto" playsinline class="size-full object-cover"></video>
+				<video id="bg-player-video" preload="none" playsinline class="size-full object-cover"></video>
 			</div>
 
 			<div id="bg-player-controls" class="absolute bottom-4 left-4 z-30 flex items-center gap-1.5 group">
@@ -86,10 +86,8 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		var errorCount = 0;
 		var toastTimer = null;
 
-		// 页面加载后立即在后台预加载第一个视频（不播放），
-		// 这样用户点击播放按钮时视频已在缓存中，可以秒播
-		video.src = urlList[currentIndex];
-		video.load();
+		// 不再在页面加载时后台预加载 44MB 背景视频（会持续抢占带宽、拖慢点击跳转）。
+		// 改为仅在用户点击「播放视频」按钮时才加载播放，实现页面秒开。
 
 		function showToast() {
 			if (!toast) return;
@@ -124,12 +122,17 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			window.dispatchEvent(new CustomEvent("bg-player-state-change", { detail: { playing: isPlaying } }));
 		}
 
-		function doPlay(changeSrc) {
-			// 首次播放时 src 已在页面加载阶段预加载，无需重新设置，直接播放实现秒开
-			// 切换到其他视频（changeSrc=true）时才更新 src
-			if (changeSrc !== false) {
+		// 确保 video 的 src 指向当前索引的视频；未设置或已切换时才赋值。
+		// 视频不再于页面加载时预加载，首次播放必须在此处设置 src 延迟加载。
+		function ensureSrc() {
+			var cur = video.getAttribute("src");
+			if (!cur || cur.indexOf(urlList[currentIndex]) === -1) {
 				video.src = urlList[currentIndex];
 			}
+		}
+
+		function doPlay(changeSrc) {
+			ensureSrc();
 			// 播放按钮点击本身属于用户手势，直接带声音播放，避免"先静音再解除"在部分浏览器下失效导致无声
 			// 若被浏览器自动播放策略拦截（play 返回 NotAllowedError），则回退为静音播放保证画面可用
 			video.play().catch(function () {
