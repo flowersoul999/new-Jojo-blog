@@ -462,7 +462,9 @@ import { Icon } from "astro-icon/components";
 })();
 </script>
 
-<style>
+<!-- 浮动歌词逐字 span（.fm-fch）由 JS 动态创建，不带 Astro 作用域样式的 data-astro-cid 属性，
+     作用域样式无法命中，故必须用 is:global（类名均为 fm- 专用前缀，无冲突）。 -->
+<style is:global>
     .fm-float-lrc-text {
 		font-family: "STKaiti", "KaiTi", "Kaiti SC", "Yu Mincho", "Yu Gothic", serif;
 		text-shadow:

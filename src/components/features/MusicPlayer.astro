@@ -1101,7 +1101,10 @@ const widgetId =
 })();
 </script>
 
-<style>
+<!-- 歌词行/逐字 span 由 JS 动态创建，不携带 Astro 作用域样式注入的 data-astro-cid 属性；
+     若使用默认作用域 <style>，.lrc-ch 等选择器永远不会命中动态节点（表现为歌词不变色），
+     因此本组件样式必须用 is:global。类名均以 lrc-/wave-/eq- 等专用前缀命名，无全局冲突。 -->
+<style is:global>
     /* 流动波浪进度条：播放 / 拖动时波浪沿路径流动 */
     .wave-flow {
         opacity: 0;

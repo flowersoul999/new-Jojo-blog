@@ -188,6 +188,70 @@ const managerConfigStr = JSON.stringify({
 
     // ── Lyrics ───────────────────────────────────────────────
     var lyricsVersion = 0;
+
+    /**
+     * 为行级歌词补全「逐字时间」（估算）。
+     * 先按每字约 0.22s 估算演唱时长（贴近中文流行歌的常见节奏），
+     * 再钳制到行间距（下一行开始 - 本行开始）的 45%~92%：
+     * - 上限 92%：下一句响起前本句一定已经唱完（旧实现把颜色铺到下一句
+     *   才到 100%，间奏越长越显得「唱完了字还没变完」）；
+     * - 下限 45%：快歌密词也不会刚进新行就瞬间跑完。
+     * 自带 chars 的真实逐字歌词（YRC）不会进入此估算。
+     */
+    function enrichChars(lines) {
+        lines.forEach(function (line, i) {
+            if (line.chars && line.chars.length) return;
+            var next = lines[i + 1];
+            var gap = next ? next.time - line.time : 5;
+            if (!(gap > 0) || !isFinite(gap)) gap = 5;
+            var n = line.text.length;
+            if (n < 1) return;
+            var singDur = n * 0.22;
+            if (singDur < gap * 0.45) singDur = gap * 0.45;
+            if (singDur > gap * 0.92) singDur = gap * 0.92;
+            var step = singDur / n;
+            var chars = [];
+            for (var j = 0; j < n; j++) {
+                chars.push({
+                    text: line.text.charAt(j),
+                    time: line.time + j * step,
+                    dur: step
+                });
+            }
+            line.chars = chars;
+        });
+    }
+
+    function lyricsApiUrl(track) {
+        return '/api/music/lyrics.json?q=' + encodeURIComponent(track.name || '')
+            + '&artist=' + encodeURIComponent(track.artist || '');
+    }
+
+    /**
+     * 通过站点代理在线获取歌词。
+     * - word=true：真实逐字歌词，直接采用；
+     * - word=false 且 allowFallback=true：行级歌词，本地估算补全后采用；
+     * - word=false 且 allowFallback=false（本地已有歌词）：保留更贴合当前
+     *   音频文件的本地时间轴，不替换。
+     * 返回 true 表示已写入 state.lyrics。
+     */
+    function fetchWordLyrics(track, ver, allowFallback) {
+        return fetch(lyricsApiUrl(track))
+            .then(function (r) { return r.ok ? r.json() : { code: 1 }; })
+            .then(function (data) {
+                if (ver !== lyricsVersion) return false;
+                if (!data || data.code !== 0 || !Array.isArray(data.lrc) || !data.lrc.length) {
+                    return false;
+                }
+                if (!data.word && !allowFallback) return false;
+                if (!data.word) enrichChars(data.lrc);
+                state.lyrics = data.lrc;
+                state.currentLrcIndex = -1;
+                emit('fm:lyrics', { lyrics: data.lrc, status: 'loaded' });
+                return true;
+            });
+    }
+
     function loadLyrics(track) {
         var ver = ++lyricsVersion;
         state.lyrics = [];
@@ -204,40 +268,47 @@ const managerConfigStr = JSON.stringify({
                     .then(function (r) { return r.text(); })
                     .then(function (text) {
                         if (ver !== lyricsVersion) return;
-                        state.lyrics = parseLRC(text);
-                        emit('fm:lyrics', { lyrics: state.lyrics, status: 'loaded' });
+                        var lines = parseLRC(text);
+                        // 先用本地行时间轴估算出逐字时间（与当前音频文件严格对齐）
+                        enrichChars(lines);
+                        state.lyrics = lines;
+                        emit('fm:lyrics', { lyrics: lines, status: 'loaded' });
+                        // 后台尝试用真实逐字歌词升级；拿不到就保留本地版本
+                        fetchWordLyrics(track, ver, false).catch(function () {});
                     })
                     .catch(function () {
                         if (ver !== lyricsVersion) return;
-                        state.lyrics = [];
-                        emit('fm:lyrics', { lyrics: [], status: 'failed' });
+                        // 本地歌词文件获取失败：降级到在线接口（允许行级回退）
+                        emit('fm:lyrics', { lyrics: [], status: 'loading' });
+                        fetchWordLyrics(track, ver, true).then(function (ok) {
+                            if (!ok && ver === lyricsVersion) {
+                                emit('fm:lyrics', { lyrics: [], status: 'failed' });
+                            }
+                        }).catch(function () {
+                            if (ver !== lyricsVersion) return;
+                            emit('fm:lyrics', { lyrics: [], status: 'failed' });
+                        });
                     });
             } else {
-                state.lyrics = parseLRC(track.lrc);
-                emit('fm:lyrics', { lyrics: state.lyrics, status: state.lyrics.length > 0 ? 'loaded' : 'none' });
+                var inline = parseLRC(track.lrc);
+                enrichChars(inline);
+                state.lyrics = inline;
+                emit('fm:lyrics', { lyrics: inline, status: inline.length ? 'loaded' : 'none' });
+                fetchWordLyrics(track, ver, false).catch(function () {});
             }
             return;
         }
 
-        // 无内建歌词：通过站点代理按 歌名+歌手 在线获取（QQ → 网易云降级）
+        // 无内建歌词：在线获取（真实逐字优先，行级则本地估算补全）
         emit('fm:lyrics', { lyrics: [], status: 'loading' });
-        var api = '/api/music/lyrics.json?q=' + encodeURIComponent(track.name || '')
-            + '&artist=' + encodeURIComponent(track.artist || '');
-        fetch(api)
-            .then(function (r) { return r.ok ? r.json() : { code: 1 }; })
-            .then(function (data) {
-                if (ver !== lyricsVersion) return;
-                if (data && data.code === 0 && Array.isArray(data.lrc)) {
-                    state.lyrics = data.lrc;
-                    emit('fm:lyrics', { lyrics: state.lyrics, status: 'loaded' });
-                } else {
-                    emit('fm:lyrics', { lyrics: [], status: 'none' });
-                }
-            })
-            .catch(function () {
-                if (ver !== lyricsVersion) return;
+        fetchWordLyrics(track, ver, true).then(function (ok) {
+            if (!ok && ver === lyricsVersion) {
                 emit('fm:lyrics', { lyrics: [], status: 'none' });
-            });
+            }
+        }).catch(function () {
+            if (ver !== lyricsVersion) return;
+            emit('fm:lyrics', { lyrics: [], status: 'none' });
+        });
     }
 
     // ── Track loading ────────────────────────────────────────
