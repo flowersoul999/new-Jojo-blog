@@ -637,6 +637,39 @@ const canonicalUrl = new URL(
 
     <!-- Tab 径向轮盘：按住 Tab 呼出快速导航 -->
     <TabRadialMenu client:load />
+
+    <!-- Swup 内存缓存自动清理：部署更新后无需手动强制刷新。
+         每次导航/预取都会把页面 HTML 缓存进内存，旧版内容会一直残留到重开页面。
+         这里定时 + 切回前台时清空缓存，保证任何页面最长保留 60 秒就自动过期。 -->
+    <script is:inline data-swup-ignore-script>
+      (() => {
+        if (window.__swupCacheAutoClear) return;
+        window.__swupCacheAutoClear = true;
+
+        const clearCache = () => {
+          try {
+            if (
+              window.swup &&
+              window.swup.cache &&
+              typeof window.swup.cache.clear === "function"
+            ) {
+              window.swup.cache.clear();
+            }
+          } catch (_) {
+            // 清理失败不影响页面正常使用
+          }
+        };
+
+        // 每 60 秒清空一次，避免 swup 长期缓存部署前的旧页面
+        setInterval(clearCache, 60 * 1000);
+        // 标签页从后台切回前台时也清一次，防止恢复旧会话中的缓存页面
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) clearCache();
+        });
+        // swup 初始化完成后立即清一次（首次加载可能复用旧的缓存记录）
+        document.addEventListener("swup:enable", () => setTimeout(clearCache, 0));
+      })();
+    </script>
   </body>
 </html>
 
