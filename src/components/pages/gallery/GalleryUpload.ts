@@ -110,7 +110,7 @@ async function readPhotoMeta(
 	const path = `public/gallery/${albumId}/photos.json`;
 	try {
 		const res = await fetch(
-			`/api/content/read?path=${encodeURIComponent(path)}`,
+			`/api/content/read/?path=${encodeURIComponent(path)}`,
 		);
 		if (!res.ok) return { records: [], sha: null };
 		const data = await res.json();

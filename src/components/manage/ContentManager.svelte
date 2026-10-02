@@ -3,9 +3,11 @@
  * 内容管理中枢（/manage/）
  * - 认证守卫：未登录显示 GitHub 登录引导
  * - 侧边栏模块导航：文章 / 图片 / 相册 / 回忆（?module= 深链切换）
- * - 文章模块为 PostManager（Phase 2）；图片/相册/回忆在后续阶段接入
+ * - 文章模块为 PostManager；图片为 ImageManager；相册为 GalleryManager；回忆后续接入
  */
 import { onMount } from "svelte";
+import GalleryManager from "./GalleryManager.svelte";
+import ImageManager from "./ImageManager.svelte";
 import PostManager from "./PostManager.svelte";
 
 interface GithubUser {
@@ -173,19 +175,9 @@ onMount(() => {
 			{#if activeModule === "posts"}
 				<PostManager />
 			{:else if activeModule === "images"}
-				<div class="card flex flex-col items-center gap-3 p-12 text-center">
-					<svg class="h-8 w-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-						<path d="M4 5h16v14H4zM8.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM4 15l4-4 3 3 4-4 5 5" />
-					</svg>
-					<p class="text-sm text-secondary">图片管理模块将在后续阶段上线</p>
-				</div>
+				<ImageManager />
 			{:else if activeModule === "gallery"}
-				<div class="card flex flex-col items-center gap-3 p-12 text-center">
-					<svg class="h-8 w-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-						<path d="M3 7a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm5 5a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z" />
-					</svg>
-					<p class="text-sm text-secondary">相册管理模块将在后续阶段上线</p>
-				</div>
+				<GalleryManager />
 			{:else}
 				<div class="card flex flex-col items-center gap-3 p-12 text-center">
 					<svg class="h-8 w-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

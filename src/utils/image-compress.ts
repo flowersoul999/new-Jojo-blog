@@ -10,6 +10,8 @@ export type CompressOptions = {
 	quality?: number;
 	maxWidth?: number;
 	maxHeight?: number;
+	/** 输出格式，默认 image/webp；替换同名 PNG/JPEG 时需保持扩展名与内容一致 */
+	type?: "image/webp" | "image/jpeg" | "image/png";
 };
 
 /** 解码结果：现代浏览器为 ImageBitmap，回退路径为 HTMLImageElement */
@@ -62,7 +64,7 @@ export async function compressImage(
 	height: number;
 	size: number;
 }> {
-	const { quality = 0.8, maxWidth, maxHeight } = options;
+	const { quality = 0.8, maxWidth, maxHeight, type = "image/webp" } = options;
 
 	const decoded = await decodeImage(file);
 	let width = decoded.width;
@@ -87,15 +89,15 @@ export async function compressImage(
 	if (!ctx) throw new Error("无法初始化画布");
 	ctx.drawImage(decoded.source, 0, 0, width, height);
 
-	// 输出 WebP，质量与 jojo-blog 一致（0.8）
+	// 输出格式默认 WebP，质量与 jojo-blog 一致（0.8）；PNG 为无损格式不传质量
 	const blob = await new Promise<Blob>((resolve, reject) => {
 		canvas.toBlob(
 			(result) => {
 				if (result) resolve(result);
-				else reject(new Error("无法生成 WEBP 文件"));
+				else reject(new Error("无法生成图片文件"));
 			},
-			"image/webp",
-			quality,
+			type,
+			type === "image/png" ? undefined : quality,
 		);
 	});
 
