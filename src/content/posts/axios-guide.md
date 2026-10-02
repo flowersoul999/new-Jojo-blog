@@ -4,7 +4,7 @@ published: 2026-09-08
 description: "从零讲透 axios 与前后端对接：环境配置、请求封装、拦截器、错误处理、跨域代理、登录鉴权，到后端一手接口对接实战。"
 tags: ["axios","HTTP","前后端对接"]
 category: "前端"
-image: "/blogs/前端/axios-guide-cover.jpg"
+image: "/blogs/前端/axios-guide-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

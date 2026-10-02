@@ -4,7 +4,7 @@ published: 2026-09-08
 description: "Pinia 状态管理：State/Getters/Actions、Options 与 Setup 两种写法、持久化插件，含面试八股。"
 tags: ["Vue","Pinia","面试八股"]
 category: "Vue"
-image: "/blogs/Vue/pinia-cover.jpg"
+image: "/blogs/Vue/pinia-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

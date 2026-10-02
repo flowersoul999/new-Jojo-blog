@@ -4,7 +4,7 @@ published: 2026-09-11
 description: "从 HTTP 底层原理讲起：请求响应结构、方法、状态码、缓存、Cookie/Session，到手搓一个 API 的完整过程。"
 tags: ["HTTP","API"]
 category: "后端"
-image: "/blogs/后端/http-cover.jpg"
+image: "/blogs/后端/http-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

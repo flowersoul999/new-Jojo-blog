@@ -4,7 +4,7 @@ published: 2026-09-08
 description: "用大白话讲透 MySQL 核心知识：建表、增删改查、联表、索引、事务，用电商系统例子贯穿全流程。"
 tags: ["MySQL","SQL"]
 category: "数据库"
-image: "/blogs/数据库/mysql-cover.jpg"
+image: "/blogs/数据库/mysql-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

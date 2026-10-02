@@ -4,7 +4,7 @@ published: 2026-09-11
 description: "FastAPI 是一个现代、快速、高性能的 Python Web 框架，基于类型提示自动校验数据、自动生成文档。从 5 分钟上手到连接数据库、完整 CRUD 实战，含面试八股考点。"
 tags: ["FastAPI", "Python", "后端"]
 category: "Python"
-image: "/blogs/Python/fastapi-cover.jpg"
+image: "/blogs/Python/fastapi-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

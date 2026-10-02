@@ -4,7 +4,7 @@ published: 2026-09-10
 description: "从 JS 视角快速入门 Python：语法、函数、类、常用库，到用 Python 写后端接口的全流程。"
 tags: ["Python"]
 category: "Python"
-image: "/blogs/Python/python-cover.jpg"
+image: "/blogs/Python/python-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

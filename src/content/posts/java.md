@@ -4,7 +4,7 @@ published: 2026-09-10
 description: "从 JS 视角快速入门 Java：语法、面向对象、集合框架、Spring Boot 写接口，含常见坑点。"
 tags: ["Java","Spring"]
 category: "Java"
-image: "/blogs/Java/java-cover.jpg"
+image: "/blogs/Java/java-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

@@ -4,7 +4,7 @@ published: 2026-09-08
 description: "从前端 JS 到写接口：Node.js 基础、模块系统、Express 框架、中间件、连接数据库全流程。"
 tags: ["Node.js","Express"]
 category: "后端"
-image: "/blogs/后端/nodejs-cover.jpg"
+image: "/blogs/后端/nodejs-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

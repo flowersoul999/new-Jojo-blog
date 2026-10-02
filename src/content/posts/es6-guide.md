@@ -4,7 +4,7 @@ published: 2026-09-09
 description: "ES6 是现代 JavaScript 的基础，本次讲解 let/const、箭头函数、解构、Promise、async/await、Class、模块化等核心语法，包含 12 道高频面试八股题。"
 tags: ["ES6", "JavaScript", "面试八股"]
 category: "前端"
-image: "/blogs/前端/es6-guide-cover.jpg"
+image: "/blogs/前端/es6-guide-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

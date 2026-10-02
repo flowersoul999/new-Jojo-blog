@@ -4,7 +4,7 @@ published: 2026-09-08
 description: "Vue Router 从路由模式、动态路由、嵌套路由、导航守卫到鉴权实战，含高频面试八股题。"
 tags: ["Vue","Vue Router","面试八股"]
 category: "Vue"
-image: "/blogs/前端/vue-router-cover.jpg"
+image: "/blogs/前端/vue-router-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

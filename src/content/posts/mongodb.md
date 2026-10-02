@@ -4,7 +4,7 @@ published: 2026-09-09
 description: "MongoDB 快速入门：从 JSON 到 Mongoose 实战，文档模型、增删改查、索引、聚合、Node.js 实战连接。"
 tags: ["MongoDB","Mongoose"]
 category: "数据库"
-image: "/blogs/数据库/mongodb-cover.jpg"
+image: "/blogs/数据库/mongodb-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

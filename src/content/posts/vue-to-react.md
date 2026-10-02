@@ -4,7 +4,7 @@ published: 2026-09-08
 description: "已经会 Vue 了，再学 React 其实很快——本文用 Vue 做参照，把 React 核心概念一个个对应起来，看完就能上手写 React 项目。"
 tags: ["Vue","React"]
 category: "前端"
-image: "/blogs/前端/vue-to-react-cover.jpg"
+image: "/blogs/前端/vue-to-react-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true

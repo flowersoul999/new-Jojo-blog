@@ -4,7 +4,7 @@ published: 2026-09-08
 description: "用「一家人过日子」的比喻讲透 Vue 组件通信：props、emit、provide/inject、事件总线等 8 种方式一次学会。"
 tags: ["Vue","组件通信"]
 category: "Vue"
-image: "/blogs/前端/vue-communication-cover.jpg"
+image: "/blogs/前端/vue-communication-cover-20261002.jpg"
 author: "jojo"
 draft: false
 comment: true
