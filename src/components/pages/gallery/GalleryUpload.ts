@@ -109,7 +109,9 @@ async function readPhotoMeta(
 ): Promise<{ records: Record<string, any>[]; sha: string | null }> {
 	const path = `public/gallery/${albumId}/photos.json`;
 	try {
-		const res = await fetch(`/api/content/read?path=${encodeURIComponent(path)}`);
+		const res = await fetch(
+			`/api/content/read?path=${encodeURIComponent(path)}`,
+		);
 		if (!res.ok) return { records: [], sha: null };
 		const data = await res.json();
 		if (data && typeof data.content === "string") {
@@ -148,7 +150,10 @@ function mergeRecords(
 	return next;
 }
 
-function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpload {
+function start(
+	host: HTMLElement,
+	onUploaded?: (id: string) => void,
+): GalleryUpload {
 	ensureStyles();
 
 	let currentAlbum: string | null = null;
@@ -175,7 +180,13 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 	}
 
 	// ---- 弹窗状态 ----
-	type Picked = { file: File; dataUrl: string; width: number; height: number; size: number };
+	type Picked = {
+		file: File;
+		dataUrl: string;
+		width: number;
+		height: number;
+		size: number;
+	};
 	let picked: Picked[] = [];
 
 	function openModal(albumId: string) {
@@ -227,11 +238,21 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 		}
 
 		const drop = box.querySelector<HTMLElement>("[data-drop]") as HTMLElement;
-		const thumbsEl = box.querySelector<HTMLElement>("[data-thumbs]") as HTMLElement;
-		const countEl = box.querySelector<HTMLElement>("[data-count]") as HTMLElement;
-		const statusEl = box.querySelector<HTMLElement>("[data-status]") as HTMLElement;
-		const uploadBtn = box.querySelector<HTMLButtonElement>("[data-upload]") as HTMLButtonElement;
-		const cancelBtn = box.querySelector<HTMLButtonElement>("[data-cancel]") as HTMLButtonElement;
+		const thumbsEl = box.querySelector<HTMLElement>(
+			"[data-thumbs]",
+		) as HTMLElement;
+		const countEl = box.querySelector<HTMLElement>(
+			"[data-count]",
+		) as HTMLElement;
+		const statusEl = box.querySelector<HTMLElement>(
+			"[data-status]",
+		) as HTMLElement;
+		const uploadBtn = box.querySelector<HTMLButtonElement>(
+			"[data-upload]",
+		) as HTMLButtonElement;
+		const cancelBtn = box.querySelector<HTMLButtonElement>(
+			"[data-cancel]",
+		) as HTMLButtonElement;
 		const fileInput = document.createElement("input");
 		fileInput.type = "file";
 		fileInput.accept = "image/*";
@@ -243,7 +264,9 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 
 		function setStatus(text: string, type: "info" | "err" | "ok" = "info") {
 			statusEl.textContent = text;
-			statusEl.className = "gu-status" + (type === "err" ? " gu-err" : type === "ok" ? " gu-ok" : "");
+			statusEl.className =
+				"gu-status" +
+				(type === "err" ? " gu-err" : type === "ok" ? " gu-ok" : "");
 		}
 		function setDropEmpty() {
 			drop.innerHTML = `<div class="gu-drop-icon">⌁</div>
@@ -254,7 +277,9 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 		function renderThumbs() {
 			thumbsEl.innerHTML = "";
 			const all = box.querySelectorAll<HTMLElement>("[data-thumb-rm]");
-			all.forEach((b) => b.remove());
+			all.forEach((b) => {
+				b.remove();
+			});
 			if (picked.length === 0) {
 				thumbsEl.hidden = true;
 				countEl.textContent = "";
@@ -289,7 +314,10 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 					continue;
 				}
 				try {
-					const c = await compressImage(file, { maxWidth: 1920, maxHeight: 1920 });
+					const c = await compressImage(file, {
+						maxWidth: 1920,
+						maxHeight: 1920,
+					});
 					picked.push({
 						file,
 						dataUrl: c.dataUrl,
@@ -298,7 +326,10 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 						size: c.size,
 					});
 				} catch (e) {
-					setStatus(`压缩「${file.name}」失败：${e instanceof Error ? e.message : "未知错误"}`, "err");
+					setStatus(
+						`压缩「${file.name}」失败：${e instanceof Error ? e.message : "未知错误"}`,
+						"err",
+					);
 				}
 			}
 			renderThumbs();
@@ -341,9 +372,13 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 			uploadBtn.disabled = true;
 			cancelBtn.disabled = true;
 
-			const desc = (box.querySelector<HTMLTextAreaElement>("[data-desc]")?.value || "").trim();
-			const tagsRaw = box.querySelector<HTMLInputElement>("[data-tags]")?.value || "";
-			const dateVal = box.querySelector<HTMLInputElement>("[data-date]")?.value || "";
+			const desc = (
+				box.querySelector<HTMLTextAreaElement>("[data-desc]")?.value || ""
+			).trim();
+			const tagsRaw =
+				box.querySelector<HTMLInputElement>("[data-tags]")?.value || "";
+			const dateVal =
+				box.querySelector<HTMLInputElement>("[data-date]")?.value || "";
 			const tags = tagsRaw
 				.split(/[,，、\s]+/)
 				.map((t) => t.trim())
@@ -371,7 +406,9 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 					});
 					const writeData = await writeRes.json().catch(() => ({}));
 					if (!writeRes.ok) {
-						throw new Error((writeData && writeData.error) || `图片 ${p.file.name} 上传失败`);
+						throw new Error(
+							(writeData && writeData.error) || `图片 ${p.file.name} 上传失败`,
+						);
 					}
 					const meta: Record<string, any> = { src: filename };
 					if (desc) meta.description = desc;
@@ -400,7 +437,10 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 					throw new Error((jsonData && jsonData.error) || "更新相册信息失败");
 				}
 
-				setStatus(`上传成功，共 ${picked.length} 张。重新部署完成后即可看到。`, "ok");
+				setStatus(
+					`上传成功，共 ${picked.length} 张。重新部署完成后即可看到。`,
+					"ok",
+				);
 				uploading = false;
 				cancelBtn.disabled = false;
 				uploadBtn.disabled = true;
@@ -425,7 +465,9 @@ function start(host: HTMLElement, onUploaded?: (id: string) => void): GalleryUpl
 
 		body.appendChild(ov);
 		modal = ov;
-		requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add("gu-on")));
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => ov.classList.add("gu-on")),
+		);
 	}
 
 	refresh();
@@ -443,7 +485,9 @@ export async function createGalleryUpload(
 ): Promise<GalleryUpload | null> {
 	// 仅登录后启用
 	try {
-		const res = await fetch("/api/auth/status/", { credentials: "same-origin" });
+		const res = await fetch("/api/auth/status/", {
+			credentials: "same-origin",
+		});
 		const data = await res.json();
 		if (!(data && data.authenticated === true)) return null;
 	} catch {

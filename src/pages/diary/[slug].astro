@@ -96,7 +96,7 @@ const pageTitle = entry.title || "日记";
 ---
 
 <MainGridLayout title={pageTitle} description="日记详情" hideSidebars>
-	<div class="card-base z-10 relative w-full overflow-hidden">
+	<div class="card-base z-10 relative w-full overflow-hidden diary-detail-card">
 		{entry.isPrivate ? (
 			<!-- 私密日记：静态页不输出内容，由前端验证密码后渲染 -->
 			<div id="diary-locked" data-slug={entry.slug} class="diary-locked flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-12 text-center">
@@ -217,6 +217,35 @@ const pageTitle = entry.title || "日记";
 		color: var(--deep-text);
 	}
 
+		/* ===================== 内容区填满到屏幕底部 ===================== */
+		/* 无论日记内容多少，内容区都从它所在位置一直延伸到底边对齐；
+		   内容超过屏幕可视范围时在卡片内纵向滚动查看超出部分。
+		   实际高度由 JS 按视口测量（高度 = 视口高 - 内容区顶部离顶距离），
+		   这里先用占位值避免首次渲染滚动条跳动，并保证最小可读高度。 */
+		.diary-detail-card {
+			display: flex;
+			flex-direction: column;
+			height: calc(100vh - 5.5rem - 0.5rem);
+			min-height: 24rem;
+			overflow-y: auto;
+			overflow-x: hidden;
+			border-radius: var(--radius-large);
+			scrollbar-width: thin;
+			scrollbar-color: color-mix(in srgb, var(--deep-text) 25%, transparent) transparent;
+		}
+		.diary-detail-card::-webkit-scrollbar {
+			width: 6px;
+		}
+		.diary-detail-card::-webkit-scrollbar-thumb {
+			background: color-mix(in srgb, var(--deep-text) 25%, transparent);
+			border-radius: 999px;
+		}
+		@media (max-width: 1023px) {
+			.diary-detail-card {
+				height: calc(100vh - 5.5rem - 0.5rem);
+			}
+		}
+
 		/* ===================== 图片灯箱 ===================== */
 		.diary-lightbox {
 			position: fixed;
@@ -263,17 +292,43 @@ const pageTitle = entry.title || "日记";
 
 	<script is:inline>
 	(function () {
-		var MOOD_MAP = {
-			"super-happy": { label: "炒鸡开心", emoji: "🤩" },
-			happy: { label: "开心", emoji: "😊" },
-			neutral: { label: "平平淡淡", emoji: "😐" },
-			unhappy: { label: "不开心", emoji: "😔" },
-			sad: { label: "伤心难过", emoji: "😭" },
-		};
-		var UNLOCK_KEY = "aemeath-diary-unlocked";
-		var DIARY_PASSWORD = "2299";
+			var MOOD_MAP = {
+				"super-happy": { label: "炒鸡开心", emoji: "🤩" },
+				happy: { label: "开心", emoji: "😊" },
+				neutral: { label: "平平淡淡", emoji: "😐" },
+				unhappy: { label: "不开心", emoji: "😔" },
+				sad: { label: "伤心难过", emoji: "😭" },
+			};
+			var UNLOCK_KEY = "aemeath-diary-unlocked";
+			var DIARY_PASSWORD = "2299";
 
-		var lightbox = document.getElementById("diary-lightbox");
+			/* 内容区填满到屏幕底部：
+			   高度 = 视口高 - 卡片顶部离视口顶的距离，保证底边与屏幕底边对齐；
+			   无论壁纸模式/页面布局/设备尺寸，测量都准确。 */
+			var card = document.querySelector(".diary-detail-card");
+			var BOTTOM_GAP = 8; // 底部预留 8px 小间距，避免贴得太死
+			function fitCardHeight() {
+				if (!card) return;
+				var top = card.getBoundingClientRect().top;
+				if (top < 0 || top > window.innerHeight) top = 5.5 * 16; // 未就绪时回退
+				var h = window.innerHeight - top - BOTTOM_GAP;
+				if (h < 24 * 16) h = 24 * 16; // 保底最小高度
+				card.style.height = h + "px";
+			}
+			if (card) {
+				// 首次渲染 + 壁纸初始化完成后各测量一次，避免布局未稳定时算错
+				fitCardHeight();
+				var fitTimer = null;
+				function requestFit() {
+					clearTimeout(fitTimer);
+					fitTimer = setTimeout(fitCardHeight, 60);
+				}
+				window.addEventListener("resize", requestFit);
+				window.addEventListener("load", fitCardHeight);
+				document.addEventListener("wallpaper-initialized", fitCardHeight, { once: true });
+			}
+
+			var lightbox = document.getElementById("diary-lightbox");
 		var lightboxImg = document.getElementById("diary-lightbox-img");
 		var lightboxClose = document.getElementById("diary-lightbox-close");
 
