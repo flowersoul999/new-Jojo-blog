@@ -11,7 +11,16 @@
  *
  * 页面数据：相册页在模板中埋 <script type="application/json" data-scatter-data>，
  * 加密相册解密后通过 password:decrypted 事件启动。
+ *
+ * 上传：通过 album 属性拿到相册 id，接入共享模块 GalleryUpload，
+ * 仅登录后显示「添加照片」入口（按钮插入 .ps-head），支持前端压缩后写入 GitHub。
  */
+
+interface Props {
+	/** 相册 id（用于无照片空状态时也能上传） */
+	album: string;
+}
+const { album } = Astro.props;
 ---
 
 <style is:global>
@@ -335,7 +344,7 @@
   }
 </style>
 
-<div class="ps-board" data-ps-board>
+<div class="ps-board" data-ps-board data-album={album}>
   <div class="ps-board-bg" data-ps-bg></div>
   <div class="ps-noise"></div>
 
@@ -354,6 +363,8 @@
 </div>
 
 <script>
+  import { createGalleryUpload } from "./GalleryUpload";
+
   (() => {
     const boardEl = document.querySelector<HTMLElement>("[data-ps-board]");
     if (!boardEl) return;
@@ -765,5 +776,14 @@
     boot();
     document.addEventListener("password:decrypted", () => setTimeout(boot, 150));
     document.addEventListener("swup:contentReplaced", boot);
+
+    // 接入共享上传模块：仅登录后显示「添加照片」入口，绑定当前相册 id
+    const headEl = boardEl.querySelector<HTMLElement>(".ps-head");
+    if (headEl) {
+      createGalleryUpload({ host: headEl }).then((upload) => {
+        const albumId = boardEl.getAttribute("data-album") || null;
+        upload?.setAlbum(albumId);
+      });
+    }
   })();
 </script>

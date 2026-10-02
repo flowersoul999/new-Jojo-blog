@@ -357,10 +357,14 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 </div>
 
 <script>
+	import { createGalleryUpload, type GalleryUpload } from "./GalleryUpload";
+
 	(() => {
 		const panelEl = document.querySelector<HTMLElement>("[data-ab-panel]");
 		if (!panelEl) return;
 		const panel = panelEl;
+
+		let upload: GalleryUpload | null = null;
 
 		const NOTE_COLORS = ["#fff3b0", "#ffd6e0", "#cdeffd", "#d8f3dc", "#f3d9fa", "#ffe5c2"];
 
@@ -699,6 +703,7 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 			panel.setAttribute("aria-hidden", "false");
 			document.body.classList.add("ab-canvas-open");
 			panel.scrollIntoView({ block: "start", behavior: "smooth" });
+			upload?.setAlbum(data.id);
 			requestAnimationFrame(() => {
 				requestAnimationFrame(() => render(data));
 			});
@@ -711,6 +716,7 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 			document.body.classList.remove("ab-canvas-open");
 			payload = null;
 			cards.length = 0;
+			upload?.setAlbum(null);
 			if (flow) flow.innerHTML = "";
 			if (emptyEl) emptyEl.hidden = true;
 		}
@@ -733,5 +739,13 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 
 		// 对外暴露：相册列表页点击卡片时调用
 		(window as any).__albumBoard = { open, close };
+
+		// 接入共享上传模块：仅登录显示「添加照片」入口；open 时 setAlbum(id)，close 时清除
+		const headEl = panel.querySelector<HTMLElement>(".ab-head");
+		if (headEl) {
+			createGalleryUpload({ host: headEl }).then((u) => {
+				upload = u;
+			});
+		}
 	})();
 </script>
