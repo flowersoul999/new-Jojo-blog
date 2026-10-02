@@ -580,6 +580,8 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 
 			if (hasNote) document.body.append(ov, box, note);
 			else document.body.append(ov, box);
+			// 记录当前打开的查看器句柄，closeLbox 依赖它，缺失会导致任何关闭方式都失效
+			lbox = { ov, box, note };
 			// 点击照片/便签以外的任意空白区域都关闭（document 捕获阶段，不受层级遮挡影响）
 			lboxDocClose = (e: Event) => {
 				const t = e.target as HTMLElement | null;
