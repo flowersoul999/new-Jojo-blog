@@ -281,44 +281,44 @@ const stack = [
 						))}
 					</ul>
 				</section>
+
+				<!-- 补充信息：原右栏的「正在关注 / 技术轨迹 / 保持联系」下移到主栏底部，给 README 让出整宽 -->
+				<div class="profile-extra">
+					<section class="profile-panel profile-side-panel card-base" aria-labelledby="interests-title">
+						<header class="profile-side-heading">
+							<Icon is:inline name="material-symbols:explore-rounded" aria-hidden="true" />
+							<h2 id="interests-title">正在关注</h2>
+						</header>
+						<p>在代码和小工具里找乐趣，也把做过、想过的东西慢慢记下来。</p>
+						<div class="chip-list">
+							{interests.map((item) => <span>{item}</span>)}
+						</div>
+					</section>
+
+					<section class="profile-panel profile-side-panel card-base" aria-labelledby="stack-title">
+						<header class="profile-side-heading">
+							<Icon is:inline name="material-symbols:terminal-rounded" aria-hidden="true" />
+							<h2 id="stack-title">技术轨迹</h2>
+						</header>
+						<div class="stack-list">
+							{stack.map((item) => <span>{item}</span>)}
+						</div>
+						<p class="profile-side-note">工具会变化，解决问题的方式会留下。</p>
+					</section>
+
+					<section class="profile-panel profile-side-panel card-base" aria-labelledby="connect-title">
+						<header class="profile-side-heading">
+							<Icon is:inline name="material-symbols:alternate-email-rounded" aria-hidden="true" />
+							<h2 id="connect-title">保持联系</h2>
+						</header>
+						<div class="profile-connect-list">
+							<a href="https://github.com/flowersoul999" target="_blank" rel="noopener noreferrer"><Icon is:inline name="fa7-brands:github" aria-hidden="true" /><span>GitHub</span><Icon class="profile-connect-arrow" is:inline name="material-symbols:arrow-outward-rounded" aria-hidden="true" /></a>
+							<a href="https://blog.csdn.net/forever0258" target="_blank" rel="noopener noreferrer"><Icon is:inline name="simple-icons:csdn" aria-hidden="true" /><span>CSDN</span><Icon class="profile-connect-arrow" is:inline name="material-symbols:arrow-outward-rounded" aria-hidden="true" /></a>
+							<a href="mailto:3266707482@qq.com"><Icon is:inline name="fa7-solid:envelope" aria-hidden="true" /><span>3266707482@qq.com</span><Icon class="profile-connect-arrow" is:inline name="material-symbols:arrow-outward-rounded" aria-hidden="true" /></a>
+						</div>
+					</section>
+				</div>
 			</main>
-
-			<aside class="profile-sidebar" aria-label="个人资料补充信息">
-				<section class="profile-panel profile-side-panel card-base" aria-labelledby="interests-title">
-					<header class="profile-side-heading">
-						<Icon is:inline name="material-symbols:explore-rounded" aria-hidden="true" />
-						<h2 id="interests-title">正在关注</h2>
-					</header>
-					<p>在代码和小工具里找乐趣，也把做过、想过的东西慢慢记下来。</p>
-					<div class="chip-list">
-						{interests.map((item) => <span>{item}</span>)}
-					</div>
-				</section>
-
-				<section class="profile-panel profile-side-panel card-base" aria-labelledby="stack-title">
-					<header class="profile-side-heading">
-						<Icon is:inline name="material-symbols:terminal-rounded" aria-hidden="true" />
-						<h2 id="stack-title">技术轨迹</h2>
-					</header>
-					<div class="stack-list">
-						{stack.map((item) => <span>{item}</span>)}
-					</div>
-					<p class="profile-side-note">工具会变化，解决问题的方式会留下。</p>
-				</section>
-
-				<section class="profile-panel profile-side-panel card-base" aria-labelledby="connect-title">
-					<header class="profile-side-heading">
-						<Icon is:inline name="material-symbols:alternate-email-rounded" aria-hidden="true" />
-						<h2 id="connect-title">保持联系</h2>
-					</header>
-					<div class="profile-connect-list">
-						<a href="https://github.com/flowersoul999" target="_blank" rel="noopener noreferrer"><Icon is:inline name="fa7-brands:github" aria-hidden="true" /><span>GitHub</span><Icon class="profile-connect-arrow" is:inline name="material-symbols:arrow-outward-rounded" aria-hidden="true" /></a>
-						<a href="https://blog.csdn.net/forever0258" target="_blank" rel="noopener noreferrer"><Icon is:inline name="simple-icons:csdn" aria-hidden="true" /><span>CSDN</span><Icon class="profile-connect-arrow" is:inline name="material-symbols:arrow-outward-rounded" aria-hidden="true" /></a>
-						<a href="mailto:3266707482@qq.com"><Icon is:inline name="fa7-solid:envelope" aria-hidden="true" /><span>3266707482@qq.com</span><Icon class="profile-connect-arrow" is:inline name="material-symbols:arrow-outward-rounded" aria-hidden="true" /></a>
-					</div>
-				</section>
-
-			</aside>
 		</div>
 
 		<footer class="profile-footer card-base">
@@ -573,15 +573,24 @@ const stack = [
 	}
 
 	.profile-layout {
+		/* 补充卡片下移后只剩主栏一列，README 占满整宽 */
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(15rem, 18rem);
+		grid-template-columns: minmax(0, 1fr);
 		align-items: start;
 		gap: 1rem;
 	}
 
-	.profile-main,
-	.profile-sidebar {
+	.profile-main {
 		display: grid;
+		gap: 1rem;
+		min-width: 0;
+	}
+
+	/* 三个补充卡片（正在关注/技术轨迹/保持联系）：桌面端在主栏底部横排三列 */
+	.profile-extra {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		align-items: start;
 		gap: 1rem;
 		min-width: 0;
 	}
@@ -1012,11 +1021,12 @@ const stack = [
 			grid-template-columns: 1fr;
 		}
 
-		.profile-sidebar {
+		/* 三个补充卡片：平板两列，第三张「保持联系」占满整行 */
+		.profile-extra {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 
-		.profile-side-panel:last-child {
+		.profile-extra .profile-side-panel:last-child {
 			grid-column: 1 / -1;
 		}
 	}
@@ -1113,11 +1123,11 @@ const stack = [
 		}
 
 		.project-grid,
-		.profile-sidebar {
+		.profile-extra {
 			grid-template-columns: 1fr;
 		}
 
-		.profile-side-panel:last-child {
+		.profile-extra .profile-side-panel:last-child {
 			grid-column: auto;
 		}
 
