@@ -76,6 +76,8 @@ interface Props {
 	};
 	// 设为 true 时隐藏左右侧边栏（如日记页全宽画布场景）
 	hideSidebars?: boolean;
+	// 设为 true 时内容区占满整个视口宽度（不套 92vw/页宽居中限制）
+	fullWidth?: boolean;
 }
 
 const backgroundImages = getBackgroundImages();
@@ -99,6 +101,7 @@ const {
 	bannerPostAiSummary,
 	bannerPageAiRecommendation,
 	hideSidebars = false,
+	fullWidth = false,
 } = Astro.props;
 
 // 检查背景壁纸模式和是否允许切换
@@ -985,10 +988,11 @@ const hasMultipleImages =
 <!-- Main content -->
 <div class={`absolute w-full z-30 pointer-events-none ${mobileNonHomeBannerClass ? 'mobile-main-no-banner' : ''} ${!(isBannerMode && isBackgroundEnabled) ? 'no-banner-layout' : ''}`} style={isFullscreenMode ? 'top: 0;' : `top: ${finalMainPanelTop}`}>
     <!-- The pointer-events-none here prevent blocking the click event of the TOC -->
-    <div class="relative w-full xl:w-[92vw] max-w-(--page-width) mx-auto pointer-events-auto">
+    <div class={`relative w-full ${fullWidth ? '' : 'xl:w-[92vw] max-w-(--page-width)'} mx-auto pointer-events-auto`}>
         <div id="main-grid"
           class={`transition duration-700 w-full left-0 right-0 grid ${gridCols} grid-rows-[auto_1fr_auto] lg:grid-rows-[auto] mx-auto gap-4 px-2 md:px-4 ${!sidebarConfig.mobileShowSidebar ? 'mobile-no-sidebar' : ''}`}
           data-sidebar-enable={sidebarLayoutConfig.enable ? "true" : "false"}
+          data-hide-sidebars={hideSidebars ? "true" : "false"}
           data-grid-hide-sidebar-on-post={hideSidebarOnPostPage ? "true" : "false"}
           data-sidebar-position={sidebarLayoutConfig.position}
           data-tablet-sidebar={sidebarLayoutConfig.tabletSidebar ?? "left"}

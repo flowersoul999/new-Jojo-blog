@@ -1894,14 +1894,15 @@ function disableAnimation() {
     if (!mainGrid) return;
 
     const sidebarEnabled = mainGrid.getAttribute("data-sidebar-enable") !== "false";
+    const hideSideBars = mainGrid.getAttribute("data-hide-sidebars") === "true";
     const sidebarHideOnPost = mainGrid.getAttribute("data-grid-hide-sidebar-on-post") === "true";
     const isPostPage = isCurrentPagePost();
     const sidebarPosition = mainGrid.getAttribute("data-sidebar-position") || "left";
     const tabletSidebar = mainGrid.getAttribute("data-tablet-sidebar") || "left";
     const showBothSidebarsOnPostPage = mainGrid.getAttribute("data-show-both-sidebars-on-post") === "true";
 
-    // 侧边栏禁用 或 文章详情页隐藏侧边栏时，保持单列布局
-    if (!sidebarEnabled || (isPostPage && sidebarHideOnPost)) {
+    // 侧边栏禁用、页面强制隐藏侧边栏(hideSidebars) 或 文章详情页隐藏侧边栏时，保持单列布局
+    if (!sidebarEnabled || hideSideBars || (isPostPage && sidebarHideOnPost)) {
       applySingleColLayout(mainGrid);
       return;
     }
