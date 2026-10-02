@@ -256,6 +256,8 @@ onMount(() => {
 			<button
 				type="button"
 				class="trm-item"
+				data-ana="径向菜单导航"
+				data-ana-label={item.label}
 				class:trm-active={isActive}
 				style="left:{center.x - BTN_SIZE / 2}px; top:{center.y - BTN_SIZE / 2}px; --tx:{Math.cos(angle) * RADIUS}px; --ty:{Math.sin(angle) * RADIUS}px; --d:{i * 20}ms"
 				onclick={() => goTo(i)}

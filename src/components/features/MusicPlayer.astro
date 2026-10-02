@@ -69,13 +69,13 @@ const widgetId =
 
             <!-- Extras: 歌词面板 / 浮动歌词 / 悬浮播放器 -->
             <div class="music-extras flex items-center gap-0.5 shrink-0">
-                <button class={`btn-lrc-panel hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400 ${!config.showLyrics ? "hidden" : ""}`} title={i18n(I18nKey.musicLyrics)} aria-label={i18n(I18nKey.musicLyrics)}>
+                <button data-ana="展开歌词面板" class={`btn-lrc-panel hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400 ${!config.showLyrics ? "hidden" : ""}`} title={i18n(I18nKey.musicLyrics)} aria-label={i18n(I18nKey.musicLyrics)}>
                     <Icon is:inline name="mdi:equalizer" class="text-lg" aria-hidden="true" />
                 </button>
-                <button class="btn-float-lrc hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400" title="浮动歌词" aria-label="浮动歌词">
+                <button data-ana="切换浮动歌词" class="btn-float-lrc hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400" title="浮动歌词" aria-label="浮动歌词">
                     <Icon is:inline name="mdi:picture-in-picture-bottom-right-outline" class="text-lg" aria-hidden="true" />
                 </button>
-                <button class="btn-mini hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400" title="悬浮播放器" aria-label="悬浮播放器">
+                <button data-ana="切换悬浮播放器" class="btn-mini hover:text-(--primary) transition-colors p-1 rounded-md flex items-center active:scale-95 text-neutral-400" title="悬浮播放器" aria-label="悬浮播放器">
                     <Icon is:inline name="mdi:record-circle-outline" class="text-lg" aria-hidden="true" />
                 </button>
             </div>
@@ -97,7 +97,7 @@ const widgetId =
 
             <!-- Volume (Always visible) -->
             <div class="flex items-center gap-1 bg-transparent h-full ml-auto">
-                <button class="btn-mute hover:text-(--primary) transition-colors p-0.5 rounded-md flex items-center" title={i18n(I18nKey.musicVolume)} aria-label={i18n(I18nKey.musicVolume)}>
+                <button data-ana="切换音乐静音" class="btn-mute hover:text-(--primary) transition-colors p-0.5 rounded-md flex items-center" title={i18n(I18nKey.musicVolume)} aria-label={i18n(I18nKey.musicVolume)}>
                     <Icon is:inline name="material-symbols:volume-up-rounded" class=" icon-vol-high text-lg" aria-hidden="true" />
                     <Icon is:inline name="material-symbols:volume-off-rounded" class="icon-vol-mute text-lg hidden" aria-hidden="true" />
                 </button>
@@ -137,30 +137,30 @@ const widgetId =
 <!-- Controls Row -->
 <div class="flex items-center justify-between px-1 select-none">
     <!-- Repeat Mode -->
-    <button class="btn-repeat text-neutral-300 dark:text-neutral-600 hover:text-(--primary) transition-colors p-2 active:scale-95" title={i18n(I18nKey.musicPlayMode)} aria-label={i18n(I18nKey.musicPlayMode)}>
+    <button data-ana="切换播放模式" class="btn-repeat text-neutral-300 dark:text-neutral-600 hover:text-(--primary) transition-colors p-2 active:scale-95" title={i18n(I18nKey.musicPlayMode)} aria-label={i18n(I18nKey.musicPlayMode)}>
         <Icon is:inline name="material-symbols:repeat-rounded" class="icon-repeat text-xl" aria-hidden="true" />
         <Icon is:inline name="material-symbols:repeat-one-rounded" class="icon-repeat-one text-xl hidden" aria-hidden="true" />
         <Icon is:inline name="material-symbols:shuffle-rounded" class="icon-shuffle text-xl hidden" aria-hidden="true" />
     </button>
 
     <!-- Prev -->
-    <button class="btn-prev text-neutral-600 dark:text-neutral-300 hover:text-(--primary) transition-colors p-2 active:scale-95" title={i18n(I18nKey.musicPrev)} aria-label={i18n(I18nKey.musicPrev)}>
+    <button data-ana="上一首歌曲" class="btn-prev text-neutral-600 dark:text-neutral-300 hover:text-(--primary) transition-colors p-2 active:scale-95" title={i18n(I18nKey.musicPrev)} aria-label={i18n(I18nKey.musicPrev)}>
         <Icon is:inline name="material-symbols:skip-previous-rounded" class="text-3xl" aria-hidden="true" />
     </button>
 
     <!-- Play/Pause (Feature) -->
-    <button class="btn-play w-12 h-12 bg-(--btn-regular-bg) hover:bg-(--btn-regular-bg-hover) active:bg-(--btn-regular-bg-active) text-(--primary) rounded-full flex items-center justify-center transition-all duration-300" title={i18n(I18nKey.musicPlay)} aria-label={i18n(I18nKey.musicPlay)}>
+    <button data-ana="播放或暂停音乐" class="btn-play w-12 h-12 bg-(--btn-regular-bg) hover:bg-(--btn-regular-bg-hover) active:bg-(--btn-regular-bg-active) text-(--primary) rounded-full flex items-center justify-center transition-all duration-300" title={i18n(I18nKey.musicPlay)} aria-label={i18n(I18nKey.musicPlay)}>
         <Icon is:inline name="material-symbols:play-arrow-rounded" class="icon-play text-3xl ml-0.5" aria-hidden="true" />
         <Icon is:inline name="material-symbols:pause-rounded" class="icon-pause text-3xl hidden" aria-hidden="true" />
     </button>
 
     <!-- Next -->
-    <button class="btn-next text-neutral-600 dark:text-neutral-300 hover:text-(--primary) transition-colors p-2 active:scale-95" title={i18n(I18nKey.musicNext)} aria-label={i18n(I18nKey.musicNext)}>
+    <button data-ana="下一首歌曲" class="btn-next text-neutral-600 dark:text-neutral-300 hover:text-(--primary) transition-colors p-2 active:scale-95" title={i18n(I18nKey.musicNext)} aria-label={i18n(I18nKey.musicNext)}>
         <Icon is:inline name="material-symbols:skip-next-rounded" class="text-3xl" aria-hidden="true" />
     </button>
 
     <!-- Playlist Toggle Arrow -->
-    <button class="btn-drawer-toggle text-neutral-400 hover:text-(--primary) transition-all duration-300 p-2 transform active:scale-95" title={i18n(I18nKey.musicPlaylist)} aria-label={i18n(I18nKey.musicPlaylist)}>
+    <button data-ana="展开播放列表" class="btn-drawer-toggle text-neutral-400 hover:text-(--primary) transition-all duration-300 p-2 transform active:scale-95" title={i18n(I18nKey.musicPlaylist)} aria-label={i18n(I18nKey.musicPlaylist)}>
         <Icon is:inline name="mdi:playlist-music" class="text-xl" aria-hidden="true" />
     </button>
 </div>
@@ -287,10 +287,12 @@ const widgetId =
         isUserScrolling: false,
         scrollTimeout: null,
         currentLrcIndex: -1,
-        // 歌词数组与最近一次播放时间，供卡拉OK逐句过渡使用
+        // 歌词数组与最近一次播放时间，供卡拉OK逐字绘制使用
         lyrics: [],
         lastTime: 0,
         karaokeRaf: 0,
+        // 每行的逐字 span 引用（与 lyrics[i].chars 一一对应），避免逐帧查询 DOM
+        lineChars: [],
         vs: {
             playlist: [],
             currentIndex: -1,
@@ -341,12 +343,15 @@ const widgetId =
         mgr.seek(p / 100);
         setProgressUI(p);
         refreshWave();
+        // 立即按跳转后的真实时间重绘逐字高亮（暂停拖动场景同样生效）
+        paintKaraoke(mgr.getState().currentTime);
     });
     ui.progressContainer.addEventListener('pointermove', function (e) {
         if (!isSeeking) return;
         var p = pctFromClientX(e.clientX);
         mgr.seek(p / 100);
         setProgressUI(p);
+        paintKaraoke(mgr.getState().currentTime);
     });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (evt) {
         ui.progressContainer.addEventListener(evt, function () {
@@ -642,6 +647,7 @@ const widgetId =
         local.currentLrcIndex = -1;
         local.lyrics = (lyrics && lyrics.length) ? lyrics : [];
         local.lastTime = 0;
+        local.lineChars = [];
         ui.lrcContainer.innerHTML = '';
         if (status === 'loading') {
             ui.lrcContainer.innerHTML = '<div class="text-neutral-400 text-sm py-10">' + cfg.i18n.loadingLyrics + '</div>';
@@ -658,42 +664,114 @@ const widgetId =
         local.lyrics.forEach(function (line, index) {
             var lineEl = document.createElement('div');
             lineEl.className = 'lrc-line py-1 cursor-pointer';
-            // --lrc-p = 当前行已演唱进度(0%~100%)，供卡拉OK渐变填充
-            lineEl.style.setProperty('--lrc-p', '0%');
             lineEl.dataset.index = index;
             lineEl.setAttribute('role', 'option');
             lineEl.setAttribute('aria-label', line.text);
-            lineEl.textContent = line.text;
+
+            // 逐字片段：每个字/词组一个 span，paintKaraoke 按真实播放时间
+            // 切换 is-done / is-singing / is-future 三种状态
+            var spans = [];
+            var chars = line.chars || [];
+            if (chars.length) {
+                chars.forEach(function (ch) {
+                    var sp = document.createElement('span');
+                    sp.className = 'lrc-ch is-future';
+                    sp.textContent = ch.text;
+                    lineEl.appendChild(sp);
+                    spans.push(sp);
+                });
+            } else {
+                // 兜底：数据异常无 chars 时仍显示纯文本
+                lineEl.textContent = line.text;
+            }
+            local.lineChars.push(spans);
+
             lineEl.onclick = function () {
                 mgr.seekToTime(line.time);
             };
             ui.lrcContainer.appendChild(lineEl);
         });
-        // 若已在播放，立即开始逐句推进
-        paintKaraoke(local.lastTime);
+        // 立即按音频真实时间绘制（late mount / 切歌后渲染 / seek 场景）
+        paintKaraoke(mgr.getState().currentTime);
     }
 
-    // ── 卡拉OK：按播放进度绘制当前行的“已唱/未唱”渐变 ──
+    // ── 卡拉OK：以音频真实时间驱动逐字高亮 ──────────────────
+
+    /** 二分查找时间 t 对应的歌词行索引；t 早于第一行时返回 -1 */
+    function lineIndexAt(lyr, t) {
+        var lo = 0;
+        var hi = lyr.length - 1;
+        var res = -1;
+        while (lo <= hi) {
+            var mid = (lo + hi) >> 1;
+            if (t >= lyr[mid].time) {
+                res = mid;
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return res;
+    }
+
+    /** 按时间 t 设置某一行内所有字 span 的状态：已唱 / 正在唱 / 未唱 */
+    function paintLineChars(lineIdx, t) {
+        var chars = local.lyrics[lineIdx].chars;
+        var spans = local.lineChars[lineIdx];
+        if (!chars || !spans) return;
+
+        // 二分查找当前正在演唱的字（t 落在该字 [time, time+dur) 区间）
+        var lo = 0;
+        var hi = chars.length - 1;
+        var cur = -1;
+        while (lo <= hi) {
+            var mid = (lo + hi) >> 1;
+            if (t >= chars[mid].time) {
+                cur = mid;
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        }
+
+        for (var k = 0; k < spans.length; k++) {
+            var sp = spans[k];
+            if (k < cur) {
+                sp.className = 'lrc-ch is-done';
+            } else if (k === cur) {
+                var ch = chars[k];
+                var p = ch.dur > 0 ? (t - ch.time) / ch.dur : 1;
+                p = Math.max(0, Math.min(1, p));
+                if (p >= 1) {
+                    // 该字已唱完：直接归入已唱色，高亮色只留给正在唱的字
+                    sp.className = 'lrc-ch is-done';
+                } else {
+                    sp.className = 'lrc-ch is-singing';
+                    // --cp = 该字字内已唱进度，决定渐变断点位置
+                    sp.style.setProperty('--cp', (p * 100).toFixed(1) + '%');
+                }
+            } else {
+                sp.className = 'lrc-ch is-future';
+            }
+        }
+    }
+
+    /** 核心绘制入口：真实时间 → 行 → 逐字状态 */
     function paintKaraoke(t) {
         local.lastTime = t;
         var lyr = local.lyrics;
         if (!lyr || !lyr.length) return;
-        var idx = local.currentLrcIndex;
-        var line = idx >= 0 ? ui.lrcContainer.querySelector('.lrc-line.is-active') : null;
-        if (!line || !lyr[idx]) return;
-        var cur = lyr[idx];
-        var next = lyr[idx + 1];
-        // 当前句时长 = 下一句起止 - 本句起止；末句取 5s 兜底
-        var dur = next ? (next.time - cur.time) : 5;
-        var p = dur > 0 ? (t - cur.time) / dur : 1;
-        p = Math.max(0, Math.min(1, p));
-        line.style.setProperty('--lrc-p', (p * 100).toFixed(2) + '%');
+        // 行索引由真实时间直接计算：快进/快退/拖动后立即正确，不依赖事件顺序
+        var idx = lineIndexAt(lyr, t);
+        if (idx !== local.currentLrcIndex) activateLine(idx);
+        if (idx >= 0) paintLineChars(idx, t);
     }
 
     function startKaraoke() {
         if (local.karaokeRaf) return;
         var tick = function () {
-            paintKaraoke(local.lastTime);
+            // 每帧直接读音频真实当前时间（timeupdate 仅约 4Hz，不能作为逐字时间源）
+            paintKaraoke(mgr.getState().currentTime);
             local.karaokeRaf = requestAnimationFrame(tick);
         };
         local.karaokeRaf = requestAnimationFrame(tick);
@@ -704,26 +782,33 @@ const widgetId =
             cancelAnimationFrame(local.karaokeRaf);
             local.karaokeRaf = 0;
         }
-        paintKaraoke(local.lastTime); // 暂停时定格在当前演唱位置
+        // 暂停时定格在当前演唱位置（同样用真实时间）
+        paintKaraoke(mgr.getState().currentTime);
     }
 
-    function updateLrcHighlight(index) {
-        if (index === local.currentLrcIndex) return;
+    /** 切换当前歌词行：paintKaraoke 内部与外部 fm:lrc-index 事件都走这里 */
+    function activateLine(index) {
+        var oldIndex = local.currentLrcIndex;
         local.currentLrcIndex = index;
 
         var lines = ui.lrcContainer.querySelectorAll('.lrc-line');
         lines.forEach(function (line, i) {
             line.classList.remove('is-active', 'is-past');
-            if (i === index) {
-                line.classList.add('is-active');
-                line.style.setProperty('--lrc-p', '0%');
-            } else if (i < index) {
-                line.classList.add('is-past');
-            }
+            if (i === index) line.classList.add('is-active');
+            else if (i < index) line.classList.add('is-past');
         });
 
-        // 立即按当前时间重绘卡拉OK渐变，避免切换瞬间进度回退
-        paintKaraoke(local.lastTime);
+        // 结算旧行字状态：向前走 → 全部标记已唱；快退（向后）→ 重置未唱。
+        // 避免旧行最后一个字一直停留在“正在唱”的高亮态。
+        if (oldIndex >= 0 && oldIndex !== index) {
+            var oldSpans = local.lineChars[oldIndex];
+            if (oldSpans) {
+                var forward = index > oldIndex;
+                oldSpans.forEach(function (sp) {
+                    sp.className = forward ? 'lrc-ch is-done' : 'lrc-ch is-future';
+                });
+            }
+        }
 
         // Auto-scroll unless user is scrolling
         if (index !== -1 && !local.isUserScrolling) {
@@ -736,6 +821,14 @@ const widgetId =
                 ui.lrcContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
             }
         }
+    }
+
+    /** 兼容外部 fm:lrc-index 事件（Manager 的 timeupdate 驱动） */
+    function updateLrcHighlight(index) {
+        if (index === local.currentLrcIndex) return;
+        activateLine(index);
+        // 立即按真实时间重绘一次，不等待下一帧 RAF
+        if (index >= 0) paintLineChars(index, mgr.getState().currentTime);
     }
 
     // ── Full sync from manager state (for late-mount) ────────
@@ -1062,26 +1155,39 @@ const widgetId =
         color: var(--lrc-future);
         font-size: 0.875rem;
         line-height: 1.6;
-        transition: color 0.35s ease, font-weight 0.3s ease, transform 0.3s ease;
+        /* 保留歌词原文中的空格，使逐字 span 与文本严格对齐 */
+        white-space: pre-wrap;
+        transition: font-weight 0.3s ease, transform 0.3s ease;
         -webkit-font-smoothing: antialiased;
     }
-    .lrc-container .lrc-line:not(.is-active):hover {
-        color: var(--lrc-current);
+
+    /* ── 逐字片段三态 ─────────────────────────────────── */
+    .lrc-container .lrc-ch {
+        color: var(--lrc-future);
     }
-    .lrc-container .lrc-line.is-past {
-        color: var(--lrc-past) !important;
+    .lrc-container .lrc-ch.is-done {
+        color: var(--lrc-past);
     }
-    /* 当前演唱行：左侧随 --lrc-p 渐显为高亮色，右侧保持未演唱色 */
-    .lrc-container .lrc-line.is-active {
+    .lrc-container .lrc-ch.is-future {
+        color: var(--lrc-future);
+    }
+    /* 正在演唱的字：左侧高亮色随 --cp 向右填充，右侧保持未演唱色 */
+    .lrc-container .lrc-ch.is-singing {
         color: transparent;
         background-image: linear-gradient(
             90deg,
-            var(--lrc-current) 0 var(--lrc-p, 0%),
-            var(--lrc-future) var(--lrc-p, 0%) 100%
+            var(--lrc-current) 0 var(--cp, 0%),
+            var(--lrc-future) var(--cp, 0%) 100%
         );
         background-clip: text;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+    }
+
+    .lrc-container .lrc-line:not(.is-active):hover .lrc-ch {
+        color: var(--lrc-current);
+    }
+    .lrc-container .lrc-line.is-active {
         font-weight: 700;
         transform: scale(1.05);
     }

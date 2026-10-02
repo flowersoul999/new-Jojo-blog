@@ -6,6 +6,13 @@
  */
 import { GITHUB_REPO } from "./editor-auth";
 
+/** 仓库定位：统计数据可存放在独立（私有）仓库，内容管理仍用主仓库 */
+export interface RepoRef {
+	owner: string;
+	name: string;
+	branch: string;
+}
+
 export interface ContentsItem {
 	name: string;
 	path: string;
@@ -66,14 +73,26 @@ function ghHeaders(
 	};
 }
 
+/** 目标仓库（默认主站仓库） */
+function targetRepo(repo?: RepoRef): RepoRef {
+	return repo ?? GITHUB_REPO;
+}
+
+/** 仓库 Contents API 基础地址 */
+function contentsBase(repo?: RepoRef): string {
+	const r = targetRepo(repo);
+	return `https://api.github.com/repos/${r.owner}/${r.name}/contents`;
+}
+
 /** 列出目录内容 */
 export async function listDir(
 	token: string,
 	dirPath: string,
+	repo?: RepoRef,
 ): Promise<ContentsItem[]> {
 	const cleanPath = dirPath.replace(/^\/+/, "").replace(/\/+$/, "");
 	const response = await fetch(
-		`https://api.github.com/repos/${GITHUB_REPO.owner}/${GITHUB_REPO.name}/contents/${encodeURI(cleanPath)}`,
+		`${contentsBase(repo)}/${encodeURI(cleanPath)}`,
 		{ headers: ghHeaders(token) },
 	);
 	if (!response.ok) {
@@ -93,10 +112,11 @@ export async function listDir(
 export async function readFile(
 	token: string,
 	filePath: string,
+	repo?: RepoRef,
 ): Promise<ReadFileResult> {
 	const cleanPath = filePath.replace(/^\/+/, "");
 	const response = await fetch(
-		`https://api.github.com/repos/${GITHUB_REPO.owner}/${GITHUB_REPO.name}/contents/${encodeURI(cleanPath)}`,
+		`${contentsBase(repo)}/${encodeURI(cleanPath)}`,
 		{ headers: ghHeaders(token) },
 	);
 	if (!response.ok) {
@@ -130,6 +150,8 @@ interface WriteOptions {
 	onConflict?: (latestContent: string) => string | null;
 	/** 提交消息 */
 	message?: string;
+	/** 目标仓库（默认主站仓库，统计数据可写独立私有仓库） */
+	repo?: RepoRef;
 }
 
 /** 写入文件（UTF-8 文本），带 409/422 冲突重试 */
@@ -149,13 +171,14 @@ export async function writeFile(
 		const body: Record<string, string> = {
 			message,
 			content: base64Content,
-			branch: GITHUB_REPO.branch,
+			branch: targetRepo(options.repo).branch,
 		};
 		if (currentSha) body.sha = currentSha;
-		return fetch(
-			`https://api.github.com/repos/${GITHUB_REPO.owner}/${GITHUB_REPO.name}/contents/${encodeURI(cleanPath)}`,
-			{ method: "PUT", headers: ghHeaders(token), body: JSON.stringify(body) },
-		);
+		return fetch(`${contentsBase(options.repo)}/${encodeURI(cleanPath)}`, {
+			method: "PUT",
+			headers: ghHeaders(token),
+			body: JSON.stringify(body),
+		});
 	};
 
 	let attempt = 0;
@@ -210,17 +233,18 @@ export async function deleteFile(
 	token: string,
 	filePath: string,
 	sha: string,
+	repo?: RepoRef,
 ): Promise<void> {
 	const cleanPath = filePath.replace(/^\/+/, "");
 	const response = await fetch(
-		`https://api.github.com/repos/${GITHUB_REPO.owner}/${GITHUB_REPO.name}/contents/${encodeURI(cleanPath)}`,
+		`${contentsBase(repo)}/${encodeURI(cleanPath)}`,
 		{
 			method: "DELETE",
 			headers: ghHeaders(token),
 			body: JSON.stringify({
 				message: `Delete ${cleanPath.split("/").pop()}`,
 				sha,
-				branch: GITHUB_REPO.branch,
+				branch: targetRepo(repo).branch,
 			}),
 		},
 	);

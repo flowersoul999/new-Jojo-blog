@@ -1,13 +1,21 @@
 import type { APIRoute } from "astro";
 import { type AdminAuthError, requireAdmin } from "@/utils/admin-auth";
-import { exportEvents, type StoredEvent } from "@/utils/analytics-store";
+import {
+	exportEvents,
+	moduleOf,
+	type StoredEvent,
+} from "@/utils/analytics-store";
 
 export const prerender = false;
 
 const CSV_COLUMNS = [
 	"time",
 	"date",
+	"type",
 	"path",
+	"module",
+	"action",
+	"label",
 	"referrer",
 	"ip",
 	"country",
@@ -15,8 +23,17 @@ const CSV_COLUMNS = [
 	"browser",
 	"device",
 	"dwell_ms",
+	"session",
+	"enter_time",
 	"vid",
 ] as const;
+
+/** 事件类型 → 中文 */
+const TYPE_NAMES: Record<string, string> = {
+	p: "页面浏览",
+	d: "停留补报",
+	a: "操作行为",
+};
 
 /** CSV 字段转义 */
 function csvCell(value: string | number): string {
@@ -27,8 +44,9 @@ function csvCell(value: string | number): string {
 	return text;
 }
 
-/** 时间戳 → Asia/Shanghai 可读时间 */
-function fmtTime(ts: number): string {
+/** 毫秒时间戳 → 可读时间（Asia/Shanghai） */
+function fmtTs(ts: number | undefined): string {
+	if (!ts) return "";
 	return new Intl.DateTimeFormat("zh-CN", {
 		timeZone: "Asia/Shanghai",
 		year: "numeric",
@@ -45,14 +63,18 @@ function toCsv(events: StoredEvent[]): string {
 	const header = CSV_COLUMNS.join(",");
 	const rows = events.map((e) =>
 		[
-			fmtTime(e.t),
+			fmtTs(e.t),
 			new Intl.DateTimeFormat("en-CA", {
 				timeZone: "Asia/Shanghai",
 				year: "numeric",
 				month: "2-digit",
 				day: "2-digit",
 			}).format(e.t),
+			TYPE_NAMES[e.ty ?? "p"] || "页面浏览",
 			csvCell(e.p ?? ""),
+			csvCell(moduleOf(e.p ?? "")),
+			csvCell(e.ac ?? ""),
+			csvCell(e.al ?? ""),
 			csvCell(e.r ?? ""),
 			csvCell(e.ip ?? ""),
 			csvCell(e.cc ?? ""),
@@ -60,6 +82,8 @@ function toCsv(events: StoredEvent[]): string {
 			csvCell(e.br ?? ""),
 			csvCell(e.dev ?? ""),
 			String(e.d ?? 0),
+			csvCell(e.sid ?? ""),
+			fmtTs(e.en),
 			csvCell(e.v ?? ""),
 		].join(","),
 	);

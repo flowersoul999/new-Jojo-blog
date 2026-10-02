@@ -18,12 +18,12 @@ import { Icon } from "astro-icon/components";
 >
 	<div class="relative flex items-center gap-2.5 rounded-[20px] border border-white/50 bg-white/60 p-2.5 pl-3 pr-8 shadow-[0_8px_24px_rgba(0,0,0,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/60">
 		<!-- 关闭 -->
-		<button class="fm-mini-close absolute right-1.5 top-1.5 z-20 rounded-full p-0.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="关闭悬浮播放器" aria-label="关闭悬浮播放器">
+		<button data-ana="关闭悬浮播放器" class="fm-mini-close absolute right-1.5 top-1.5 z-20 rounded-full p-0.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="关闭悬浮播放器" aria-label="关闭悬浮播放器">
 			<Icon is:inline name="material-symbols:close-rounded" class="text-lg" aria-hidden="true" />
 		</button>
 
 		<!-- 唱片（旋转 + 中央播放态，仿 fqzlr disc） -->
-		<button class="fm-mini-cover-btn relative h-11 w-11 shrink-0 rounded-full transition-transform active:scale-95" title="播放/暂停" aria-label="播放/暂停">
+		<button data-ana="播放或暂停音乐" class="fm-mini-cover-btn relative h-11 w-11 shrink-0 rounded-full transition-transform active:scale-95" title="播放/暂停" aria-label="播放/暂停">
 			<img class="fm-mini-cover h-full w-full rounded-full object-cover shadow-[0_0_0_1.5px_#fff,0_0_0_2.5px_rgba(0,0,0,0.55),0_5px_16px_rgba(0,0,0,0.22)] dark:shadow-[0_0_0_1.5px_#000,0_0_0_2.5px_rgba(255,255,255,0.7),0_5px_16px_rgba(0,0,0,0.45)]" src="" alt="封面" />
 			<span class="fm-mini-cover-mask absolute inset-0 flex items-center justify-center rounded-full bg-black/30 opacity-0 transition-opacity">
 				<Icon is:inline name="material-symbols:play-arrow-rounded" class="fm-mini-icon-play text-xl text-white ml-0.5" aria-hidden="true" />
@@ -59,22 +59,22 @@ import { Icon } from "astro-icon/components";
 
 		<!-- 控制条（单行紧凑，参照 fqzlr toolbar） -->
 		<div class="flex shrink-0 items-center justify-end gap-0.5">
-			<button class="fm-mini-prev p-1.5 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="上一首" aria-label="上一首">
+			<button data-ana="上一首歌曲" class="fm-mini-prev p-1.5 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="上一首" aria-label="上一首">
 				<Icon is:inline name="material-symbols:skip-previous-rounded" class="text-xl" aria-hidden="true" />
 			</button>
-			<button class="fm-mini-play mx-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition active:scale-95 dark:bg-white dark:text-neutral-900" title="播放/暂停" aria-label="播放/暂停">
+			<button data-ana="播放或暂停音乐" class="fm-mini-play mx-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition active:scale-95 dark:bg-white dark:text-neutral-900" title="播放/暂停" aria-label="播放/暂停">
 				<Icon is:inline name="material-symbols:play-arrow-rounded" class="fm-mini-icon-play-big ml-0.5 text-xl" aria-hidden="true" />
 				<Icon is:inline name="material-symbols:pause-rounded" class="fm-mini-icon-pause-big hidden text-xl" aria-hidden="true" />
 			</button>
-			<button class="fm-mini-next p-1.5 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="下一首" aria-label="下一首">
+			<button data-ana="下一首歌曲" class="fm-mini-next p-1.5 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="下一首" aria-label="下一首">
 				<Icon is:inline name="material-symbols:skip-next-rounded" class="text-xl" aria-hidden="true" />
 			</button>
-			<button class="fm-mini-mode p-1.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="播放模式" aria-label="播放模式">
+			<button data-ana="切换播放模式" class="fm-mini-mode p-1.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="播放模式" aria-label="播放模式">
 				<Icon is:inline name="material-symbols:repeat-rounded" class="fm-mini-icon-repeat text-lg" aria-hidden="true" />
 				<Icon is:inline name="material-symbols:repeat-one-rounded" class="fm-mini-icon-repeat-one text-lg hidden" aria-hidden="true" />
 				<Icon is:inline name="material-symbols:shuffle-rounded" class="fm-mini-icon-shuffle text-lg hidden" aria-hidden="true" />
 			</button>
-			<button class="fm-mini-mute p-1.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="静音" aria-label="静音">
+			<button data-ana="切换音乐静音" class="fm-mini-mute p-1.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="静音" aria-label="静音">
 				<Icon is:inline name="material-symbols:volume-up-rounded" class="fm-mini-icon-vol-up text-lg" aria-hidden="true" />
 				<Icon is:inline name="material-symbols:volume-off-rounded" class="fm-mini-icon-vol-off text-lg hidden" aria-hidden="true" />
 			</button>
@@ -167,17 +167,100 @@ import { Icon } from "astro-icon/components";
             }
         }
 
-        function refreshLrc() {
-            var visible = uiState.lrc
+        // ── 浮动歌词逐字高亮（与歌词面板共用同一份逐字 IR）────
+        /** 浮动歌词是否应可见 */
+        function floatVisible() {
+            return uiState.lrc
                 && currentLyrics.length > 0
                 && currentLrcIndex >= 0
                 && !!currentLyrics[currentLrcIndex];
-            if (visible) {
-                els.lrcText.textContent = currentLyrics[currentLrcIndex].text;
+        }
+
+        /** 重建当前行的逐字 span */
+        function renderFloatLine() {
+            var line = currentLyrics[currentLrcIndex];
+            els.lrcText.textContent = '';
+            if (!line) return;
+            if (line.chars && line.chars.length) {
+                line.chars.forEach(function (ch) {
+                    var sp = document.createElement('span');
+                    sp.className = 'fm-fch is-future';
+                    sp.textContent = ch.text;
+                    els.lrcText.appendChild(sp);
+                });
+            } else {
+                els.lrcText.textContent = line.text;
+            }
+        }
+
+        /** 按真实时间绘制逐字状态（与面板 paintLineChars 同一套规则） */
+        function paintFloat(t) {
+            var line = currentLyrics[currentLrcIndex];
+            if (!line || !line.chars) return;
+            var chars = line.chars;
+            var spans = els.lrcText.children;
+
+            // 二分查找当前正在演唱的字
+            var cur = -1;
+            var lo = 0;
+            var hi = chars.length - 1;
+            while (lo <= hi) {
+                var mid = (lo + hi) >> 1;
+                if (t >= chars[mid].time) {
+                    cur = mid;
+                    lo = mid + 1;
+                } else {
+                    hi = mid - 1;
+                }
+            }
+
+            for (var k = 0; k < spans.length; k++) {
+                var sp = spans[k];
+                if (k < cur) {
+                    sp.className = 'fm-fch is-done';
+                } else if (k === cur) {
+                    var ch = chars[k];
+                    var p = ch.dur > 0 ? (t - ch.time) / ch.dur : 1;
+                    p = Math.max(0, Math.min(1, p));
+                    if (p >= 1) sp.className = 'fm-fch is-done';
+                    else {
+                        sp.className = 'fm-fch is-singing';
+                        sp.style.setProperty('--cp', (p * 100).toFixed(1) + '%');
+                    }
+                } else {
+                    sp.className = 'fm-fch is-future';
+                }
+            }
+        }
+
+        var floatRaf = 0;
+        function floatTick() {
+            var m = mgr || window.__fireflyMusic;
+            if (m) paintFloat(m.getState().currentTime);
+            floatRaf = requestAnimationFrame(floatTick);
+        }
+        /** 按可见性与播放状态启停逐字 RAF */
+        function syncFloatRaf() {
+            var m = mgr || window.__fireflyMusic;
+            var playing = m ? m.getState().isPlaying : false;
+            if (floatVisible() && playing && !floatRaf) {
+                floatRaf = requestAnimationFrame(floatTick);
+            } else if ((!floatVisible() || !playing) && floatRaf) {
+                cancelAnimationFrame(floatRaf);
+                floatRaf = 0;
+            }
+        }
+
+        function refreshLrc() {
+            var m = mgr || window.__fireflyMusic;
+            if (floatVisible()) {
+                renderFloatLine();
                 floatLrc.classList.remove('opacity-0');
+                if (m) paintFloat(m.getState().currentTime);
             } else {
                 floatLrc.classList.add('opacity-0');
             }
+            syncFloatRaf();
         }
 
         // ── 波浪路径（与卡片同款）──────────────────────────────
@@ -269,12 +352,15 @@ import { Icon } from "astro-icon/components";
             mgr.seek(p / 100);
             setProgress(p);
             refreshWave();
+            // 浮动歌词逐字高亮实时跟随拖动
+            if (floatVisible()) paintFloat(mgr.getState().currentTime);
         });
         els.track.addEventListener('pointermove', function (e) {
             if (!isSeeking || !mgr) return;
             var p = pctFromClientX(e.clientX);
             mgr.seek(p / 100);
             setProgress(p);
+            if (floatVisible()) paintFloat(mgr.getState().currentTime);
         });
         ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (evt) {
             els.track.addEventListener(evt, function () {
@@ -317,12 +403,21 @@ import { Icon } from "astro-icon/components";
         });
         window.addEventListener('fm:play-state', function (e) {
             setPlayingUI(e.detail.isPlaying);
+            syncFloatRaf();
+            // 暂停瞬间定格在当前演唱位置
+            if (!e.detail.isPlaying && mgr && floatVisible()) {
+                paintFloat(mgr.getState().currentTime);
+            }
         });
         window.addEventListener('fm:time', function (e) {
             var d = e.detail;
             if (!isSeeking) setProgress(d.progress);
             els.current.textContent = d.currentTimeStr;
             els.total.textContent = d.durationStr;
+            // 暂停态（含拖动结束后的 timeupdate）也要保持逐字位置正确
+            if (mgr && floatVisible() && !mgr.getState().isPlaying) {
+                paintFloat(d.currentTime);
+            }
         });
         window.addEventListener('fm:mode', function (e) {
             setModeUI(e.detail.playMode);
@@ -378,6 +473,26 @@ import { Icon } from "astro-icon/components";
 		text-shadow:
 			0 1px 12px rgba(0, 0, 0, 0.9),
 			0 0 4px rgba(0, 0, 0, 0.7);
+	}
+
+	/* ── 浮动歌词逐字三态 ─────────────────────────────── */
+	.fm-fch.is-future {
+		color: inherit; /* 未演唱：沿用浮动歌词原本的中性色 */
+	}
+	.fm-fch.is-done {
+		color: var(--lrc-past, #e11d48);
+	}
+	/* 正在演唱的字：高亮色随 --cp 向右填充，未唱部分为灰色 */
+	.fm-fch.is-singing {
+		color: transparent;
+		background-image: linear-gradient(
+			90deg,
+			var(--lrc-current, #fb7185) 0 var(--cp, 0%),
+			var(--lrc-future, #94a3b8) var(--cp, 0%) 100%
+		);
+		background-clip: text;
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
 	}
 
     .fm-mini-waveflow {

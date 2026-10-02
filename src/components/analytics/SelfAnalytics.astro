@@ -1,9 +1,11 @@
 ---
 /**
  * 自托管统计埋点
- * - 生成持久 vid（localStorage UUID）
- * - 记录页面停留时长，swup/astro 切页时归入上一页
- * - localStorage 批量暂存，≥5 条 / 30 秒 / 离开页面时 sendBeacon 上报
+ * - 生成持久 vid（localStorage UUID）+ 每次访问 sid（会话 ID）
+ * - 进入页面立即上报一次 PV（ty:p），切页/离开时补报停留时长（ty:d）
+ * - 切后台只暂停计时，不重复计 PV（修复旧版 visibilitychange 重复记 PV 的问题）
+ * - 通用行为采集（ty:a）：data-ana 声明、出站链接、按钮点击委托
+ * - localStorage 批量暂存，≥10 条 / 30 秒 / 离开页面时 sendBeacon 上报
  * 防重复执行：运行时补 data-swup-ignore-script + window 全局守卫
  */
 interface Props {
@@ -22,20 +24,27 @@ const { enabled = true } = Astro.props;
 			// Astro 7 的 define:vars 会丢弃 data-swup-ignore-script，须在运行时补回
 			document.currentScript?.setAttribute("data-swup-ignore-script", "");
 
-			// 不参与统计的路由前缀
+			// 不参与统计的路由前缀（后台/写作等私有页面）
 			const SKIP_PREFIXES = ["/admin/", "/write/", "/portfolio/", "/memories/"];
 			const TRACK_ENDPOINT = "/api/analytics/track/";
 			const QUEUE_KEY = "aemeath:analytics:queue";
 			const VID_KEY = "aemeath:analytics:vid";
+			const QUEUE_FLUSH_SIZE = 10;
+			const QUEUE_MAX = 100;
+			const FLUSH_INTERVAL = 30_000;
+			const CLICK_DEDUP_MS = 1500;
 
-			const currentPath = () => window.location.pathname;
+			const isTracked = (p) => !SKIP_PREFIXES.some((prefix) => p.startsWith(prefix));
 
 			// 获取或生成访客 ID
 			let vid = "";
 			try {
 				vid = localStorage.getItem(VID_KEY) || "";
 				if (!/^[A-Za-z0-9_-]{8,64}$/.test(vid)) {
-					vid = (crypto.randomUUID?.() || `v-${Date.now()}-${Math.random().toString(36).slice(2)}`).slice(0, 64);
+					vid = (
+						crypto.randomUUID?.() ||
+						`v-${Date.now()}-${Math.random().toString(36).slice(2)}`
+					).slice(0, 64);
 					localStorage.setItem(VID_KEY, vid);
 				}
 			} catch {
@@ -43,84 +52,321 @@ const { enabled = true } = Astro.props;
 			}
 			if (!vid) return;
 
+			// 会话 ID：每次打开/刷新页面生成一个（同一标签页内的浏览归为同一次访问）
+			const sid = (
+				crypto.randomUUID?.() ||
+				`s-${Date.now()}-${Math.random().toString(36).slice(2)}`
+			)
+				.replace(/-/g, "")
+				.slice(0, 32);
+
 			// 事件队列（localStorage 持久化，防止刷新丢失）
 			let queue = [];
 			try {
 				const saved = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
-				if (Array.isArray(saved)) queue = saved.filter((e) => e && typeof e.p === "string").slice(-100);
+				if (Array.isArray(saved)) {
+					queue = saved
+						.filter((e) => e && typeof e.p === "string")
+						.slice(-QUEUE_MAX);
+				}
 			} catch {
 				queue = [];
 			}
 
 			const persist = () => {
 				try {
-					localStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(-100)));
+					localStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(-QUEUE_MAX)));
 				} catch {
 					// 存储不可用时仅保留内存队列
 				}
 			};
 
-			let lastPath = currentPath();
-			let enterAt = Date.now();
-			let active = !SKIP_PREFIXES.some((p) => lastPath.startsWith(p));
-
-			const sendBeaconFlush = () => {
-				if (!queue.length) return;
-				const body = JSON.stringify({ events: queue });
-				queue = [];
-				persist();
+			// ------------------------------------------------------------------
+			// 上报
+			// ------------------------------------------------------------------
+			let inflight = false;
+			const flush = () => {
+				if (!queue.length || inflight) return;
+				inflight = true;
+				const batch = queue.slice(0, 50);
+				const body = JSON.stringify({ events: batch });
+				const done = () => {
+					// 仅移除已发送的部分，失败时保留以便下次重试
+					queue = queue.slice(batch.length);
+					persist();
+					inflight = false;
+				};
 				try {
 					if (navigator.sendBeacon) {
-						navigator.sendBeacon(TRACK_ENDPOINT, new Blob([body], { type: "application/json" }));
-					} else {
-						fetch(TRACK_ENDPOINT, { method: "POST", body, keepalive: true });
+						const ok = navigator.sendBeacon(
+							TRACK_ENDPOINT,
+							new Blob([body], { type: "application/json" }),
+						);
+						if (ok) {
+							done();
+							return;
+						}
 					}
+					fetch(TRACK_ENDPOINT, {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body,
+						keepalive: true,
+					})
+						.then(done)
+						.catch(() => {
+							inflight = false;
+						});
 				} catch {
-					// 上报失败静默丢弃，避免影响页面
+					inflight = false;
 				}
 			};
 
-			const pushCurrent = () => {
-				if (!active) return;
-				const now = Date.now();
-				const dwell = Math.min(Math.max(0, now - enterAt), 24 * 60 * 60 * 1000);
-				queue.push({
-					v: vid,
-					p: lastPath,
-					r: document.referrer || "",
-					d: Math.round(dwell),
-					t: now,
-				});
-				persist();
-				if (queue.length >= 5) sendBeaconFlush();
+			let quickTimer = 0;
+			const scheduleQuickFlush = () => {
+				window.clearTimeout(quickTimer);
+				quickTimer = window.setTimeout(flush, 4000);
 			};
 
-			// swup / astro 页面切换：记录上一页停留，进入新页重新计时
+			// ------------------------------------------------------------------
+			// 页面生命周期：进入立即报 PV，离开/切页补停留
+			// ------------------------------------------------------------------
+			let active = false;
+			let curPath = "";
+			let pageEn = 0; // 本次进入该页面的时间戳（跨隐藏片段保持不变）
+			let visibleStart = 0; // 当前可见片段起点
+			let visibleAccum = 0; // 已结束片段累计的可见毫秒
+			let ended = false; // 当前页面是否已发送最终停留
+
+			const clean = (raw, max) =>
+				String(raw == null ? "" : raw)
+					.replace(/[\u0000-\u001f\u007f]/g, "")
+					.replace(/\s+/g, " ")
+					.trim()
+					.slice(0, max);
+
+			const sendDwell = () => {
+				if (!curPath || ended) return;
+				let d = visibleAccum;
+				if (!document.hidden) d += Date.now() - visibleStart;
+				d = Math.max(0, Math.round(d));
+				ended = true;
+				if (d < 300) return; // 不足 0.3 秒的误触不发停留事件
+				queue.push({
+					v: vid,
+					ty: "d",
+					p: curPath,
+					d,
+					t: Date.now(),
+					sid,
+					en: pageEn,
+				});
+				persist();
+			};
+
+			let firstReferrer = document.referrer || "";
+			const beginPage = (p) => {
+				curPath = p;
+				active = isTracked(p);
+				pageEn = Date.now();
+				visibleStart = pageEn;
+				visibleAccum = 0;
+				ended = false;
+				if (!active) return;
+				// 进入即报 PV（停留时长为 0，后续由 d 事件补全）
+				queue.push({
+					v: vid,
+					ty: "p",
+					p,
+					r: firstReferrer,
+					d: 0,
+					t: pageEn,
+					sid,
+					en: pageEn,
+				});
+				firstReferrer = "";
+				persist();
+				scheduleQuickFlush();
+			};
+
+			const endPage = () => {
+				if (!active) {
+					curPath = "";
+					return;
+				}
+				sendDwell();
+				flush();
+				curPath = "";
+			};
+
+			// swup / astro 页面切换：结算上一页，进入新页重新计时
 			const onPageLoad = () => {
-				const p = currentPath();
-				if (p !== lastPath) pushCurrent();
-				lastPath = p;
-				active = !SKIP_PREFIXES.some((prefix) => p.startsWith(prefix));
-				enterAt = Date.now();
+				const p = window.location.pathname;
+				if (p === curPath) return; // 同一页面的重复生命周期事件不重置
+				endPage();
+				beginPage(p);
 			};
 			document.addEventListener("astro:page-load", onPageLoad);
 			document.addEventListener("swup:page:view", onPageLoad);
 
-			// 切后台 / 离开页面：记录停留并冲刷
-			const onHide = () => {
-				pushCurrent();
-				sendBeaconFlush();
-			};
+			// 切后台：结算当前可见片段并冲刷；回前台：开始新的可见片段（同一 en，服务端累加）
 			document.addEventListener("visibilitychange", () => {
-				if (document.visibilityState === "hidden") onHide();
+				if (document.hidden) {
+					if (active && curPath && !ended) {
+						visibleAccum += Date.now() - visibleStart;
+						// 隐藏即视为一次片段结束，发送增量停留
+						ended = true;
+						if (visibleAccum >= 300) {
+							queue.push({
+								v: vid,
+								ty: "d",
+								p: curPath,
+								d: Math.round(visibleAccum),
+								t: Date.now(),
+								sid,
+								en: pageEn,
+							});
+							persist();
+						}
+						visibleAccum = 0;
+					}
+					flush();
+				} else if (active && curPath) {
+					// 回到页面：允许再发一条同 en 的 d 事件
+					ended = false;
+					visibleStart = Date.now();
+					visibleAccum = 0;
+				}
 			});
-			window.addEventListener("pagehide", onHide);
+
+			const onLeave = () => {
+				if (!ended) {
+					visibleAccum += document.hidden
+						? 0
+						: Math.max(0, Date.now() - visibleStart);
+					visibleStart = Date.now();
+					sendDwell();
+				}
+				flush();
+			};
+			window.addEventListener("pagehide", onLeave);
+			window.addEventListener("beforeunload", onLeave);
+			// bfcache 恢复：重新开始可见片段
+			window.addEventListener("pageshow", (e) => {
+				if (e.persisted && active && curPath) {
+					ended = false;
+					visibleStart = Date.now();
+					visibleAccum = 0;
+				}
+			});
 
 			// 每 30 秒冲刷一次积压事件
-			window.setInterval(sendBeaconFlush, 30_000);
+			window.setInterval(flush, FLUSH_INTERVAL);
 
-			// 供调试 / 手动上报
-			window.__selfAnalytics = { flush: sendBeaconFlush };
+			// ------------------------------------------------------------------
+			// 行为采集：声明式 data-ana + 出站链接 + 按钮点击委托
+			// ------------------------------------------------------------------
+			const trackAction = (action, label) => {
+				if (!active || !curPath) return;
+				const ac = clean(action, 40);
+				if (!ac) return;
+				queue.push({
+					v: vid,
+					ty: "a",
+					p: curPath,
+					t: Date.now(),
+					sid,
+					ac,
+					al: clean(label || "", 60),
+				});
+				persist();
+				if (queue.length >= QUEUE_FLUSH_SIZE) flush();
+				else scheduleQuickFlush();
+			};
+
+			const readableName = (el) => {
+				const named =
+					el.getAttribute("aria-label") ||
+					el.getAttribute("title") ||
+					el.getAttribute("data-tooltip");
+				if (named) return clean(named, 20);
+				if (el.tagName === "INPUT") {
+					return clean(el.getAttribute("value") || el.getAttribute("name") || "", 20);
+				}
+				const text = (el.textContent || "").replace(/\s+/g, " ").trim();
+				if (text) return clean(text, 20);
+				const img = el.querySelector?.("img[alt]");
+				if (img) return clean(img.getAttribute("alt") || "", 20);
+				return el.id ? `#${el.id.slice(0, 18)}` : "";
+			};
+
+			// 同一元素同一名称短时间内只记一次，过滤连发点击
+			const clickCache = new WeakMap();
+			const shouldRecord = (el, name) => {
+				const now = Date.now();
+				const last = clickCache.get(el);
+				if (last && last.name === name && now - last.at < CLICK_DEDUP_MS) {
+					return false;
+				}
+				clickCache.set(el, { name, at: now });
+				return true;
+			};
+
+			const handleClick = (ev) => {
+				if (!active || !curPath) return;
+				const target = ev.target instanceof Element ? ev.target : null;
+				if (!target) return;
+				const el = target.closest(
+					"[data-ana], a[href], button, [role='button'], summary",
+				);
+				if (!el) return;
+
+				// 1) 显式声明：data-ana="播放音乐" data-ana-label="晴天"
+				const ana = el.getAttribute("data-ana");
+				if (ana) {
+					trackAction(
+						ana,
+						el.getAttribute("data-ana-label") || readableName(el),
+					);
+					return;
+				}
+
+				// 2) 链接：只单独记录出站 / 邮件 / 电话，站内跳转交给 PV
+				if (el.tagName === "A") {
+					const href = el.getAttribute("href") || "";
+					if (/^https?:/i.test(href)) {
+						let u = null;
+						try {
+							u = new URL(href, window.location.href);
+						} catch {
+							u = null;
+						}
+						if (u && u.host !== window.location.host) {
+							trackAction("出站链接", `${u.host}${u.pathname}`);
+						}
+						return;
+					}
+					if (/^mailto:/i.test(href)) {
+						trackAction("邮件联系", href.slice(7, 67));
+						return;
+					}
+					if (/^tel:/i.test(href)) {
+						trackAction("拨打电话", href.slice(4, 64));
+					}
+					return;
+				}
+
+				// 3) 通用按钮/控件点击，记录可读名称
+				const name = readableName(el);
+				if (name && shouldRecord(el, name)) trackAction("点击", name);
+			};
+			document.addEventListener("click", handleClick, true);
+
+			// 首个页面（首次加载时 onPageLoad 尚未监听）
+			beginPage(window.location.pathname);
+
+			// 对外接口：供调试 / 手动上报自定义行为
+			window.__selfAnalytics = { flush, track: trackAction };
 		})();
 	</script>
 )}

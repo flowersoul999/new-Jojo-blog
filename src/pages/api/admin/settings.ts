@@ -89,6 +89,10 @@ export const PUT: APIRoute = async ({ cookies, request }) => {
 			recordIp:
 				typeof input.recordIp === "boolean" ? input.recordIp : undefined,
 			maskIp: typeof input.maskIp === "boolean" ? input.maskIp : undefined,
+			recordActions:
+				typeof input.recordActions === "boolean"
+					? input.recordActions
+					: undefined,
 			adminLogins: Array.isArray(input.adminLogins)
 				? (input.adminLogins as string[]).filter((x) => x.trim())
 				: undefined,

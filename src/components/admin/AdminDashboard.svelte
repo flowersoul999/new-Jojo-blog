@@ -1,11 +1,12 @@
 <script lang="ts">
 /**
  * 后台管理仪表盘
- * - 访问统计：今日/昨日/累计 KPI + 近 30 天趋势折线图 + 设备/浏览器环形图 + 地域分布条形图
- * - 用户行为：热门内容排行 + 浏览路径列表
- * - 访客明细：IP 分页表格
- * - 系统设置：埋点开关 / IP 隐私 / 保留天数 / 白名单 / 数据导出 / 立即清理
- * 数据来源：/api/admin/stats、/api/admin/settings、/api/admin/export
+ * - 访问统计：采集诊断 + 今日/昨日/累计 KPI + 近 30 天趋势 + 24 小时访问时段
+ *   + 设备/浏览器环形图 + 地域分布 + 模块分布
+ * - 用户行为：热门内容、浏览路径、行为类型、实时操作流（时间/页面/行为/IP）
+ * - 访客明细：访客列表（IP/环境/访问时间段/会话）+ 展开会话时间线（页面轨迹+操作）+ IP 汇总
+ * - 系统设置：埋点开关 / 行为采集 / IP 隐私 / 保留天数 / 白名单 / 数据导出 / 立即清理
+ * 数据来源：/api/admin/stats、/api/admin/visitor、/api/admin/settings、/api/admin/export
  */
 import { onMount } from "svelte";
 import ClientPagination from "../common/ClientPagination.svelte";
@@ -23,8 +24,14 @@ interface LabelValue {
 	label: string;
 	value: number;
 }
+interface HourPoint {
+	hour: number;
+	pv: number;
+	uv: number;
+}
 interface TopPath {
 	path: string;
+	module: string;
 	pv: number;
 	uv: number;
 	avgDwell: number;
@@ -42,11 +49,83 @@ interface BehaviorRow {
 	dwell: number;
 	ip: string;
 	country: string;
+	vid: string;
+}
+interface ActionRow {
+	ts: number;
+	path: string;
+	action: string;
+	label: string;
+	ip: string;
+	country: string;
+	vid: string;
+}
+interface VisitorRow {
+	vid: string;
+	ip: string;
+	ips: string[];
+	country: string;
+	dev: string;
+	os: string;
+	br: string;
+	firstTs: number;
+	lastTs: number;
+	sessions: number;
+	pv: number;
+	actions: number;
+	pageCount: number;
+}
+interface SessionPage {
+	path: string;
+	enter: number;
+	dwell: number;
+	views: number;
+}
+interface SessionAction {
+	ts: number;
+	path: string;
+	action: string;
+	label: string;
+}
+interface VisitorSession {
+	start: number;
+	end: number;
+	pv: number;
+	pages: SessionPage[];
+	actions: SessionAction[];
+}
+interface VisitorDetail {
+	vid: string;
+	ip: string;
+	ips: string[];
+	country: string;
+	dev: string;
+	os: string;
+	br: string;
+	firstTs: number;
+	lastTs: number;
+	sessions: VisitorSession[];
+}
+interface Diagnostics {
+	env: "local" | "production";
+	tokenConfigured: boolean;
+	enabled: boolean;
+	recordIp: boolean;
+	recordActions: boolean;
+	repo: { owner: string; name: string; branch: string; isMainRepo: boolean };
+	ipExposed: boolean;
+	dayFiles: number;
+	latestDay: string | null;
+	latestEventTs: number | null;
+	eventsToday: number;
+	serverTime: number;
+	storeError: string;
 }
 interface Settings {
 	enabled: boolean;
 	recordIp: boolean;
 	maskIp: boolean;
+	recordActions: boolean;
 	adminLogins: string[];
 	retentionDays: number;
 }
@@ -56,14 +135,21 @@ interface StatsData {
 	yesterday: { pv: number; uv: number };
 	cumulative: { pv: number; uv: number };
 	trend: DayPoint[];
+	hourly: HourPoint[];
 	devices: LabelValue[];
 	browsers: LabelValue[];
 	countries: LabelValue[];
+	modules: LabelValue[];
 	topPaths: TopPath[];
+	actions: LabelValue[];
+	actionStream: ActionRow[];
 	behaviors: BehaviorRow[];
+	visitors: VisitorRow[];
+	totalVisitors: number;
 	ipList: IpRow[];
 	totalIpCount: number;
 	rangeDays: number;
+	diagnostics: Diagnostics;
 }
 
 // ============================================================================
@@ -84,10 +170,17 @@ let lastUpdated = $state(0);
 let ipPage = $state(1);
 const IP_PAGE_SIZE = 10;
 
+// 访客详情
+let detailVid = $state("");
+let detailLoading = $state(false);
+let detailMap = $state<Record<string, VisitorDetail>>({});
+let detailErr = $state("");
+
 // 设置表单
 let sEnabled = $state(true);
 let sRecordIp = $state(true);
-let sMaskIp = $state(true);
+let sMaskIp = $state(false);
+let sRecordActions = $state(true);
 let sRetention = $state(90);
 let sAdmins = $state("");
 let saving = $state(false);
@@ -106,24 +199,6 @@ let exporting = $state("");
 const fmt = (n: number) =>
 	new Intl.NumberFormat("zh-CN").format(Math.max(0, Math.round(n)));
 
-const TABS: Array<{ key: View; label: string }> = [
-	{ key: "overview", label: "访问统计" },
-	{ key: "behavior", label: "用户行为" },
-	{ key: "visitors", label: "访客明细" },
-	{ key: "settings", label: "系统设置" },
-];
-
-function switchView(key: string) {
-	if (
-		key === "overview" ||
-		key === "behavior" ||
-		key === "visitors" ||
-		key === "settings"
-	) {
-		view = key;
-	}
-}
-
 function fmtDur(ms: number): string {
 	if (!ms || ms < 1000) return "<1秒";
 	const s = Math.round(ms / 1000);
@@ -139,14 +214,116 @@ function fmtDate(d: string): string {
 	return parts.length === 3 ? `${parts[1]}-${parts[2]}` : d;
 }
 
+const dtf = new Intl.DateTimeFormat("zh-CN", {
+	month: "2-digit",
+	day: "2-digit",
+	hour: "2-digit",
+	minute: "2-digit",
+	hour12: false,
+});
+const clockFmt = new Intl.DateTimeFormat("zh-CN", {
+	hour: "2-digit",
+	minute: "2-digit",
+	hour12: false,
+});
+
 function fmtDateTime(ts: number): string {
-	return new Intl.DateTimeFormat("zh-CN", {
-		month: "2-digit",
-		day: "2-digit",
-		hour: "2-digit",
-		minute: "2-digit",
-		hour12: false,
-	}).format(ts);
+	return dtf.format(ts);
+}
+
+function fmtClock(ts: number): string {
+	return clockFmt.format(ts);
+}
+
+/** 访问时间段：同一天显示 "10-02 14:05 ~ 14:23"，跨天显示完整两端 */
+function fmtRange(start: number, end: number): string {
+	const a = fmtDateTime(start);
+	const bFull = fmtDateTime(end);
+	const b = a.slice(0, 5) === bFull.slice(0, 5) ? fmtClock(end) : bFull;
+	return `${a} ~ ${b}`;
+}
+
+function vidShort(vid: string): string {
+	return vid ? vid.slice(0, 8) : "未知";
+}
+
+/** 会话内页面与操作合并为一条时间线 */
+function sessionTimeline(session: VisitorSession) {
+	const items: Array<{
+		kind: "page" | "action";
+		t: number;
+		path?: string;
+		dwell?: number;
+		action?: string;
+		label?: string;
+	}> = [];
+	for (const p of session.pages) {
+		items.push({ kind: "page", t: p.enter, path: p.path, dwell: p.dwell });
+	}
+	for (const a of session.actions) {
+		items.push({
+			kind: "action",
+			t: a.ts,
+			action: a.action,
+			label: a.label,
+			path: a.path,
+		});
+	}
+	return items.sort((a, b) => a.t - b.t);
+}
+
+/** 采集诊断横幅条目 */
+function diagItems(d: Diagnostics | undefined) {
+	if (!d) return [];
+	const items: Array<{
+		type: "error" | "warn" | "ok";
+		title: string;
+		desc: string;
+	}> = [];
+	if (d.env === "production" && !d.tokenConfigured) {
+		items.push({
+			type: "error",
+			title: "采集未生效：服务器缺少 ANALYTICS_TOKEN 环境变量",
+			desc: "访问上报全部被静默丢弃，因此后台没有任何数据。请在 Vercel 项目 Settings → Environment Variables 中添加 ANALYTICS_TOKEN（GitHub 令牌，需 Contents 读写权限）后重新部署。",
+		});
+	}
+	if (!d.enabled) {
+		items.push({
+			type: "warn",
+			title: "统计埋点当前处于关闭状态",
+			desc: "新的访问事件不会被记录，可在「系统设置」页重新开启。",
+		});
+	}
+	if (d.storeError) {
+		items.push({
+			type: "error",
+			title: "数据仓库读取失败",
+			desc: d.storeError,
+		});
+	}
+	if (d.ipExposed) {
+		items.push({
+			type: "warn",
+			title: "访客 IP 正明文写入公开仓库，任何人都能看到",
+			desc: `当前数据仓库 ${d.repo.owner}/${d.repo.name} 是公开仓库。建议新建一个私有仓库并配置 ANALYTICS_REPO_OWNER / ANALYTICS_REPO_NAME 环境变量，或在设置中开启 IP 脱敏。`,
+		});
+	}
+	if (d.tokenConfigured && d.enabled && !d.storeError) {
+		if (d.dayFiles > 0) {
+			items.push({
+				type: "ok",
+				title: `采集正常 · 今日页面浏览 ${fmt(d.eventsToday)} 次 · 最新数据日期 ${d.latestDay}`,
+				desc: `数据仓库：${d.repo.owner}/${d.repo.name}（${d.repo.branch}）`,
+			});
+		} else {
+			items.push({
+				type: "warn",
+				title: "链路已就绪，但数据仓库里还没有任何事件",
+				desc: "部署完成后访问几个页面，约 1 分钟后点刷新即可看到数据。",
+			});
+		}
+	}
+	return items;
 }
 
 // ============================================================================
@@ -184,6 +361,7 @@ async function loadSettings() {
 		sEnabled = settings.enabled;
 		sRecordIp = settings.recordIp;
 		sMaskIp = settings.maskIp;
+		sRecordActions = settings.recordActions !== false;
 		sRetention = settings.retentionDays;
 		sAdmins = (settings.adminLogins || []).join("\n");
 	} catch (e) {
@@ -208,6 +386,33 @@ onMount(async () => {
 	}
 });
 
+async function toggleVisitor(vid: string) {
+	if (detailVid === vid) {
+		detailVid = "";
+		return;
+	}
+	detailVid = vid;
+	detailErr = "";
+	if (detailMap[vid]) return;
+	detailLoading = true;
+	try {
+		const res = await fetch(
+			`/api/admin/visitor/?vid=${encodeURIComponent(vid)}&days=30`,
+			{
+				credentials: "same-origin",
+			},
+		);
+		const data = await res.json();
+		if (!res.ok || data.ok !== true)
+			throw new Error(data.error || "访客详情加载失败");
+		detailMap = { ...detailMap, [vid]: data.data as VisitorDetail };
+	} catch (e) {
+		detailErr = e instanceof Error ? e.message : "访客详情加载失败";
+	} finally {
+		detailLoading = false;
+	}
+}
+
 // ============================================================================
 // 设置保存 / 清理 / 导出
 // ============================================================================
@@ -224,6 +429,7 @@ async function saveSettings() {
 				enabled: sEnabled,
 				recordIp: sRecordIp,
 				maskIp: sMaskIp,
+				recordActions: sRecordActions,
 				retentionDays: sRetention,
 				adminLogins: sAdmins
 					.split(/[\n,，]/)
@@ -340,7 +546,6 @@ const LINE_PAD = { l: 44, r: 14, t: 18, b: 30 };
 
 let hoverIndex = $state(-1);
 
-// 折线图派生数据（Svelte 模板表达式限制较多，统一在脚本区计算）
 function lineChart(data: StatsData | null) {
 	if (!data || data.trend.length < 2) return null;
 	const n = data.trend.length;
@@ -370,7 +575,6 @@ function lineChart(data: StatsData | null) {
 	};
 }
 
-// 环形图分组（按标题聚合设备/浏览器两类）
 function donutGroups(data: StatsData | null): Array<{
 	title: string;
 	segs: Array<{ d: string; color: string; ratio: number; label: string }>;
@@ -383,10 +587,20 @@ function donutGroups(data: StatsData | null): Array<{
 	return groups.map((g) => ({ title: g.title, segs: donutSegments(g.values) }));
 }
 
-// 地域条形图最大值（Svelte 模板表达式限制较多，统一在脚本区计算）
 function maxCountryOf(data: StatsData | null): number {
 	if (!data || data.countries.length === 0) return 1;
 	return Math.max(1, ...data.countries.map((c) => c.value));
+}
+
+/** 24 小时时段图最大值 */
+function maxHourlyOf(data: StatsData | null): number {
+	if (!data) return 1;
+	return Math.max(1, ...data.hourly.map((h) => h.pv));
+}
+
+function maxModuleOf(data: StatsData | null): number {
+	if (!data || data.modules.length === 0) return 1;
+	return Math.max(1, ...data.modules.map((m) => m.value));
 }
 </script>
 
@@ -447,6 +661,25 @@ function maxCountryOf(data: StatsData | null): number {
 			</div>
 		{/if}
 
+		<!-- 采集诊断：数据获取失败原因直接展示在这里 -->
+		{#if stats}
+			{#each diagItems(stats.diagnostics) as diag}
+				<div
+					class="mb-3 flex gap-3 rounded-2xl border px-4 py-3 text-sm {diag.type === 'error'
+						? 'border-red-500/40 bg-red-500/5 text-red-600 dark:text-red-400'
+						: diag.type === 'warn'
+							? 'border-amber-500/40 bg-amber-500/5 text-amber-600 dark:text-amber-400'
+							: 'border-emerald-500/40 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400'}"
+				>
+					<span class="mt-0.5 flex-none font-bold">{diag.type === "ok" ? "✓" : diag.type === "warn" ? "!" : "×"}</span>
+					<div class="min-w-0">
+						<p class="font-semibold">{diag.title}</p>
+						{#if diag.desc}<p class="mt-1 leading-relaxed opacity-90">{diag.desc}</p>{/if}
+					</div>
+				</div>
+			{/each}
+		{/if}
+
 		<!-- 页签 -->
 		<nav class="mb-6 flex flex-wrap gap-2" aria-label="后台管理模块">
 			{#each [
@@ -484,6 +717,30 @@ function maxCountryOf(data: StatsData | null): number {
 						<p class="mt-1 text-xs text-(--content-meta)">独立访客 {fmt(kpi.uv)}</p>
 					</div>
 				{/each}
+			</section>
+
+			<!-- 24 小时访问时段 -->
+			<section class="card-base onload-animation mt-4 rounded-2xl p-5">
+				<header class="mb-4">
+					<h2 class="text-sm font-bold">访问时段分布</h2>
+					<p class="mt-0.5 text-xs text-(--content-meta)">近 {stats.rangeDays} 天各小时段的浏览量（北京时间，悬停看详情）</p>
+				</header>
+				<div class="flex h-32 items-end gap-[3px]">
+					{#each stats.hourly as h}
+						<div class="group relative flex h-full flex-1 flex-col justify-end">
+							<div
+								class="w-full rounded-t-[3px] bg-(--primary)/70 transition group-hover:bg-(--primary)"
+								style="height:{Math.max(3, (h.pv / maxHourlyOf(stats)) * 100)}%; opacity:{0.35 + 0.65 * (h.pv / maxHourlyOf(stats))}"
+								title={`${h.hour}:00-${h.hour}:59 · 浏览 ${h.pv} · 访客 ${h.uv}`}
+							></div>
+						</div>
+					{/each}
+				</div>
+				<div class="mt-1.5 flex gap-[3px] text-[10px] text-(--content-meta)">
+					{#each stats.hourly as h}
+						<span class="flex-1 text-center">{h.hour % 3 === 0 ? `${h.hour}` : ""}</span>
+					{/each}
+				</div>
 			</section>
 
 			<!-- 趋势折线图 -->
@@ -527,7 +784,6 @@ function maxCountryOf(data: StatsData | null): number {
 								</linearGradient>
 							</defs>
 
-							<!-- 网格线 -->
 							{#each chart.ticks as v}
 								<g>
 									<line x1={LINE_PAD.l} y1={chart.py(v)} x2={LINE_W - LINE_PAD.r} y2={chart.py(v)} stroke="currentColor" class="text-(--line-divider)" stroke-opacity="0.5" stroke-dasharray="3 4" />
@@ -535,20 +791,17 @@ function maxCountryOf(data: StatsData | null): number {
 								</g>
 							{/each}
 
-							<!-- X 轴标签 -->
 							{#each stats.trend as d, i}
 								{#if i % Math.ceil(chart.n / 7) === 0 || i === chart.n - 1}
 									<text x={chart.px(i)} y={LINE_H - 8} text-anchor="middle" font-size="10" fill="currentColor" class="text-(--content-meta)">{fmtDate(d.date)}</text>
 								{/if}
 							{/each}
 
-							<!-- 面积与折线 -->
 							<path d={chart.areaPv} fill="url(#area-pv)" />
 							<path d={chart.areaUv} fill="url(#area-uv)" />
 							<path d={chart.linePv} fill="none" stroke="#4d86e8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
 							<path d={chart.lineUv} fill="none" stroke="#d777c9" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
 
-							<!-- 悬停指示 -->
 							{#if hoverIndex >= 0}
 								<line x1={chart.px(hoverIndex)} y1={LINE_PAD.t} x2={chart.px(hoverIndex)} y2={LINE_H - LINE_PAD.b} stroke="#4d86e8" stroke-opacity="0.35" />
 								<circle cx={chart.px(hoverIndex)} cy={chart.py(stats.trend[hoverIndex].pv)} r="4.5" fill="#4d86e8" stroke="#fff" stroke-width="1.5" />
@@ -559,7 +812,7 @@ function maxCountryOf(data: StatsData | null): number {
 						{#if hoverIndex >= 0 && stats.trend[hoverIndex]}
 							<div
 								class="pointer-events-none absolute top-0 z-10 rounded-xl border bg-(--card-bg)/95 px-3 py-2 text-xs shadow-xl backdrop-blur"
-								style="left:{Math.min(chart.px(hoverIndex) / LINE_W * 100, 70)}%; transform:translateX(-50%)"
+								style="left:{Math.min((chart.px(hoverIndex) / LINE_W) * 100, 70)}%; transform:translateX(-50%)"
 							>
 								<p class="mb-1 font-bold">{stats.trend[hoverIndex].date}</p>
 								<p class="text-(--content-meta)">浏览量 <b class="text-(--deep-text)">{fmt(stats.trend[hoverIndex].pv)}</b></p>
@@ -607,21 +860,44 @@ function maxCountryOf(data: StatsData | null): number {
 					{#if stats.countries.length === 0}
 						<p class="py-8 text-center text-sm text-(--content-meta)">暂无数据</p>
 					{:else}
-					<ul class="mt-3 space-y-2">
-						{#each stats.countries as c}
+						<ul class="mt-3 space-y-2">
+							{#each stats.countries as c}
+								<li>
+									<div class="flex items-center justify-between text-xs">
+										<span class="truncate text-(--content-meta)">{c.label}</span>
+										<b class="tabular-nums text-(--deep-text)">{fmt(c.value)}</b>
+									</div>
+									<div class="mt-1 h-2 overflow-hidden rounded-full bg-(--muted)/40">
+										<div class="h-full rounded-full bg-(--primary)" style="width:{Math.max(3, (c.value / maxCountryOf(stats)) * 100)}%"></div>
+									</div>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			</section>
+
+			<!-- 模块分布 -->
+			<section class="card-base onload-animation mt-4 rounded-2xl p-5">
+				<h2 class="text-sm font-bold">模块分布</h2>
+				<p class="mt-0.5 text-xs text-(--content-meta)">访客主要访问了网站的哪些模块</p>
+				{#if stats.modules.length === 0}
+					<p class="py-8 text-center text-sm text-(--content-meta)">暂无数据</p>
+				{:else}
+					<ul class="mt-3 grid gap-2 sm:grid-cols-2">
+						{#each stats.modules as m}
 							<li>
 								<div class="flex items-center justify-between text-xs">
-									<span class="truncate text-(--content-meta)">{c.label}</span>
-									<b class="tabular-nums text-(--deep-text)">{fmt(c.value)}</b>
+									<span class="text-(--content-meta)">{m.label}</span>
+									<b class="tabular-nums text-(--deep-text)">{fmt(m.value)}</b>
 								</div>
 								<div class="mt-1 h-2 overflow-hidden rounded-full bg-(--muted)/40">
-									<div class="h-full rounded-full bg-(--primary)" style="width:{Math.max(3, (c.value / maxCountryOf(stats)) * 100)}%"></div>
+									<div class="h-full rounded-full bg-gradient-to-r from-(--primary) to-[#d777c9]" style="width:{Math.max(3, (m.value / maxModuleOf(stats)) * 100)}%"></div>
 								</div>
 							</li>
 						{/each}
 					</ul>
 				{/if}
-				</div>
 			</section>
 		{:else if view === "behavior" && stats}
 			<!-- ======================== 用户行为 ======================== -->
@@ -634,59 +910,234 @@ function maxCountryOf(data: StatsData | null): number {
 					{:else}
 						{@const maxPv = Math.max(1, ...stats.topPaths.map((t) => t.pv))}
 						<ol class="space-y-2.5">
-								{#each stats.topPaths as t, i}
-									<li>
-										<div class="flex items-center gap-2 text-sm">
-											<span class="w-5 flex-none text-xs font-bold {i < 3 ? "text-(--primary)" : "text-(--content-meta)"}">{i + 1}</span>
-											<a href={t.path} target="_blank" rel="noreferrer" class="min-w-0 flex-1 truncate font-medium text-(--deep-text) hover:text-(--primary)">{t.path}</a>
-											<span class="flex-none text-xs text-(--content-meta)">{fmt(t.pv)} PV · {fmt(t.uv)} UV · {fmtDur(t.avgDwell)}</span>
-										</div>
-										<div class="ml-7 mt-1 h-1.5 overflow-hidden rounded-full bg-(--muted)/40">
-											<div class="h-full rounded-full bg-gradient-to-r from-(--primary) to-[#d777c9]" style="width:{Math.max(3, (t.pv / maxPv) * 100)}%"></div>
-										</div>
-									</li>
-								{/each}
-							</ol>
+							{#each stats.topPaths as t, i}
+								<li>
+									<div class="flex items-center gap-2 text-sm">
+										<span class="w-5 flex-none text-xs font-bold {i < 3 ? "text-(--primary)" : "text-(--content-meta)"}">{i + 1}</span>
+										<a href={t.path} target="_blank" rel="noreferrer" class="min-w-0 flex-1 truncate font-medium text-(--deep-text) hover:text-(--primary)">{t.path}</a>
+										<span class="flex-none text-xs text-(--content-meta)">{fmt(t.pv)} PV · {fmt(t.uv)} UV · {fmtDur(t.avgDwell)}</span>
+									</div>
+									<div class="ml-7 mt-1 h-1.5 overflow-hidden rounded-full bg-(--muted)/40">
+										<div class="h-full rounded-full bg-gradient-to-r from-(--primary) to-[#d777c9]" style="width:{Math.max(3, (t.pv / maxPv) * 100)}%"></div>
+									</div>
+								</li>
+							{/each}
+						</ol>
 					{/if}
 				</div>
 
 				<div class="card-base onload-animation rounded-2xl p-5">
-					<h2 class="text-sm font-bold">最近浏览路径</h2>
-					<p class="mt-0.5 mb-3 text-xs text-(--content-meta)">最近 {stats.behaviors.length} 次页面访问</p>
-					{#if stats.behaviors.length === 0}
+					<h2 class="text-sm font-bold">行为类型汇总</h2>
+					<p class="mt-0.5 mb-3 text-xs text-(--content-meta)">近 {stats.rangeDays} 天访客的操作行为分布</p>
+					{#if stats.actions.length === 0}
 						<p class="py-10 text-center text-sm text-(--content-meta)">暂无数据</p>
 					{:else}
+						{@const maxAction = Math.max(1, ...stats.actions.map((a) => a.value))}
 						<ul class="space-y-2.5">
-								{#each stats.behaviors as b}
-									<li class="flex items-center gap-2 text-sm">
-										<span class="flex-none text-xs tabular-nums text-(--content-meta)">{fmtDateTime(b.ts)}</span>
-										<a href={b.path} target="_blank" rel="noreferrer" class="min-w-0 flex-1 truncate font-medium text-(--deep-text) hover:text-(--primary)">{b.path}</a>
-										<span class="flex-none text-xs text-(--content-meta)">{fmtDur(b.dwell)}</span>
-										<span class="hidden flex-none text-xs text-(--content-meta) sm:inline">{b.country}</span>
-									</li>
-								{/each}
-							</ul>
+							{#each stats.actions as a}
+								<li>
+									<div class="flex items-center justify-between text-xs">
+										<span class="truncate font-medium text-(--deep-text)">{a.label}</span>
+										<b class="tabular-nums text-(--content-meta)">{fmt(a.value)} 次</b>
+									</div>
+									<div class="mt-1 h-1.5 overflow-hidden rounded-full bg-(--muted)/40">
+										<div class="h-full rounded-full bg-[#39b99a]" style="width:{Math.max(3, (a.value / maxAction) * 100)}%"></div>
+									</div>
+								</li>
+							{/each}
+						</ul>
 					{/if}
 				</div>
 			</section>
+
+			<!-- 实时操作流 -->
+			<section class="card-base onload-animation mt-4 rounded-2xl p-5">
+				<h2 class="text-sm font-bold">最近操作行为</h2>
+				<p class="mt-0.5 mb-3 text-xs text-(--content-meta)">最近 {stats.actionStream.length} 条访客操作（含发生页面与访客 IP）</p>
+				{#if stats.actionStream.length === 0}
+					<p class="py-10 text-center text-sm text-(--content-meta)">暂无操作记录（按钮点击、出站链接等行为会显示在这里）</p>
+				{:else}
+					<div class="overflow-x-auto">
+						<table class="w-full text-left text-sm">
+							<thead>
+								<tr class="border-b text-xs text-(--content-meta)">
+									<th class="py-2.5 pr-4 font-semibold">时间</th>
+									<th class="py-2.5 pr-4 font-semibold">行为</th>
+									<th class="py-2.5 pr-4 font-semibold">发生页面</th>
+									<th class="py-2.5 pr-4 font-semibold">访客 / IP</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each stats.actionStream as a}
+									<tr class="border-b border-(--line-divider)/40 transition hover:bg-(--muted)/20">
+										<td class="whitespace-nowrap py-2.5 pr-4 text-xs tabular-nums text-(--content-meta)">{fmtDateTime(a.ts)}</td>
+										<td class="py-2.5 pr-4">
+											<span class="inline-flex items-center gap-1.5 rounded-full bg-[#39b99a]/10 px-2.5 py-1 text-xs font-semibold text-[#2e9e82]">
+												{a.action}
+												{#if a.label}<span class="font-normal text-(--content-meta)">{a.label}</span>{/if}
+											</span>
+										</td>
+										<td class="max-w-[16rem] py-2.5 pr-4">
+											<a href={a.path} target="_blank" rel="noreferrer" class="block truncate text-xs text-(--deep-text) hover:text-(--primary)">{a.path}</a>
+										</td>
+										<td class="whitespace-nowrap py-2.5 text-xs text-(--content-meta)">
+											<span class="font-mono">{a.ip || "未记录"}</span>
+											<span class="ml-1.5">{a.country}</span>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</section>
+
+			<!-- 最近浏览路径 -->
+			<section class="card-base onload-animation mt-4 rounded-2xl p-5">
+				<h2 class="text-sm font-bold">最近浏览路径</h2>
+				<p class="mt-0.5 mb-3 text-xs text-(--content-meta)">最近 {stats.behaviors.length} 次页面访问</p>
+				{#if stats.behaviors.length === 0}
+					<p class="py-10 text-center text-sm text-(--content-meta)">暂无数据</p>
+				{:else}
+					<ul class="space-y-2.5">
+						{#each stats.behaviors as b}
+							<li class="flex items-center gap-2 text-sm">
+								<span class="flex-none text-xs tabular-nums text-(--content-meta)">{fmtDateTime(b.ts)}</span>
+								<a href={b.path} target="_blank" rel="noreferrer" class="min-w-0 flex-1 truncate font-medium text-(--deep-text) hover:text-(--primary)">{b.path}</a>
+								<span class="hidden flex-none text-xs text-(--content-meta) md:inline">{fmtDur(b.dwell)}</span>
+								<span class="hidden flex-none font-mono text-xs text-(--content-meta) lg:inline">{b.ip}</span>
+								<span class="hidden flex-none text-xs text-(--content-meta) lg:inline">{b.country}</span>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</section>
 		{:else if view === "visitors" && stats}
 			<!-- ======================== 访客明细 ======================== -->
-			{@const ipTotal = stats.totalIpCount}
-			{@const ipPageCount = Math.max(1, Math.ceil(ipTotal / IP_PAGE_SIZE))}
-			{@const safePage = Math.min(ipPage, ipPageCount)}
-			{@const ipRows = stats.ipList.slice((safePage - 1) * IP_PAGE_SIZE, safePage * IP_PAGE_SIZE)}
 			<div class="card-base onload-animation rounded-2xl p-5">
 				<header class="mb-4 flex flex-wrap items-center justify-between gap-2">
 					<div>
-						<h2 class="text-sm font-bold">访客 IP 明细</h2>
+						<h2 class="text-sm font-bold">访客列表</h2>
 						<p class="mt-0.5 text-xs text-(--content-meta)">
-							近 {stats.rangeDays} 天共 {fmt(ipTotal)} 个 IP · {settings?.maskIp ? "已启用 IP 脱敏展示" : "显示完整 IP"}
+							近 {stats.rangeDays} 天共 {fmt(stats.totalVisitors)} 位访客 · 点击行查看每次访问的时间段、页面轨迹与操作
 						</p>
 					</div>
 				</header>
-				{#if ipTotal === 0}
+				{#if stats.totalVisitors === 0}
 					<p class="py-10 text-center text-sm text-(--content-meta)">暂无数据</p>
 				{:else}
+					<div class="overflow-x-auto">
+						<table class="w-full text-left text-sm">
+							<thead>
+								<tr class="border-b text-xs text-(--content-meta)">
+									<th class="py-2.5 pr-4 font-semibold">访客 / IP</th>
+									<th class="py-2.5 pr-4 font-semibold">地域</th>
+									<th class="py-2.5 pr-4 font-semibold">访问环境</th>
+									<th class="py-2.5 pr-4 font-semibold">访问时间段（首次 ~ 最近）</th>
+									<th class="py-2.5 pr-4 text-right font-semibold">PV</th>
+									<th class="py-2.5 pr-4 text-right font-semibold">会话</th>
+									<th class="py-2.5 pr-4 text-right font-semibold">行为/页面</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each stats.visitors as row}
+									<tr
+										class="cursor-pointer border-b border-(--line-divider)/40 transition hover:bg-(--muted)/20 {detailVid === row.vid ? "bg-(--primary)/5" : ""}"
+										onclick={() => toggleVisitor(row.vid)}
+									>
+										<td class="py-2.5 pr-4">
+											<p class="font-mono text-xs font-semibold text-(--deep-text)">{vidShort(row.vid)}</p>
+											<p class="mt-0.5 font-mono text-[11px] text-(--content-meta)">{row.ip || "未记录 IP"}</p>
+										</td>
+										<td class="py-2.5 pr-4 text-xs text-(--content-meta)">{row.country}</td>
+										<td class="py-2.5 pr-4 text-xs text-(--content-meta)">
+											<p>{row.dev} · {row.os}</p>
+											<p class="mt-0.5">{row.br}</p>
+										</td>
+										<td class="whitespace-nowrap py-2.5 pr-4 text-xs tabular-nums text-(--deep-text)">{fmtRange(row.firstTs, row.lastTs)}</td>
+										<td class="py-2.5 pr-4 text-right tabular-nums">{fmt(row.pv)}</td>
+										<td class="py-2.5 pr-4 text-right tabular-nums">{fmt(row.sessions)}</td>
+										<td class="whitespace-nowrap py-2.5 pr-4 text-right text-xs tabular-nums text-(--content-meta)">{fmt(row.actions)} / {fmt(row.pageCount)}</td>
+									</tr>
+									{#if detailVid === row.vid}
+										<tr class="border-b border-(--line-divider)/40 bg-(--muted)/10">
+											<td colspan="7" class="p-4">
+												{#if detailLoading}
+													<p class="py-6 text-center text-xs text-(--content-meta)">正在加载该访客的访问记录…</p>
+												{:else if detailErr}
+													<p class="py-6 text-center text-xs text-red-500">{detailErr}</p>
+												{:else if detailMap[row.vid]}
+													{@const detail = detailMap[row.vid]}
+													<div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-(--content-meta)">
+														<span>IP：<b class="font-mono text-(--deep-text)">{detail.ips.join("、") || "未记录"}</b></span>
+														<span>环境：{detail.dev} · {detail.os} · {detail.br}</span>
+														<span>{detail.country}</span>
+													</div>
+													{#if detail.sessions.length === 0}
+														<p class="py-4 text-center text-xs text-(--content-meta)">该时间范围内没有会话明细</p>
+													{:else}
+														<div class="space-y-3">
+															{#each detail.sessions as s, si}
+																<div class="rounded-xl border border-(--line-divider)/50 bg-(--card-bg) p-3.5">
+																	<div class="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+																		<p class="text-xs font-bold text-(--deep-text)">
+																			访问 #{detail.sessions.length - si} · {fmtRange(s.start, s.end)}
+																		</p>
+																		<span class="text-[11px] text-(--content-meta)">时长 {fmtDur(s.end - s.start)} · {fmt(s.pv)} 个页面 · {fmt(s.actions.length)} 个操作</span>
+																	</div>
+																	<ol class="space-y-1.5 border-l-2 border-(--primary)/25 pl-3">
+																		{#each sessionTimeline(s) as item}
+																			{#if item.kind === "page"}
+																				<li class="flex items-center gap-2 text-xs">
+																					<span class="w-10 flex-none tabular-nums text-(--content-meta)">{fmtClock(item.t)}</span>
+																					<i class="h-1.5 w-1.5 flex-none rounded-full bg-[#4d86e8]"></i>
+																					<a href={item.path} target="_blank" rel="noreferrer" class="min-w-0 flex-1 truncate text-(--deep-text) hover:text-(--primary)">{item.path}</a>
+																					{#if item.dwell}<span class="flex-none text-[11px] text-(--content-meta)">停留 {fmtDur(item.dwell)}</span>{/if}
+																				</li>
+																			{:else}
+																				<li class="flex items-center gap-2 text-xs">
+																					<span class="w-10 flex-none tabular-nums text-(--content-meta)">{fmtClock(item.t)}</span>
+																					<i class="h-1.5 w-1.5 flex-none rounded-full bg-[#39b99a]"></i>
+																					<span class="min-w-0 flex-1 truncate text-(--content-meta)">
+																						{item.action}{#if item.label} · {item.label}{/if}
+																						<span class="ml-1 opacity-70">（{item.path}）</span>
+																					</span>
+																				</li>
+																			{/if}
+																		{/each}
+																	</ol>
+																</div>
+															{/each}
+														</div>
+													{/if}
+												{/if}
+											</td>
+										</tr>
+									{/if}
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</div>
+
+			<!-- IP 汇总 -->
+			<div class="card-base onload-animation mt-4 rounded-2xl p-5">
+				<header class="mb-4 flex flex-wrap items-center justify-between gap-2">
+					<div>
+						<h2 class="text-sm font-bold">访客 IP 汇总</h2>
+						<p class="mt-0.5 text-xs text-(--content-meta)">
+							近 {stats.rangeDays} 天共 {fmt(stats.totalIpCount)} 个 IP · {settings?.maskIp ? "已启用 IP 脱敏展示" : "显示完整 IP"}
+						</p>
+					</div>
+				</header>
+				{#if stats.totalIpCount === 0}
+					<p class="py-10 text-center text-sm text-(--content-meta)">暂无数据</p>
+				{:else}
+					{@const ipTotal = stats.totalIpCount}
+					{@const ipPageCount = Math.max(1, Math.ceil(ipTotal / IP_PAGE_SIZE))}
+					{@const safePage = Math.min(ipPage, ipPageCount)}
+					{@const ipRows = stats.ipList.slice((safePage - 1) * IP_PAGE_SIZE, safePage * IP_PAGE_SIZE)}
 					<div class="overflow-x-auto">
 						<table class="w-full text-left text-sm">
 							<thead>
@@ -699,16 +1150,16 @@ function maxCountryOf(data: StatsData | null): number {
 								</tr>
 							</thead>
 							<tbody>
-									{#each ipRows as row}
-										<tr class="border-b border-(--line-divider)/40 transition hover:bg-(--muted)/20">
-											<td class="py-2.5 pr-4 font-mono text-xs text-(--deep-text)">{row.ip}</td>
-											<td class="py-2.5 pr-4 text-(--content-meta)">{row.country}</td>
-											<td class="py-2.5 pr-4 text-right tabular-nums">{fmt(row.pv)}</td>
-											<td class="py-2.5 pr-4 text-right tabular-nums">{fmt(row.uv)}</td>
-											<td class="py-2.5 text-xs tabular-nums text-(--content-meta)">{fmtDateTime(row.lastSeen)}</td>
-										</tr>
-									{/each}
-								</tbody>
+								{#each ipRows as row}
+									<tr class="border-b border-(--line-divider)/40 transition hover:bg-(--muted)/20">
+										<td class="py-2.5 pr-4 font-mono text-xs text-(--deep-text)">{row.ip}</td>
+										<td class="py-2.5 pr-4 text-xs text-(--content-meta)">{row.country}</td>
+										<td class="py-2.5 pr-4 text-right tabular-nums">{fmt(row.pv)}</td>
+										<td class="py-2.5 pr-4 text-right tabular-nums">{fmt(row.uv)}</td>
+										<td class="py-2.5 text-xs tabular-nums text-(--content-meta)">{fmtDateTime(row.lastSeen)}</td>
+									</tr>
+								{/each}
+							</tbody>
 						</table>
 					</div>
 					<ClientPagination totalItems={ipTotal} itemsPerPage={IP_PAGE_SIZE} currentPage={safePage} onPageChange={(p) => (ipPage = p)} />
@@ -723,6 +1174,7 @@ function maxCountryOf(data: StatsData | null): number {
 
 					{#each [
 						{ key: "enabled", label: "统计埋点", desc: "关闭后停止接收新的访问事件（历史数据保留）", checked: sEnabled },
+						{ key: "recordActions", label: "采集操作行为", desc: "记录按钮点击、出站链接等用户操作，用于「用户行为」分析", checked: sRecordActions },
 						{ key: "recordIp", label: "记录访客 IP", desc: "关闭后不再保存 IP 字段（已有数据不受影响）", checked: sRecordIp },
 						{ key: "maskIp", label: "隐藏 IP 后段", desc: "展示时脱敏（如 192.168.1.*），IPv6 保留前三组", checked: sMaskIp },
 					] as item}
@@ -737,6 +1189,7 @@ function maxCountryOf(data: StatsData | null): number {
 								aria-checked={item.checked}
 								onclick={() => {
 									if (item.key === "enabled") sEnabled = !sEnabled;
+									if (item.key === "recordActions") sRecordActions = !sRecordActions;
 									if (item.key === "recordIp") sRecordIp = !sRecordIp;
 									if (item.key === "maskIp") sMaskIp = !sMaskIp;
 								}}
@@ -786,7 +1239,7 @@ function maxCountryOf(data: StatsData | null): number {
 
 				<section class="card-base onload-animation rounded-2xl p-5">
 					<h2 class="text-sm font-bold">数据导出</h2>
-					<p class="mt-0.5 mb-4 text-xs text-(--content-meta)">导出事件明细（IP 按当前脱敏设置处理）</p>
+					<p class="mt-0.5 mb-4 text-xs text-(--content-meta)">导出事件明细（含访问、停留、行为三类，IP 按当前脱敏设置处理）</p>
 
 					<div class="grid grid-cols-2 gap-3">
 						<label class="block">
