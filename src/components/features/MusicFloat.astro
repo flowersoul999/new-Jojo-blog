@@ -10,72 +10,73 @@ import { Icon } from "astro-icon/components";
 	<span class="fm-float-lrc-text block whitespace-nowrap overflow-hidden text-ellipsis text-2xl text-neutral-700/85 dark:text-neutral-200/90"></span>
 </div>
 
-<!-- 悬浮迷你播放器 -->
+<!-- 悬浮迷你播放器（左下角，参照 fqzlr 毛玻璃风格） -->
 <div
-	class="fm-mini fixed left-1/2 bottom-6 z-[130] w-[min(92vw,680px)] -translate-x-1/2 translate-y-6 scale-95 opacity-0 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+	class="fm-mini fixed bottom-4 left-4 z-[130] w-[min(94vw,440px)] translate-y-6 scale-95 opacity-0 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
 	role="dialog"
 	aria-label="悬浮播放器"
 >
-	<div class="relative rounded-[28px] border border-white/40 bg-white/70 p-3 pl-4 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-neutral-900/70">
+	<div class="relative flex items-center gap-2.5 rounded-[20px] border border-white/50 bg-white/60 p-2.5 pl-3 pr-8 shadow-[0_8px_24px_rgba(0,0,0,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/60">
 		<!-- 关闭 -->
-		<button class="fm-mini-close absolute right-3 top-3 rounded-full p-1 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="关闭悬浮播放器" aria-label="关闭悬浮播放器">
-			<Icon is:inline name="material-symbols:close-rounded" class="text-2xl" aria-hidden="true" />
+		<button class="fm-mini-close absolute right-1.5 top-1.5 z-20 rounded-full p-0.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="关闭悬浮播放器" aria-label="关闭悬浮播放器">
+			<Icon is:inline name="material-symbols:close-rounded" class="text-lg" aria-hidden="true" />
 		</button>
 
-		<!-- 上半：封面 + 信息 + 波浪进度 -->
-		<div class="flex items-center gap-3 pr-10">
-			<button class="fm-mini-cover-btn relative h-16 w-16 shrink-0 overflow-visible rounded-full active:scale-95 transition-transform" title="播放/暂停" aria-label="播放/暂停">
-				<img class="fm-mini-cover h-full w-full rounded-full border-2 border-white object-cover shadow-lg dark:border-neutral-700" src="" alt="封面" />
-				<span class="fm-mini-cover-mask absolute inset-0 flex items-center justify-center rounded-full bg-black/25 opacity-0 transition-opacity">
-					<Icon is:inline name="material-symbols:play-arrow-rounded" class="fm-mini-icon-play text-3xl text-white ml-0.5" aria-hidden="true" />
-					<Icon is:inline name="material-symbols:pause-rounded" class="fm-mini-icon-pause text-3xl text-white hidden" aria-hidden="true" />
-				</span>
-			</button>
+		<!-- 唱片（旋转 + 中央播放态，仿 fqzlr disc） -->
+		<button class="fm-mini-cover-btn relative h-11 w-11 shrink-0 rounded-full transition-transform active:scale-95" title="播放/暂停" aria-label="播放/暂停">
+			<img class="fm-mini-cover h-full w-full rounded-full object-cover shadow-[0_0_0_1.5px_#fff,0_0_0_2.5px_rgba(0,0,0,0.55),0_5px_16px_rgba(0,0,0,0.22)] dark:shadow-[0_0_0_1.5px_#000,0_0_0_2.5px_rgba(255,255,255,0.7),0_5px_16px_rgba(0,0,0,0.45)]" src="" alt="封面" />
+			<span class="fm-mini-cover-mask absolute inset-0 flex items-center justify-center rounded-full bg-black/30 opacity-0 transition-opacity">
+				<Icon is:inline name="material-symbols:play-arrow-rounded" class="fm-mini-icon-play text-xl text-white ml-0.5" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:pause-rounded" class="fm-mini-icon-pause text-xl text-white hidden" aria-hidden="true" />
+			</span>
+		</button>
 
-			<div class="min-w-0 flex-1">
-				<div class="fm-mini-title truncate text-base font-bold leading-tight text-neutral-800 dark:text-neutral-100">未在播放</div>
-				<div class="fm-mini-artist truncate text-xs text-neutral-500 dark:text-neutral-400">—</div>
-				<div class="mt-1 flex items-center gap-2">
-					<span class="fm-mini-current w-9 shrink-0 text-right text-[10px] tabular-nums text-neutral-400">0:00</span>
-					<div class="fm-mini-track relative h-5 flex-1 cursor-pointer touch-none" role="slider" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-						<div class="fm-mini-fill absolute left-0 top-1/2 h-[3px] w-0 -translate-y-1/2 rounded-full bg-(--primary) pointer-events-none"></div>
-						<svg class="fm-mini-wave absolute left-0 top-0 h-full w-full overflow-visible pointer-events-none" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
-							<defs>
-								<clipPath id="fm-mini-wave-clip">
-									<rect class="fm-mini-clip" x="0" y="0" width="0" height="20"></rect>
-								</clipPath>
-							</defs>
-							<g class="fm-mini-waveflow" clip-path="url(#fm-mini-wave-clip)">
-								<path class="fm-mini-wavepath" d="" fill="none" stroke="var(--primary)" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
-							</g>
-						</svg>
-						<div class="fm-mini-thumb pointer-events-none absolute left-0 top-1/2 z-10 -ml-[7px] -mt-[7px] h-3.5 w-3.5 rounded-full bg-(--primary) ring-2 ring-white shadow-sm dark:ring-neutral-800"></div>
-					</div>
-					<span class="fm-mini-total w-9 shrink-0 text-[10px] tabular-nums text-neutral-400">0:00</span>
+		<!-- 歌曲信息 + 进度 -->
+		<div class="min-w-0 flex-1">
+			<div class="flex items-baseline gap-2 leading-tight">
+				<span class="fm-mini-title min-w-0 flex-1 truncate text-sm font-bold text-neutral-800 dark:text-neutral-100">未在播放</span>
+				<span class="fm-mini-artist max-w-[42%] shrink-0 truncate text-[11px] text-neutral-500 dark:text-neutral-400">—</span>
+			</div>
+			<div class="mt-0.5 flex items-center gap-1">
+				<span class="fm-mini-current w-7 shrink-0 text-right text-[10px] tabular-nums text-neutral-400">0:00</span>
+				<div class="fm-mini-track relative h-5 min-w-0 flex-1 cursor-pointer touch-none" role="slider" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+					<div class="fm-mini-fill absolute left-0 top-1/2 h-[3px] w-0 -translate-y-1/2 rounded-full bg-(--primary) pointer-events-none"></div>
+					<svg class="fm-mini-wave absolute left-0 top-0 h-full w-full overflow-visible pointer-events-none" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
+						<defs>
+							<clipPath id="fm-mini-wave-clip">
+								<rect class="fm-mini-clip" x="0" y="0" width="0" height="20"></rect>
+							</clipPath>
+						</defs>
+						<g class="fm-mini-waveflow" clip-path="url(#fm-mini-wave-clip)">
+							<path class="fm-mini-wavepath" d="" fill="none" stroke="var(--primary)" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+						</g>
+					</svg>
+					<div class="fm-mini-thumb pointer-events-none absolute left-0 top-1/2 z-10 -ml-[5px] -mt-[5px] h-2.5 w-2.5 rounded-full bg-(--primary) ring-2 ring-white shadow-sm dark:ring-neutral-800"></div>
 				</div>
+				<span class="fm-mini-total w-7 shrink-0 text-[10px] tabular-nums text-neutral-400">0:00</span>
 			</div>
 		</div>
 
-		<!-- 下半：控制条 -->
-		<div class="mt-2 flex items-center justify-center gap-1 rounded-2xl bg-black/5 py-1.5 dark:bg-white/5">
-			<button class="fm-mini-mode p-2 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="播放模式" aria-label="播放模式">
-				<Icon is:inline name="material-symbols:repeat-rounded" class="fm-mini-icon-repeat text-xl" aria-hidden="true" />
-				<Icon is:inline name="material-symbols:repeat-one-rounded" class="fm-mini-icon-repeat-one text-xl hidden" aria-hidden="true" />
-				<Icon is:inline name="material-symbols:shuffle-rounded" class="fm-mini-icon-shuffle text-xl hidden" aria-hidden="true" />
+		<!-- 控制条（单行紧凑，参照 fqzlr toolbar） -->
+		<div class="flex shrink-0 items-center justify-end gap-0.5">
+			<button class="fm-mini-prev p-1.5 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="上一首" aria-label="上一首">
+				<Icon is:inline name="material-symbols:skip-previous-rounded" class="text-xl" aria-hidden="true" />
 			</button>
-			<button class="fm-mini-prev p-2 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="上一首" aria-label="上一首">
-				<Icon is:inline name="material-symbols:skip-previous-rounded" class="text-2xl" aria-hidden="true" />
+			<button class="fm-mini-play mx-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition active:scale-95 dark:bg-white dark:text-neutral-900" title="播放/暂停" aria-label="播放/暂停">
+				<Icon is:inline name="material-symbols:play-arrow-rounded" class="fm-mini-icon-play-big ml-0.5 text-xl" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:pause-rounded" class="fm-mini-icon-pause-big hidden text-xl" aria-hidden="true" />
 			</button>
-			<button class="fm-mini-play mx-1 flex h-13 w-13 items-center justify-center rounded-[20px] bg-neutral-900 p-3 text-white transition active:scale-95 dark:bg-white dark:text-neutral-900" title="播放/暂停" aria-label="播放/暂停">
-				<Icon is:inline name="material-symbols:play-arrow-rounded" class="fm-mini-icon-play-big ml-0.5 text-2xl" aria-hidden="true" />
-				<Icon is:inline name="material-symbols:pause-rounded" class="fm-mini-icon-pause-big hidden text-2xl" aria-hidden="true" />
+			<button class="fm-mini-next p-1.5 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="下一首" aria-label="下一首">
+				<Icon is:inline name="material-symbols:skip-next-rounded" class="text-xl" aria-hidden="true" />
 			</button>
-			<button class="fm-mini-next p-2 text-neutral-600 transition hover:text-(--primary) active:scale-95 dark:text-neutral-300" title="下一首" aria-label="下一首">
-				<Icon is:inline name="material-symbols:skip-next-rounded" class="text-2xl" aria-hidden="true" />
+			<button class="fm-mini-mode p-1.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="播放模式" aria-label="播放模式">
+				<Icon is:inline name="material-symbols:repeat-rounded" class="fm-mini-icon-repeat text-lg" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:repeat-one-rounded" class="fm-mini-icon-repeat-one text-lg hidden" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:shuffle-rounded" class="fm-mini-icon-shuffle text-lg hidden" aria-hidden="true" />
 			</button>
-			<button class="fm-mini-mute p-2 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="静音" aria-label="静音">
-				<Icon is:inline name="material-symbols:volume-up-rounded" class="fm-mini-icon-vol-up text-xl" aria-hidden="true" />
-				<Icon is:inline name="material-symbols:volume-off-rounded" class="fm-mini-icon-vol-off text-xl hidden" aria-hidden="true" />
+			<button class="fm-mini-mute p-1.5 text-neutral-400 transition hover:text-(--primary) active:scale-95" title="静音" aria-label="静音">
+				<Icon is:inline name="material-symbols:volume-up-rounded" class="fm-mini-icon-vol-up text-lg" aria-hidden="true" />
+				<Icon is:inline name="material-symbols:volume-off-rounded" class="fm-mini-icon-vol-off text-lg hidden" aria-hidden="true" />
 			</button>
 		</div>
 	</div>
