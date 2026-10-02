@@ -1,0 +1,800 @@
+---
+title: "前端实习必备知识总结"
+published: 2026-09-15
+description: "围绕一个电商项目，梳理前端实习面试常考板块：Git 命令、前后端分离与 RESTful API、Axios 封装、Vue 核心、Vue CLI/Vite、Element-UI 组件库。"
+tags: ["Git", "Vue", "Axios", "接口", "前端"]
+category: "前端"
+image: "/blogs/前端/frontend-intern-cover.jpg"
+author: "jojo"
+draft: false
+comment: true
+lang: "zh-CN"
+aiPolished: false
+---
+
+本文整理了前端实习面试最常考的几大板块：**Git 常用命令**、**前后端分离 API 交互**、**Vue 实战核心**、**Vue CLI / Vite** 与 **Element-UI 组件库**，并穿插一个电商项目贯穿讲解。
+
+## 目录
+
+- [Git 版本控制常用命令](#一git-版本控制常用命令)
+- [前后端分离与 API 交互模式](#二前后端分离与-api-交互模式)
+- [Vue 核心知识](#三vue-核心知识)
+- [Vue CLI 与项目创建](#四vue-cli-与项目创建)
+- [Element-UI 组件库](#五element-ui-组件库)
+
+## 一、Git 版本控制常用命令
+
+  
+我之前学 Git 的时候觉得很乱，后来想通了一件事——Git 就像一个**"存档系统"**。你打游戏的时候会存档对吧？Git 干的就是这个事，只不过存的是代码。
+
+  
+我下面用一个电商项目的场景来贯穿讲解。假设我要开发一个商城系统，里面有**用户表、商品表、订单表**，我一个人开发也会用 Git 来管理代码版本。
+
+  
+### 1.1 初始化与克隆
+
+  
+---
+
+**场景**：我接手了一个电商项目，需要把远程仓库的代码拉到本地。
+
+  
+
+  
+
+```
+# 把远程仓库代码下载到本地（第一次）
+git clone https://github.com/xxx/shop-frontend.git
+
+# 或者本地新建一个项目并初始化
+git init                  # 把当前文件夹变成 Git 仓库
+git remote add origin https://github.com/xxx/shop-frontend.git
+                            # 关联远程仓库
+```
+
+  
+### 1.2 日常开发三板斧：add → commit → push
+
+  
+这三个命令是日常用得最多的，记住这个流程就行：
+
+  
+---
+
+**场景**：我写完了商品列表页面，要提交代码。
+
+  
+
+  
+
+```
+# 第一步：把修改的文件加入暂存区
+git add .                          # 加全部修改
+git add src/views/ProductList.vue   # 只加某个文件
+
+# 第二步：提交到本地仓库，写清楚你干了啥
+git commit -m "完成商品列表页面，支持分页加载"
+
+# 第三步：推送到远程仓库
+git push origin main              # main 是分支名
+```
+
+  
+打个比方：`git add` 是把东西放进购物车，`git commit` 是下单确认，`git push` 是发货到仓库。
+
+  
+### 1.3 拉取与分支管理
+
+  
+---
+
+**场景**：同事改了订单接口，我要同步他的代码；同时我要开发一个新功能，不想影响主分支。
+
+  
+
+  
+
+```
+# 拉取远程最新代码（同事改了接口我得同步）
+git pull origin main
+
+# 新建分支开发新功能（比如做购物车功能）
+git checkout -b feature/cart     # 创建并切换到新分支
+
+# 在新分支上开发完之后，切回主分支合并
+git checkout main                # 切回 main 分支
+git merge feature/cart          # 把 cart 分支的代码合并过来
+
+# 删掉用完的分支
+git branch -d feature/cart
+```
+
+  
+### 1.4 冲突解决（一定会遇到的）
+
+  
+我之前就遇到过这种情况：我和同事同时改了 `OrderList.vue` 这个文件，他先推了，我再 push 就被拒绝了。
+
+  
+
+```
+# 先拉取，会发现冲突
+git pull origin main
+
+# Git 会在冲突文件里标记出冲突：
+<<<<<<< HEAD
+<div class="order-id">订单号：{{ order.id }}</div>     # 我的代码
+=======
+<div class="order-no">订单编号：{{ order.orderNo }}</div>  # 同事的代码
+>>>>>>> 7a3b2c1
+
+# 手动决定保留哪个，删掉冲突标记，然后
+git add src/views/OrderList.vue
+git commit -m "解决订单列表冲突"
+git push origin main
+```
+
+  
+> **警告**：**血泪教训**：pull 之前一定先 commit 自己的代码，不然冲突的时候你的修改可能丢失。我之前就因为没 commit 直接 pull，差点丢了一下午的代码。
+
+  
+### 1.5 常用命令速查表
+
+  
+| 命令 | 作用 | 大白话 |
+|---|---|---|
+| `git status` | 查看文件状态 | 看看哪些文件改了 |
+| `git log` | 查看提交历史 | 看看之前都存了哪些档 |
+| `git diff` | 查看修改内容 | 看看具体改了啥 |
+| `git add .` | 加入暂存区 | 放进购物车 |
+| `git commit -m "说明"` | 提交到本地 | 下单确认 |
+| `git push origin main` | 推送到远程 | 发货 |
+| `git pull origin main` | 拉取远程更新 | 收货 |
+| `git checkout -b 分支名` | 新建并切换分支 | 开个新存档 |
+| `git merge 分支名` | 合并分支 | 两个存档合并 |
+| `git stash` | 暂存当前修改 | 先把活儿放一边 |
+| `git stash pop` | 恢复暂存的修改 | 把活儿拿回来继续 |
+
+  
+---
+
+  
+  
+## 二、前后端分离与 API 交互模式
+
+  
+以前做网页，后端把数据塞到 HTML 模板里，前端只管写样式。现在不一样了——**前后端分离**就是前端管页面，后端管数据，中间靠 API（接口）来通信。
+
+  
+打个比方：前端是餐厅的菜单和点餐台，后端是厨房。你（用户）在前端点了个菜（发请求），后端厨房做好了端出来（返回数据），前端负责把菜摆好看（渲染页面）。
+
+  
+### 2.1 什么是 RESTful API
+
+  
+RESTful 就是一种 API 设计风格——用 HTTP 方法表示你要干嘛，用 URL 表示你要操作什么资源。
+
+  
+以电商系统为例：
+
+  
+| HTTP 方法 | URL | 含义 | 大白话 |
+|---|---|---|---|
+| GET | `/api/products` | 获取商品列表 | 查看所有商品 |
+| GET | `/api/products/123` | 获取单个商品 | 看某个商品详情 |
+| POST | `/api/orders` | 创建订单 | 提交一个新订单 |
+| PUT | `/api/users/1` | 更新用户信息 | 修改个人资料 |
+| DELETE | `/api/orders/456` | 删除订单 | 取消某个订单 |
+
+  
+> **提示**：**记忆技巧**：GET = 拿，POST = 给，PUT = 换，DELETE = 删。跟 CRUD（增删改查）一一对应。
+
+  
+### 2.2 前端怎么发请求——Axios 封装
+
+  
+我在项目里不会每次请求都写一遍 `axios.get()`，而是做一层封装。下面是我在电商项目里实际用的方式：
+
+  
+
+```
+// src/utils/request.js —— Axios 二次封装
+import axios from 'axios'
+import { showFailToast } from 'vant'
+import router from '@/router'
+
+// 创建 axios 实例
+const request = axios.create({
+  baseURL: 'http://localhost:3000/api',  // 后端接口地址
+  timeout: 10000                          // 10秒超时
+})
+
+// 请求拦截器：每次发请求前自动带上 Token
+request.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
+// 响应拦截器：统一处理返回数据和错误
+request.interceptors.response.use(
+  (response) => {
+    // 后端约定的格式：{ code: 200, data: {}, message: '' }
+    const { code, data, message } = response.data
+    if (code === 200) {
+      return data          // 正常返回数据
+    }
+    if (code === 401) {
+      // Token 过期，跳转登录
+      localStorage.removeItem('token')
+      router.push('/login')
+      return Promise.reject(new Error('登录已过期'))
+    }
+    // 其他错误弹出提示
+    showFailToast(message)
+    return Promise.reject(new Error(message))
+  },
+  (error) => {
+    showFailToast('网络异常，请稍后重试')
+    return Promise.reject(error)
+  }
+)
+
+export default request
+```
+
+  
+### 2.3 在页面里怎么调用
+
+  
+---
+
+**场景**：商品列表页面，打开时请求后端获取商品数据并展示。
+
+  
+
+  
+
+```
+// src/api/product.js —— 接口统一管理
+import request from '@/utils/request'
+
+export const getProducts = (params) => {
+  return request.get('/products', { params })  // GET 请求
+}
+
+export const getProductDetail = (id) => {
+  return request.get(`/products/${id}`)         // 路径参数
+}
+
+export const createOrder = (data) => {
+  return request.post('/orders', data)          // POST 请求
+}
+```
+
+  
+
+```
+<!-- src/views/ProductList.vue -->
+<script setup>
+import { ref, onMounted } from 'vue'
+import { getProducts } from '@/api/product'
+
+const products = ref([])
+const loading = ref(false)
+const page = ref(1)
+
+const loadProducts = async () => {
+  loading.value = true
+  try {
+    const data = await getProducts({ page: page.value, size: 10 })
+    products.value = data.list
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadProducts()   // 页面加载时自动请求
+})
+</script>
+
+<template>
+  <div v-for="item in products" :key="item.id">
+    <h3>{{ item.name }}</h3>
+    <p>￥{{ item.price }}</p>
+  </div>
+</template>
+```
+
+  
+> **提示**：**为什么要封装？**1. 不用每次手写 Token；2. 错误统一处理不用每个页面都写；3. 后端地址变了只改一个地方就行。
+
+  
+### 2.4 前后端交互完整流程图
+
+  
+
+```
+用户点击"购买"
+    ↓
+前端 Vue 发起 POST /api/orders  （Axios 请求拦截器加上 Token）
+    ↓
+后端 Node.js + Express 收到请求  （验证 Token、处理业务逻辑）
+    ↓
+数据库 MongoDB 写入订单记录
+    ↓
+后端返回 { code: 200, data: { orderId: 789 }, message: "下单成功" }
+    ↓
+前端 Axios 响应拦截器收到数据
+    ↓
+Vue 更新页面，显示"下单成功"
+```
+
+  
+---
+
+  
+  
+## 三、Vue 核心知识
+
+  
+Vue 是我目前最熟的框架。我用自己的项目经验来梳理一下 Vue 最核心的几个概念。
+
+  
+### 3.1 响应式数据 — ref 和 reactive
+
+  
+响应式的意思是：数据变了，页面自动更新。就像 Excel 公式，你改了某个单元格，所有引用它的地方都会自动更新。
+
+  
+
+```
+<script setup>
+import { ref, reactive } from 'vue'
+
+// ref 用于基本类型（字符串、数字、布尔值）
+const count = ref(0)
+const productName = ref('iPhone 15')
+
+// 修改 ref 要用 .value
+function increment() {
+  count.value++
+}
+
+// reactive 用于对象/数组
+const order = reactive({
+  id: 1001,
+  items: [],
+  totalPrice: 0
+})
+
+// 修改 reactive 直接改属性
+function addToOrder(product) {
+  order.items.push(product)
+  order.totalPrice += product.price
+}
+</script>
+```
+
+  
+> **提示**：**简单记**：基本类型用 ref，对象用 reactive。用 ref 在 JS 里要 `.value`，在 template 里不用。
+
+  
+### 3.2 指令 — 模板里的特殊标记
+
+  
+Vue 指令就是标签属性前面加个 `v-`，告诉 Vue 这里要干点特殊的事。
+
+  
+
+```
+<!-- v-if / v-show：控制元素显示隐藏 -->
+<p v-if="order.items.length === 0">购物车是空的</p>
+<p v-else>购物车有 {{ order.items.length }} 件商品</p>
+
+<div v-show="isLoading">加载中...</div>
+<!-- v-if 是真正删除/创建 DOM，v-show 只是 display:none 切换 -->
+
+<!-- v-for：循环渲染列表 -->
+<div v-for="item in products" :key="item.id">
+  <span>{{ item.name }}
+  <span>￥{{ item.price }}
+</div>
+
+<!-- v-model：双向绑定（输入框和数据同步） -->
+<input v-model="productName" placeholder="输入商品名" />
+<p>你输入了：{{ productName }}</p>
+
+<!-- v-on / @：绑定事件 -->
+<button @click="addToOrder(product)">加入购物车</button>
+<button @click="count = 0">清零</button>
+```
+
+  
+| 指令 | 作用 | 我的理解 |
+|---|---|---|
+| `v-if` / `v-else` | 条件渲染 | 满足条件才创建这个元素 |
+| `v-show` | 显示/隐藏 | 元素一直在，只是切换 display |
+| `v-for` | 列表渲染 | 遍历数组生成多个元素 |
+| `v-model` | 双向绑定 | 输入框和数据双向同步 |
+| `v-bind` / `:` | 绑定属性 | 动态设置元素的属性值 |
+| `v-on` / `@` | 绑定事件 | 点击、输入、滚动等事件 |
+
+  
+### 3.3 computed 和 watch
+
+  
+
+```
+<script setup>
+import { ref, computed, watch } from 'vue'
+
+const price = ref(100)
+const quantity = ref(2)
+
+// computed：有缓存，依赖不变就不重新计算
+const totalPrice = computed(() => {
+  return price.value * quantity.value
+})
+// 页面用 {{ totalPrice }} 显示，只有 price 或 quantity 变了才重新算
+
+// watch：监听某个数据变化时执行操作
+watch(totalPrice, (newVal, oldVal) => {
+  console.log(`总价从 ${oldVal} 变成了 ${newVal}`)
+  if (newVal > 500) {
+    alert('超过500了，确认购买吗？')
+  }
+})
+</script>
+```
+
+  
+| 对比项 | computed | watch |
+|---|---|---|
+| 用途 | 计算派生值 | 数据变化时执行操作 |
+| 缓存 | 有缓存 | 无缓存 |
+| 能否异步 | 不能 | 可以 |
+| 使用场景 | 计算总价、格式化数据 | 监听变化发请求、弹提示 |
+
+  
+### 3.4 组件通信
+
+  
+组件化开发就是把页面拆成一块一块的独立组件。但组件之间需要传数据，这就是组件通信。
+
+  
+
+```
+<!-- 父组件 ProductList.vue -->
+<script setup>
+import { ref } from 'vue'
+import ProductCard from './ProductCard.vue'
+
+const products = ref([
+  { id: 1, name: 'iPhone 15', price: 5999 },
+  { id: 2, name: '华为 Mate60', price: 6999 }
+])
+
+// 接收子组件触发的事件
+function handleAddToCart(product) {
+  console.log('添加到购物车：', product.name)
+}
+</script>
+
+<template>
+  <!-- :product 是传数据给子组件，@add 是监听子组件的事件 -->
+  <ProductCard
+    v-for="item in products"
+    :key="item.id"
+    :product="item"
+    @add="handleAddToCart"
+  />
+</template>
+
+<!-- 子组件 ProductCard.vue -->
+<script setup>
+// 接收父组件传来的数据
+const props = defineProps({
+  product: Object
+})
+
+// 向父组件发送事件
+const emit = defineEmits(['add'])
+
+function addToCart() {
+  emit('add', props.product)
+}
+</script>
+
+<template>
+  <div class="card">
+    <h3>{{ product.name }}</h3>
+    <p>￥{{ product.price }}</p>
+    <button @click="addToCart">加入购物车</button>
+  </div>
+</template>
+```
+
+  
+| 方式 | 方向 | 场景 |
+|---|---|---|
+| props / emit | 父 ↔ 子 | 最常用，父子组件传数据 |
+| provide / inject | 祖 → 孙 | 跨层级传数据 |
+| Pinia | 全局 | 多个组件共享状态（登录态、购物车） |
+| ref / expose | 父 → 子 | 父组件直接调用子组件方法 |
+
+  
+### 3.5 Pinia 状态管理
+
+  
+Pinia 就是全局仓库。比如用户登录信息、购物车数据，很多页面都要用，放在每个组件里太麻烦，就放到 Pinia 里统一管理。
+
+  
+
+```
+// src/stores/user.js
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+
+export const useUserStore = defineStore('user', () => {
+  const token = ref(localStorage.getItem('token') || '')
+  const userInfo = ref(null)
+
+  function setToken(newToken) {
+    token.value = newToken
+    localStorage.setItem('token', newToken)
+  }
+
+  function logout() {
+    token.value = ''
+    userInfo.value = null
+    localStorage.removeItem('token')
+  }
+
+  return { token, userInfo, setToken, logout }
+})
+```
+
+  
+
+```
+// 任意组件里使用
+<script setup>
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+
+// 直接读取
+console.log(userStore.token)
+
+// 调用方法
+userStore.setToken('abc123')
+userStore.logout()
+</script>
+```
+
+  
+### 3.6 Vue Router 路由
+
+  
+路由就是根据 URL 显示不同的页面。比如 `/products` 显示商品列表，`/order/123` 显示订单详情。
+
+  
+
+```
+// src/router/index.js
+import { createRouter, createWebHistory } from 'vue-router'
+
+const routes = [
+  { path: '/', redirect: '/products' },
+  { path: '/products', component: () => import('@/views/ProductList.vue') },
+  { path: '/product/:id', component: () => import('@/views/ProductDetail.vue') },
+  { path: '/login', component: () => import('@/views/Login.vue') }
+]
+
+const router = createRouter({
+  history: createWebHistory(),  // history 模式
+  routes
+})
+
+// 全局路由守卫：没登录就跳登录页
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  if (to.path !== '/login' && !token) {
+    next('/login')
+  } else {
+    next()
+  }
+})
+
+export default router
+```
+
+  
+> **提示**：**路由懒加载**就是 `() => import('组件')` 这种写法。好处是打开首页时不会把所有页面的代码都加载了，用到哪个加载哪个，首屏更快。
+
+  
+
+```
+<!-- 页面里用 router-link 跳转 -->
+<router-link to="/products">商品列表</router-link>
+
+<!-- 编程式导航 -->
+<script setup>
+import { useRouter, useRoute } from 'vue-router'
+
+const router = useRouter()
+const route = useRoute()
+
+function goProductDetail(id) {
+  router.push(`/product/${id}`)
+}
+
+// 获取路由参数
+console.log(route.params.id)
+</script>
+```
+
+  
+---
+
+  
+  
+## 四、Vue CLI 与项目创建
+
+  
+### 4.1 Vue CLI 是什么
+
+  
+Vue CLI 是 Vue 官方的脚手架工具，一句话就能生成一个完整的项目骨架——Webpack 配置、Babel 转译、ESLint 检查、开发服务器，全给你配好了。
+
+  
+
+```
+# 安装 Vue CLI
+npm install -g @vue/cli
+
+# 创建项目（会弹出交互式选择）
+vue create my-shop
+
+# 启动开发服务器
+cd my-shop
+npm run serve
+
+# 打包构建
+npm run build
+```
+
+  
+### 4.2 Vite 方式（现在更推荐）
+
+  
+
+```
+# 创建项目
+npm create vue@latest
+
+# 按提示选择配置后
+cd my-project
+npm install
+npm run dev
+```
+
+  
+| 对比项 | Vue CLI | Vite |
+|---|---|---|
+| 构建工具 | Webpack | ES Module + Rollup |
+| 启动速度 | 慢（需先打包） | 极快（按需加载） |
+| 热更新 | 秒级 | 毫秒级 |
+| 适用版本 | Vue2 为主 | Vue3 官方推荐 |
+| 老项目兼容 | 好 | 新项目优先 |
+
+  
+> **提示**：**面试怎么说**："我项目用的是 Vite，启动和热更新都很快。Vue CLI 我也了解，原理是基于 Webpack 打包。Vite 开发时利用浏览器原生 ES Module 按需加载，所以快。"
+
+  
+---
+
+  
+  
+## 五、Element-UI 组件库
+
+  
+Element-UI 是一套现成的 Vue 组件库——表格、表单、弹窗、按钮等都有现成的，不用自己从零写。就像搭积木一样，拿来即用。
+
+  
+### 5.1 安装与使用
+
+  
+
+```
+# Vue2 用 Element-UI
+npm install element-ui
+
+# Vue3 用 Element-Plus
+npm install element-plus
+```
+
+  
+
+```
+// main.js —— 全局注册
+import { createApp } from 'vue'
+import App from './App.vue'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+
+const app = createApp(App)
+app.use(ElementPlus)
+app.mount('#app')
+```
+
+  
+
+```
+<!-- 页面里直接用 -->
+<template>
+  <el-button type="primary">提交订单</el-button>
+
+  <el-table :data="products" stripe>
+    <el-table-column prop="name" label="商品名称" />
+    <el-table-column prop="price" label="价格" />
+    <el-table-column label="操作">
+      <template #default="scope">
+        <el-button size="small" @click="edit(scope.row)">编辑</el-button>
+      </template>
+    </el-table-column>
+  </el-table>
+
+  <el-dialog v-model="dialogVisible" title="编辑商品">
+    <el-form :model="form">
+      <el-form-item label="名称">
+        <el-input v-model="form.name" />
+      </el-form-item>
+    </el-form>
+  </el-dialog>
+</template>
+```
+
+  
+| 常用组件 | 用途 |
+|---|---|
+| `el-button` | 按钮 |
+| `el-table` | 数据表格（后台管理最常用） |
+| `el-form` / `el-input` | 表单与输入框 |
+| `el-dialog` | 弹窗对话框 |
+| `el-pagination` | 分页 |
+| `el-menu` | 导航菜单 |
+| `el-upload` | 文件上传 |
+| `el-message` | 消息提示 |
+
+  
+> **提示**：**为什么用组件库？**不用自己写弹窗动画、表格排序、表单校验这些复杂的东西，节省大量时间。而且风格统一，做后台管理系统特别合适。
+
+  
+---
+
+  
+  
+## 总结
+
+  
+这篇文章围绕一个电商项目，把前端实习面试最常考的几个板块梳理了一遍：
+
+  
+| 板块 | 核心要点 |
+|---|---|
+| Git | add → commit → push 三板斧，分支管理，冲突解决 |
+| 前后端分离 | RESTful API 设计，Axios 封装（拦截器处理 Token 和错误） |
+| Vue 核心 | 响应式数据、指令、computed/watch、组件通信、Pinia、Router |
+| Vue CLI | 脚手架创建项目，Vite 和 Webpack 的区别 |
+| Element-UI | 组件库使用，快速搭建后台管理界面 |
+
+  
+这些知识不是死记硬背的，都是在做项目的过程中慢慢理解的。建议自己也搭一个电商小项目，把这些东西串起来用一遍，比看十遍文档都管用。
