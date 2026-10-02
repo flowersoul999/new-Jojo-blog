@@ -478,7 +478,7 @@ export async function aggregateStats(days = 30): Promise<StatsResult> {
 
 	const loaded = await Promise.all([...union].map((d) => loadDay(d)));
 	const byDay = new Map<string, StoredEvent[]>();
-	union.forEach((d, i) => {
+	[...union].forEach((d, i) => {
 		byDay.set(d, loaded[i]);
 	});
 
