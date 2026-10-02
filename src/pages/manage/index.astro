@@ -1,0 +1,11 @@
+---
+import ContentManager from "@/components/manage/ContentManager.svelte";
+import WriteLayout from "@/layouts/WriteLayout.astro";
+
+// 内容管理页依赖浏览器端 URL 与认证状态，禁止静态预渲染（SSR 阶段无 location）
+export const prerender = false;
+---
+
+<WriteLayout title="内容管理">
+	<ContentManager client:load />
+</WriteLayout>

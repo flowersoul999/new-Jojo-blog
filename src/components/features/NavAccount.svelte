@@ -22,6 +22,7 @@ let { variant = "desktop" }: Props = $props();
 // 认证状态
 let authenticated = $state(false);
 let user = $state<GithubUser | null>(null);
+let isAdmin = $state(false);
 let open = $state(false);
 
 // GitHub 品牌图标路径（内联，避免依赖构建期图标扫描）
@@ -36,6 +37,7 @@ async function checkAuth() {
 		});
 		const data = await res.json();
 		authenticated = data.authenticated === true;
+		isAdmin = data.isAdmin === true;
 		user = data.user ?? null;
 	} catch {
 		authenticated = false;
@@ -54,12 +56,6 @@ onMount(() => {
 	document.addEventListener("click", onDocClick);
 	return () => document.removeEventListener("click", onDocClick);
 });
-
-// 打开内容管理面板（ContentEditor 监听该事件）
-function openManager() {
-	open = false;
-	window.dispatchEvent(new CustomEvent("content-editor:open"));
-}
 
 // 退出登录
 async function logout() {
@@ -127,23 +123,36 @@ const displayName = $derived(user?.name || user?.login || "");
 						</svg>
 						写文章
 					</a>
-					<button
-						type="button"
-						class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
-						onclick={openManager}
+					<a
+						href="/manage/"
+						class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10"
+						onclick={() => (open = false)}
 						role="menuitem"
 					>
 						<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
 						</svg>
 						内容管理
-					</button>
-					<button
-						type="button"
-						class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-red-500 hover:bg-red-500/10"
-						onclick={logout}
-						role="menuitem"
-					>
+					</a>
+						{#if isAdmin}
+							<a
+								href="/admin/"
+								class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10"
+								onclick={() => (open = false)}
+								role="menuitem"
+							>
+								<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+								</svg>
+								后台管理
+							</a>
+						{/if}
+						<button
+							type="button"
+							class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-red-500 hover:bg-red-500/10"
+							onclick={logout}
+							role="menuitem"
+						>
 						<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
 						</svg>
@@ -185,23 +194,34 @@ const displayName = $derived(user?.name || user?.login || "");
 				</svg>
 				写文章
 			</a>
-			<button
-				type="button"
-				data-mobile-menu-close
-				class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
-				onclick={openManager}
-			>
-				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-					<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
-				</svg>
-				内容管理
-			</button>
-			<button
-				type="button"
-				data-mobile-menu-close
-				class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm text-red-500 hover:bg-red-500/10"
-				onclick={logout}
-			>
+			<a
+					href="/manage/"
+					data-mobile-menu-close
+					class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm hover:bg-black/5 dark:hover:bg-white/10"
+				>
+					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+					</svg>
+					内容管理
+				</a>
+				{#if isAdmin}
+					<a
+						href="/admin/"
+						data-mobile-menu-close
+						class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm hover:bg-black/5 dark:hover:bg-white/10"
+					>
+						<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+						</svg>
+						后台管理
+					</a>
+				{/if}
+				<button
+					type="button"
+					data-mobile-menu-close
+					class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm text-red-500 hover:bg-red-500/10"
+					onclick={logout}
+				>
 				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 					<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
 				</svg>

@@ -2,9 +2,9 @@
 import GoogleAnalytics from "@components/analytics/GoogleAnalytics.astro";
 import La51Analytics from "@components/analytics/La51Analytics.astro";
 import MicrosoftClarity from "@components/analytics/MicrosoftClarity.astro";
+import SelfAnalytics from "@components/analytics/SelfAnalytics.astro";
 import UmamiAnalytics from "@components/analytics/UmamiAnalytics.astro";
 import UmamiMetrics from "@components/analytics/UmamiMetrics.astro";
-import ContentEditor from "@components/features/ContentEditor.svelte";
 import FancyboxManager from "@components/features/FancyboxManager.astro";
 import FontSetup from "@components/features/FontSetup.astro";
 import MusicFloat from "@components/features/MusicFloat.astro";
@@ -156,6 +156,8 @@ const canonicalUrl = new URL(
             screenRecord={analyticsConfig.la51Analytics?.screenRecord}
             />
     )}
+        {/* 自托管统计埋点（与外部统计服务并存，互不影响） */}
+        <SelfAnalytics enabled={analyticsConfig?.selfHostedAnalytics?.enabled !== false} />
 
     <title>{pageTitle}</title>
     <meta
@@ -630,10 +632,6 @@ const canonicalUrl = new URL(
     <!-- Fancybox Manager -->
     <FancyboxManager />
     <WalineManager />
-
-    <!-- 内容编辑器：GitHub 登录后可在网页上直接编辑文章和配置。
-         延迟到浏览器空闲期水合，避免编辑器脚本阻塞首屏关键路径 -->
-    <ContentEditor client:idle />
 
     <!-- Tab 径向轮盘：按住 Tab 呼出快速导航 -->
     <TabRadialMenu client:load />
