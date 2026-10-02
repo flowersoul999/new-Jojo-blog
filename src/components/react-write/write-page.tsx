@@ -2,6 +2,8 @@
 
 // 图片压缩工具（算法与质量参数和 jojo-blog 完全一致：WebP 0.8）
 import { compressImage } from "@utils/image-compress";
+// 上传先进入裁剪画布（裁剪 + 压缩一体化），封面锁定 16:10
+import { openImageCrop } from "@utils/image-crop";
 import {
 	Eye,
 	FileUp,
@@ -51,6 +53,20 @@ type PostForm = {
 	description: string;
 	category: string;
 	draft: boolean;
+	// ---- 高级字段（对应 frontmatter.ts 的 PostMeta 扩展字段）----
+	updated: string; // YYYY-MM-DD，空串 = 未设置
+	lang: string; // 默认 "zh-CN"
+	pinned: boolean;
+	pinnedOrder: number | ""; // 空串 = 未设置（表单友好）
+	author: string;
+	sourceLink: string;
+	licenseName: string;
+	licenseUrl: string;
+	comment: boolean; // 默认 true
+	password: string;
+	passwordHint: string;
+	aiSummary: string;
+	aiPolished: boolean; // 默认 true
 };
 
 type PostListItem = { name: string; path: string; type: "file" | "dir" };
@@ -86,12 +102,28 @@ type PublishJob = {
 	description: string;
 	category: string;
 	draft: boolean;
+	// ---- 高级字段（随任务快照持久化，续跑时原样回填）----
+	updated: string;
+	lang: string;
+	pinned: boolean;
+	pinnedOrder: number | "";
+	author: string;
+	sourceLink: string;
+	licenseName: string;
+	licenseUrl: string;
+	comment: boolean;
+	password: string;
+	passwordHint: string;
+	aiSummary: string;
+	aiPolished: boolean;
 	images: JobImage[];
 	cover: JobImage | null;
 	startedAt: number;
 };
 
-const JOB_KEY = "aemeath-write-publish-job";
+// v2：任务快照结构含高级字段，旧版快照（aemeath-write-publish-job）直接忽略，
+// 避免缺字段导致续跑时丢配置
+const JOB_KEY = "aemeath-write-publish-job-v2";
 const DRAFTS_KEY = "aemeath-write-drafts";
 
 // 图片压缩质量（与 jojo-blog 的 diary-image-uploader 保持一致：WebP 80%）
@@ -118,6 +150,19 @@ function emptyForm(): PostForm {
 		description: "",
 		category: "",
 		draft: false,
+		updated: "",
+		lang: "zh-CN",
+		pinned: false,
+		pinnedOrder: "",
+		author: "",
+		sourceLink: "",
+		licenseName: "",
+		licenseUrl: "",
+		comment: true,
+		password: "",
+		passwordHint: "",
+		aiSummary: "",
+		aiPolished: true,
 	};
 }
 
@@ -300,6 +345,7 @@ export default function WritePage(): ReactElement {
 						);
 					}
 					// dev 下写文件触发的全量刷新可能打断发布：有快照就自动续跑
+					let resumed = false;
 					try {
 						const jobRaw = sessionStorage.getItem(JOB_KEY);
 						if (jobRaw) {
@@ -307,9 +353,19 @@ export default function WritePage(): ReactElement {
 							hydrateFromJob(pendingJob);
 							toast.info("检测到未完成的发布，正在自动续跑…");
 							void runJob(pendingJob, new Map());
+							resumed = true;
 						}
 					} catch {
 						sessionStorage.removeItem(JOB_KEY);
+					}
+					// ?edit=slug 预加载：从内容管理「编辑」跳转直达，无需再选文章；
+					// 有未完成发布续跑时让位，避免二次弹「未保存」确认
+					if (!resumed) {
+						const editParam = new URLSearchParams(location.search).get("edit");
+						if (editParam) {
+							void loadPost(`src/content/posts/${editParam}.md`);
+							history.replaceState(null, "", location.pathname);
+						}
 					}
 				} else {
 					setAuthState("anon");
@@ -586,6 +642,20 @@ export default function WritePage(): ReactElement {
 				description: meta.description,
 				category: meta.category,
 				draft: meta.draft,
+				// 高级字段回填（缺省时由 defaultPostMeta 保证字段齐全）
+				updated: meta.updated,
+				lang: meta.lang,
+				pinned: meta.pinned,
+				pinnedOrder: meta.pinnedOrder,
+				author: meta.author,
+				sourceLink: meta.sourceLink,
+				licenseName: meta.licenseName,
+				licenseUrl: meta.licenseUrl,
+				comment: meta.comment,
+				password: meta.password,
+				passwordHint: meta.passwordHint,
+				aiSummary: meta.aiSummary,
+				aiPolished: meta.aiPolished,
 			});
 			setPublishedUrl(null);
 			toast.success("文章已载入编辑器");
@@ -672,6 +742,19 @@ export default function WritePage(): ReactElement {
 			description: job.description,
 			category: job.category,
 			draft: job.draft,
+			updated: job.updated,
+			lang: job.lang,
+			pinned: job.pinned,
+			pinnedOrder: job.pinnedOrder,
+			author: job.author,
+			sourceLink: job.sourceLink,
+			licenseName: job.licenseName,
+			licenseUrl: job.licenseUrl,
+			comment: job.comment,
+			password: job.password,
+			passwordHint: job.passwordHint,
+			aiSummary: job.aiSummary,
+			aiPolished: job.aiPolished,
 		});
 		const toUrlItem = (img: JobImage): ImageItem =>
 			img.kind === "url"
@@ -750,7 +833,7 @@ export default function WritePage(): ReactElement {
 					: job.cover.publicPath
 				: "";
 
-			// 3. 组装 frontmatter + 正文（高级字段由 defaultPostMeta 默认值补齐，Phase 3 开放编辑）
+			// 3. 组装 frontmatter + 正文（高级字段编辑后可自由配置，未设置则省略默认值）
 			const fullMd = buildPostMarkdown(
 				{
 					...defaultPostMeta(),
@@ -761,6 +844,19 @@ export default function WritePage(): ReactElement {
 					category: job.category,
 					draft: job.draft,
 					image: coverPath,
+					updated: job.updated,
+					lang: job.lang,
+					pinned: job.pinned,
+					pinnedOrder: job.pinnedOrder,
+					author: job.author,
+					sourceLink: job.sourceLink,
+					licenseName: job.licenseName,
+					licenseUrl: job.licenseUrl,
+					comment: job.comment,
+					password: job.password,
+					passwordHint: job.passwordHint,
+					aiSummary: job.aiSummary,
+					aiPolished: job.aiPolished,
 				},
 				bodyMd,
 			);
@@ -857,6 +953,19 @@ export default function WritePage(): ReactElement {
 			description: form.description,
 			category: form.category,
 			draft: form.draft,
+			updated: form.updated,
+			lang: form.lang,
+			pinned: form.pinned,
+			pinnedOrder: form.pinnedOrder,
+			author: form.author,
+			sourceLink: form.sourceLink,
+			licenseName: form.licenseName,
+			licenseUrl: form.licenseUrl,
+			comment: form.comment,
+			password: form.password,
+			passwordHint: form.passwordHint,
+			aiSummary: form.aiSummary,
+			aiPolished: form.aiPolished,
 			images: jobImages,
 			cover: jobCover,
 			startedAt: Date.now(),
@@ -1239,6 +1348,137 @@ export default function WritePage(): ReactElement {
 								</label>
 							</div>
 						</div>
+
+						{/* 高级设置 */}
+						<details className="card p-4">
+							<summary className="flex cursor-pointer select-none items-center justify-between text-sm font-semibold">
+								<span>高级设置</span>
+								<span className="text-[11px] font-normal text-secondary">
+									置顶 / 授权 / 密码等
+								</span>
+							</summary>
+							<div className="mt-3 space-y-2.5">
+								{/* 置顶 */}
+								<label className="flex cursor-pointer select-none items-center justify-between gap-2 text-sm text-secondary">
+									<span>置顶文章（首页优先展示）</span>
+									<input
+										type="checkbox"
+										checked={form.pinned}
+										onChange={(e) => update({ pinned: e.target.checked })}
+										className="h-4 w-4 accent-(--treasure-brand)"
+									/>
+								</label>
+								{form.pinned && (
+									<input
+										type="number"
+										placeholder="置顶排序序号（越小越靠前）"
+										className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+										value={
+											form.pinnedOrder === "" ? "" : Number(form.pinnedOrder)
+										}
+										onChange={(e) =>
+											update({
+												pinnedOrder:
+													e.target.value === "" ? "" : Number(e.target.value),
+											})
+										}
+									/>
+								)}
+								<input
+									type="date"
+									placeholder="更新时间（留空则不显示「更新于」）"
+									className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+									value={form.updated}
+									onChange={(e) => update({ updated: e.target.value })}
+								/>
+								<input
+									type="text"
+									placeholder="作者（留空则用站点默认作者）"
+									className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+									value={form.author}
+									onChange={(e) => update({ author: e.target.value })}
+								/>
+								<input
+									type="text"
+									placeholder="原文链接（转载来源，留空不显示）"
+									className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+									value={form.sourceLink}
+									onChange={(e) => update({ sourceLink: e.target.value })}
+								/>
+								{/* 授权 */}
+								<div className="flex gap-2">
+									<input
+										type="text"
+										placeholder="授权名称（如 CC BY-NC-SA 4.0）"
+										className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+										value={form.licenseName}
+										onChange={(e) => update({ licenseName: e.target.value })}
+									/>
+									<input
+										type="text"
+										placeholder="授权链接"
+										className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+										value={form.licenseUrl}
+										onChange={(e) => update({ licenseUrl: e.target.value })}
+									/>
+								</div>
+								{/* 评论 / 密码 */}
+								<label className="flex cursor-pointer select-none items-center justify-between gap-2 text-sm text-secondary">
+									<span>开启评论</span>
+									<input
+										type="checkbox"
+										checked={form.comment}
+										onChange={(e) => update({ comment: e.target.checked })}
+										className="h-4 w-4 accent-(--treasure-brand)"
+									/>
+								</label>
+								<input
+									type="text"
+									placeholder="阅读密码（留空则公开阅读）"
+									className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+									value={form.password}
+									onChange={(e) => update({ password: e.target.value })}
+								/>
+								{form.password && (
+									<input
+										type="text"
+										placeholder="密码提示（如：站长微信号）"
+										className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+										value={form.passwordHint}
+										onChange={(e) => update({ passwordHint: e.target.value })}
+									/>
+								)}
+								{/* 语言 */}
+								<select
+									className="bg-card w-full rounded-lg border px-3 py-2 text-sm"
+									value={form.lang}
+									onChange={(e) => update({ lang: e.target.value })}
+								>
+									<option value="zh-CN">简体中文（zh-CN）</option>
+									<option value="zh-TW">繁體中文（zh-TW）</option>
+									<option value="en">English（en）</option>
+									<option value="ja">日本語（ja）</option>
+									<option value="ko">한국어（ko）</option>
+								</select>
+								{/* AI 摘要 / 润色 */}
+								<textarea
+									rows={2}
+									placeholder="AI 摘要（列表卡片展示，留空则自动截取正文）"
+									className="bg-card block w-full resize-none rounded-lg border p-2.5 text-sm"
+									value={form.aiSummary}
+									onChange={(e) => update({ aiSummary: e.target.value })}
+								/>
+								<label className="flex cursor-pointer select-none items-center justify-between gap-2 text-sm text-secondary">
+									<span>启用 AI 润色</span>
+									<input
+										type="checkbox"
+										checked={form.aiPolished}
+										onChange={(e) => update({ aiPolished: e.target.checked })}
+										className="h-4 w-4 accent-(--treasure-brand)"
+									/>
+								</label>
+							</div>
+						</details>
 
 						{/* 图片管理 */}
 						<div className="card p-4">

@@ -5,6 +5,10 @@ export const analyticsConfig: AnalyticsConfig = {
 	googleAnalyticsId: "",
 	// Microsoft Clarity ID
 	microsoftClarityId: "",
+	// 自托管统计：内置埋点 + GitHub 仓库存储，默认开启（运行时以 analytics/settings.json 为准）
+	selfHostedAnalytics: {
+		enabled: true,
+	},
 	// Umami 统计配置（暂未配置自己的 Umami 账户，留空即不加载统计脚本）
 	umamiAnalytics: {
 		// Umami Website ID

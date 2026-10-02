@@ -67,7 +67,9 @@ function switchModule(id: string) {
 // ---- 认证检查 ----
 async function checkAuth() {
 	try {
-		const res = await fetch("/api/auth/status/", { credentials: "same-origin" });
+		const res = await fetch("/api/auth/status/", {
+			credentials: "same-origin",
+		});
 		const data = await res.json();
 		authenticated = data.authenticated === true;
 		user = data.user ?? null;

@@ -64,7 +64,9 @@ const visiblePosts = $derived.by(() => {
 	else if (filter === "published") list = posts.filter((p) => !p.draft);
 	else if (filter === "pinned") list = posts.filter((p) => p.pinned);
 	return [...list].sort((a, b) =>
-		a.published === b.published ? a.slug.localeCompare(b.slug) : b.published.localeCompare(a.published),
+		a.published === b.published
+			? a.slug.localeCompare(b.slug)
+			: b.published.localeCompare(a.published),
 	);
 });
 

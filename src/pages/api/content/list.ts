@@ -80,13 +80,10 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 			);
 			if (!treeResponse.ok) {
 				const errorText = await treeResponse.text();
-				return new Response(
-					JSON.stringify({ ok: false, error: errorText }),
-					{
-						status: treeResponse.status,
-						headers: { "Content-Type": "application/json" },
-					},
-				);
+				return new Response(JSON.stringify({ ok: false, error: errorText }), {
+					status: treeResponse.status,
+					headers: { "Content-Type": "application/json" },
+				});
 			}
 			const treeData = await treeResponse.json();
 			if (treeData.truncated) {

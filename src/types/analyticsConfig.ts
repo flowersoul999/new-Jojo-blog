@@ -1,6 +1,11 @@
 export type AnalyticsConfig = {
 	googleAnalyticsId?: string; // Google Analytics ID
 	microsoftClarityId?: string; // Microsoft Clarity ID
+	/** 自托管统计（内置埋点 + GitHub 存储），与外部统计服务并存互不影响 */
+	selfHostedAnalytics?: {
+		/** 埋点总开关，默认 true；运行时仍以 analytics/settings.json 为准 */
+		enabled?: boolean;
+	};
 	umamiAnalytics?: {
 		websiteId?: string; // Umami Website ID
 		scriptUrl?: string; // Umami JS地址，支持使用自建

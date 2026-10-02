@@ -4,9 +4,9 @@
 // - 数据源由调用方注入（本地 fs / GitHub API），本模块保持纯解析逻辑
 
 import {
-	type PostMeta,
 	buildPostMarkdown,
 	defaultPostMeta,
+	type PostMeta,
 	parsePostMarkdown,
 } from "@/components/react-write/frontmatter";
 
@@ -104,10 +104,7 @@ export async function buildPostsIndex(
 				if (!imageRefs[ref]) imageRefs[ref] = [];
 				if (!imageRefs[ref].includes(slug)) imageRefs[ref].push(slug);
 			}
-		} catch {
-			// 单文件解析失败不影响整体
-			continue;
-		}
+		} catch {}
 	}
 
 	posts.sort((a, b) =>
@@ -135,9 +132,7 @@ export async function buildMemoriesIndex(
 			if (content == null) continue;
 			const parsed = parseMemoryMarkdown(content);
 			entries.push({ slug, path: file.path, ...parsed });
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 
 	entries.sort((a, b) => b.date.localeCompare(a.date));
@@ -206,6 +201,6 @@ export function buildMemoryMarkdown(
 	return lines.join("\n");
 }
 
+export type { PostMeta };
 /** 组装文章 frontmatter（复用 frontmatter.ts 的生成逻辑，供 API 侧校验用） */
 export { buildPostMarkdown, defaultPostMeta };
-export type { PostMeta };

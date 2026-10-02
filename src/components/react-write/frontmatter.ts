@@ -141,7 +141,7 @@ export function parsePostMarkdown(raw: string): ParsedPost {
 				meta.pinned = value.trim() === "true";
 				break;
 			case "pinnedOrder":
-				meta.pinnedOrder = parseInt(yamlUnquote(value), 10) || "";
+				meta.pinnedOrder = Number.parseInt(yamlUnquote(value), 10) || "";
 				break;
 			case "author":
 				meta.author = yamlUnquote(value);
@@ -193,20 +193,23 @@ export function buildPostMarkdown(meta: PostMeta, body: string): string {
 		`image: ${yamlQuote(meta.image)}`,
 		`lang: ${yamlQuote(meta.lang || "zh-CN")}`,
 	];
-	if (meta.updated) lines.push(`updated: ${yamlQuote(meta.updated.slice(0, 10))}`);
-	if (meta.pinned) lines.push(`pinned: true`);
+	if (meta.updated)
+		lines.push(`updated: ${yamlQuote(meta.updated.slice(0, 10))}`);
+	if (meta.pinned) lines.push("pinned: true");
 	if (meta.pinned && meta.pinnedOrder !== "" && meta.pinnedOrder != null) {
 		lines.push(`pinnedOrder: ${Number(meta.pinnedOrder)}`);
 	}
 	if (meta.author) lines.push(`author: ${yamlQuote(meta.author)}`);
 	if (meta.sourceLink) lines.push(`sourceLink: ${yamlQuote(meta.sourceLink)}`);
-	if (meta.licenseName) lines.push(`licenseName: ${yamlQuote(meta.licenseName)}`);
+	if (meta.licenseName)
+		lines.push(`licenseName: ${yamlQuote(meta.licenseName)}`);
 	if (meta.licenseUrl) lines.push(`licenseUrl: ${yamlQuote(meta.licenseUrl)}`);
-	if (meta.comment === false) lines.push(`comment: false`);
+	if (meta.comment === false) lines.push("comment: false");
 	if (meta.password) lines.push(`password: ${yamlQuote(meta.password)}`);
-	if (meta.passwordHint) lines.push(`passwordHint: ${yamlQuote(meta.passwordHint)}`);
+	if (meta.passwordHint)
+		lines.push(`passwordHint: ${yamlQuote(meta.passwordHint)}`);
 	if (meta.aiSummary) lines.push(`aiSummary: ${yamlQuote(meta.aiSummary)}`);
-	if (meta.aiPolished === false) lines.push(`aiPolished: false`);
+	if (meta.aiPolished === false) lines.push("aiPolished: false");
 	lines.push("---", "", body.trim(), "");
 	return lines.join("\n");
 }

@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { isAdminLogin } from "@/utils/admin-auth";
 import { getAuthToken, getGithubUser, isLocalDev } from "@/utils/editor-auth";
 
 export const prerender = false;
@@ -9,6 +10,7 @@ export const GET: APIRoute = async ({ cookies }) => {
 		return new Response(
 			JSON.stringify({
 				authenticated: true,
+				isAdmin: true,
 				user: {
 					login: "local-dev",
 					avatar_url:
@@ -24,21 +26,29 @@ export const GET: APIRoute = async ({ cookies }) => {
 
 	// 没有 token，返回未认证状态
 	if (!token) {
-		return new Response(JSON.stringify({ authenticated: false }), {
-			headers: { "Content-Type": "application/json" },
-		});
+		return new Response(
+			JSON.stringify({ authenticated: false, isAdmin: false }),
+			{
+				headers: { "Content-Type": "application/json" },
+			},
+		);
 	}
 
 	// 验证 token 有效性并获取用户信息
 	const user = await getGithubUser(token);
 
 	if (!user) {
-		return new Response(JSON.stringify({ authenticated: false }), {
-			headers: { "Content-Type": "application/json" },
-		});
+		return new Response(
+			JSON.stringify({ authenticated: false, isAdmin: false }),
+			{
+				headers: { "Content-Type": "application/json" },
+			},
+		);
 	}
 
-	return new Response(JSON.stringify({ authenticated: true, user }), {
+	const isAdmin = await isAdminLogin(cookies);
+
+	return new Response(JSON.stringify({ authenticated: true, isAdmin, user }), {
 		headers: { "Content-Type": "application/json" },
 	});
 };

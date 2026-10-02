@@ -1,0 +1,126 @@
+---
+/**
+ * 自托管统计埋点
+ * - 生成持久 vid（localStorage UUID）
+ * - 记录页面停留时长，swup/astro 切页时归入上一页
+ * - localStorage 批量暂存，≥5 条 / 30 秒 / 离开页面时 sendBeacon 上报
+ * 防重复执行：运行时补 data-swup-ignore-script + window 全局守卫
+ */
+interface Props {
+	/** 统计总开关（静态配置，运行时再以服务端设置为准） */
+	enabled?: boolean;
+}
+
+const { enabled = true } = Astro.props;
+---
+
+{enabled && (
+	<script is:inline>
+		(() => {
+			if (window.__selfAnalyticsInit) return;
+			window.__selfAnalyticsInit = true;
+			// Astro 7 的 define:vars 会丢弃 data-swup-ignore-script，须在运行时补回
+			document.currentScript?.setAttribute("data-swup-ignore-script", "");
+
+			// 不参与统计的路由前缀
+			const SKIP_PREFIXES = ["/admin/", "/write/", "/portfolio/", "/memories/"];
+			const TRACK_ENDPOINT = "/api/analytics/track/";
+			const QUEUE_KEY = "aemeath:analytics:queue";
+			const VID_KEY = "aemeath:analytics:vid";
+
+			const currentPath = () => window.location.pathname;
+
+			// 获取或生成访客 ID
+			let vid = "";
+			try {
+				vid = localStorage.getItem(VID_KEY) || "";
+				if (!/^[A-Za-z0-9_-]{8,64}$/.test(vid)) {
+					vid = (crypto.randomUUID?.() || `v-${Date.now()}-${Math.random().toString(36).slice(2)}`).slice(0, 64);
+					localStorage.setItem(VID_KEY, vid);
+				}
+			} catch {
+				vid = "";
+			}
+			if (!vid) return;
+
+			// 事件队列（localStorage 持久化，防止刷新丢失）
+			let queue = [];
+			try {
+				const saved = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+				if (Array.isArray(saved)) queue = saved.filter((e) => e && typeof e.p === "string").slice(-100);
+			} catch {
+				queue = [];
+			}
+
+			const persist = () => {
+				try {
+					localStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(-100)));
+				} catch {
+					// 存储不可用时仅保留内存队列
+				}
+			};
+
+			let lastPath = currentPath();
+			let enterAt = Date.now();
+			let active = !SKIP_PREFIXES.some((p) => lastPath.startsWith(p));
+
+			const sendBeaconFlush = () => {
+				if (!queue.length) return;
+				const body = JSON.stringify({ events: queue });
+				queue = [];
+				persist();
+				try {
+					if (navigator.sendBeacon) {
+						navigator.sendBeacon(TRACK_ENDPOINT, new Blob([body], { type: "application/json" }));
+					} else {
+						fetch(TRACK_ENDPOINT, { method: "POST", body, keepalive: true });
+					}
+				} catch {
+					// 上报失败静默丢弃，避免影响页面
+				}
+			};
+
+			const pushCurrent = () => {
+				if (!active) return;
+				const now = Date.now();
+				const dwell = Math.min(Math.max(0, now - enterAt), 24 * 60 * 60 * 1000);
+				queue.push({
+					v: vid,
+					p: lastPath,
+					r: document.referrer || "",
+					d: Math.round(dwell),
+					t: now,
+				});
+				persist();
+				if (queue.length >= 5) sendBeaconFlush();
+			};
+
+			// swup / astro 页面切换：记录上一页停留，进入新页重新计时
+			const onPageLoad = () => {
+				const p = currentPath();
+				if (p !== lastPath) pushCurrent();
+				lastPath = p;
+				active = !SKIP_PREFIXES.some((prefix) => p.startsWith(prefix));
+				enterAt = Date.now();
+			};
+			document.addEventListener("astro:page-load", onPageLoad);
+			document.addEventListener("swup:page:view", onPageLoad);
+
+			// 切后台 / 离开页面：记录停留并冲刷
+			const onHide = () => {
+				pushCurrent();
+				sendBeaconFlush();
+			};
+			document.addEventListener("visibilitychange", () => {
+				if (document.visibilityState === "hidden") onHide();
+			});
+			window.addEventListener("pagehide", onHide);
+
+			// 每 30 秒冲刷一次积压事件
+			window.setInterval(sendBeaconFlush, 30_000);
+
+			// 供调试 / 手动上报
+			window.__selfAnalytics = { flush: sendBeaconFlush };
+		})();
+	</script>
+)}

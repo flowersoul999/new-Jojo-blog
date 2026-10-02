@@ -124,12 +124,14 @@ export default defineConfig({
 			ignore: (targetUrl) => {
 				const targetPath = targetUrl.split(/[?#]/)[0] || "/";
 				const currentPath = window.location.pathname;
-				// 写作页 /write/ 同样是独立全屏布局，跨布局边界直接走原生跳转
+				// 写作页 /write/ 与后台管理 /admin/ 为独立全屏布局，跨布局边界直接走原生跳转
 				return (
 					targetPath === "/portfolio/" ||
 					currentPath === "/portfolio/" ||
 					targetPath === "/write/" ||
 					currentPath.startsWith("/write/") ||
+					targetPath === "/admin/" ||
+					currentPath.startsWith("/admin/") ||
 					targetPath === "/memories/" ||
 					currentPath.startsWith("/memories/")
 				);

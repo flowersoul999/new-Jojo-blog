@@ -1,11 +1,11 @@
 import type { APIRoute } from "astro";
+import { galleryConfig } from "@/config/galleryConfig";
 import {
 	GITHUB_REPO,
 	isLocalDev,
 	listLocalDir,
 	requireAuth,
 } from "@/utils/editor-auth";
-import { galleryConfig } from "@/config/galleryConfig";
 
 export const prerender = false;
 
@@ -20,7 +20,10 @@ export const prerender = false;
 const IMAGE_EXT = /\.(jpe?g|png|webp|avif|gif)$/i;
 
 /** 统计相册目录下的图片数量（本地 fs 或 GitHub Contents API） */
-async function countAlbumPhotos(token: string, albumId: string): Promise<number> {
+async function countAlbumPhotos(
+	token: string,
+	albumId: string,
+): Promise<number> {
 	if (isLocalDev) {
 		const items = listLocalDir(`public/gallery/${albumId}`);
 		return items.filter(

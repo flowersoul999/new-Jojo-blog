@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { buildPostsIndex, type PostsIndex } from "@/utils/content-index";
 import {
 	GITHUB_REPO,
 	isLocalDev,
@@ -6,7 +7,6 @@ import {
 	readLocalFile,
 	requireAuth,
 } from "@/utils/editor-auth";
-import { buildPostsIndex, type PostsIndex } from "@/utils/content-index";
 
 export const prerender = false;
 
@@ -103,7 +103,7 @@ async function readPostFile(
 	const content =
 		data.encoding === "base64" && data.content
 			? decodeBase64(data.content)
-			: data.content ?? null;
+			: (data.content ?? null);
 	return { content };
 }
 
