@@ -272,6 +272,31 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		opacity: 1;
 	}
 
+	/* 放大查看的显式关闭按钮 */
+	.ab-ov-close {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		width: 30px;
+		height: 30px;
+		z-index: 3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: none;
+		border-radius: 999px;
+		background: rgba(0, 0, 0, 0.55);
+		color: #fff;
+		cursor: pointer;
+		backdrop-filter: blur(3px);
+		-webkit-backdrop-filter: blur(3px);
+		transition: transform 0.18s ease, background 0.18s ease;
+	}
+	.ab-ov-close:hover {
+		transform: scale(1.1);
+		background: rgba(0, 0, 0, 0.75);
+	}
+
 	/* 可拖拽彩纸便签 */
 	.ab-ov-note {
 		position: fixed;
@@ -517,6 +542,19 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 			const strip = document.createElement("div");
 			strip.className = "ab-ov-strip";
 			box.append(big, strip);
+
+			// 显式关闭按钮
+			const closeBtn = document.createElement("button");
+			closeBtn.type = "button";
+			closeBtn.className = "ab-ov-close";
+			closeBtn.setAttribute("aria-label", "关闭");
+			closeBtn.innerHTML =
+				'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+			closeBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				closeLbox(true);
+			});
+			box.append(closeBtn);
 
 			const note = document.createElement("div");
 			note.className = "ab-ov-note";
