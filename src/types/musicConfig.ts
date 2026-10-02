@@ -12,6 +12,10 @@ export type MusicPlayerConfig = {
 	// 是否显示歌词
 	showLyrics?: boolean;
 
+	// 歌词颜色方案（可配置，缺省用组件内的默认色）
+	// past=已演唱文本颜色, current=当前演唱高亮色, future=未演唱文本颜色
+	lyricsColors?: { past?: string; current?: string; future?: string };
+
 	// 是否在导航栏显示音乐播放器
 	showInNavbar?: boolean;
 

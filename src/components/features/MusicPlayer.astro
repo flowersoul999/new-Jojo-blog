@@ -13,6 +13,18 @@ const { class: className, style, id } = Astro.props;
 
 const config = musicPlayerConfig;
 
+// 歌词颜色方案 → 组件级 CSS 变量（缺省回退到 <style> 内默认值）
+const lc = config.lyricsColors || {};
+const lcStyleVars = [
+	lc.past ? `--lrc-past:${lc.past}` : "",
+	lc.current ? `--lrc-current:${lc.current}` : "",
+	lc.future ? `--lrc-future:${lc.future}` : "",
+]
+	.filter(Boolean)
+	.join(";");
+
+const widgetStyleStr = `${style || ""}${lcStyleVars ? (style ? ";" : "") + lcStyleVars : ""}`;
+
 const viewConfigStr = JSON.stringify({
 	showLyrics: config.showLyrics ?? true,
 	i18n: {
@@ -34,7 +46,7 @@ const widgetId =
 	id || `music-widget-${Math.random().toString(36).substring(2, 9)}`;
 ---
 
-<div id={widgetId} class:list={["music-player-widget w-full relative transition-all duration-300", className]} style={style} role="region" aria-label={i18n(I18nKey.music)}>
+<div id={widgetId} class:list={["music-player-widget w-full relative transition-all duration-300", className]} style={widgetStyleStr} role="region" aria-label={i18n(I18nKey.music)}>
 
     <!-- Top Row: Cover & Info -->
 <div class="flex items-center gap-2 mb-2 px-1">
@@ -275,6 +287,10 @@ const widgetId =
         isUserScrolling: false,
         scrollTimeout: null,
         currentLrcIndex: -1,
+        // 歌词数组与最近一次播放时间，供卡拉OK逐句过渡使用
+        lyrics: [],
+        lastTime: 0,
+        karaokeRaf: 0,
         vs: {
             playlist: [],
             currentIndex: -1,
@@ -624,6 +640,8 @@ const widgetId =
 
     function renderLyricsUI(lyrics, status) {
         local.currentLrcIndex = -1;
+        local.lyrics = (lyrics && lyrics.length) ? lyrics : [];
+        local.lastTime = 0;
         ui.lrcContainer.innerHTML = '';
         if (status === 'loading') {
             ui.lrcContainer.innerHTML = '<div class="text-neutral-400 text-sm py-10">' + cfg.i18n.loadingLyrics + '</div>';
@@ -633,22 +651,60 @@ const widgetId =
             ui.lrcContainer.innerHTML = '<div class="text-neutral-400 text-sm py-10">' + cfg.i18n.failedLyrics + '</div>';
             return;
         }
-        if (!lyrics || lyrics.length === 0) {
+        if (local.lyrics.length === 0) {
             ui.lrcContainer.innerHTML = '<div class="text-neutral-400 text-sm py-10" role="option">' + cfg.i18n.noLyrics + '</div>';
             return;
         }
-        lyrics.forEach(function (line, index) {
+        local.lyrics.forEach(function (line, index) {
             var lineEl = document.createElement('div');
-            lineEl.className = 'lrc-line transition-all duration-300 text-sm text-neutral-400 py-1 cursor-pointer hover:text-(--primary)';
-            lineEl.innerText = line.text;
+            lineEl.className = 'lrc-line py-1 cursor-pointer';
+            // --lrc-p = 当前行已演唱进度(0%~100%)，供卡拉OK渐变填充
+            lineEl.style.setProperty('--lrc-p', '0%');
             lineEl.dataset.index = index;
             lineEl.setAttribute('role', 'option');
             lineEl.setAttribute('aria-label', line.text);
+            lineEl.textContent = line.text;
             lineEl.onclick = function () {
                 mgr.seekToTime(line.time);
             };
             ui.lrcContainer.appendChild(lineEl);
         });
+        // 若已在播放，立即开始逐句推进
+        paintKaraoke(local.lastTime);
+    }
+
+    // ── 卡拉OK：按播放进度绘制当前行的“已唱/未唱”渐变 ──
+    function paintKaraoke(t) {
+        local.lastTime = t;
+        var lyr = local.lyrics;
+        if (!lyr || !lyr.length) return;
+        var idx = local.currentLrcIndex;
+        var line = idx >= 0 ? ui.lrcContainer.querySelector('.lrc-line.is-active') : null;
+        if (!line || !lyr[idx]) return;
+        var cur = lyr[idx];
+        var next = lyr[idx + 1];
+        // 当前句时长 = 下一句起止 - 本句起止；末句取 5s 兜底
+        var dur = next ? (next.time - cur.time) : 5;
+        var p = dur > 0 ? (t - cur.time) / dur : 1;
+        p = Math.max(0, Math.min(1, p));
+        line.style.setProperty('--lrc-p', (p * 100).toFixed(2) + '%');
+    }
+
+    function startKaraoke() {
+        if (local.karaokeRaf) return;
+        var tick = function () {
+            paintKaraoke(local.lastTime);
+            local.karaokeRaf = requestAnimationFrame(tick);
+        };
+        local.karaokeRaf = requestAnimationFrame(tick);
+    }
+
+    function stopKaraoke() {
+        if (local.karaokeRaf) {
+            cancelAnimationFrame(local.karaokeRaf);
+            local.karaokeRaf = 0;
+        }
+        paintKaraoke(local.lastTime); // 暂停时定格在当前演唱位置
     }
 
     function updateLrcHighlight(index) {
@@ -657,14 +713,17 @@ const widgetId =
 
         var lines = ui.lrcContainer.querySelectorAll('.lrc-line');
         lines.forEach(function (line, i) {
+            line.classList.remove('is-active', 'is-past');
             if (i === index) {
-                line.classList.add('text-(--primary)', 'font-bold', 'text-base');
-                line.classList.remove('text-neutral-400', 'text-sm');
-            } else {
-                line.classList.remove('text-(--primary)', 'font-bold', 'text-base');
-                line.classList.add('text-neutral-400', 'text-sm');
+                line.classList.add('is-active');
+                line.style.setProperty('--lrc-p', '0%');
+            } else if (i < index) {
+                line.classList.add('is-past');
             }
         });
+
+        // 立即按当前时间重绘卡拉OK渐变，避免切换瞬间进度回退
+        paintKaraoke(local.lastTime);
 
         // Auto-scroll unless user is scrolling
         if (index !== -1 && !local.isUserScrolling) {
@@ -746,6 +805,9 @@ const widgetId =
 
     on('fm:play-state', function (e) {
         updatePlayStateUI(e.detail.isPlaying);
+        // 播放时启动卡拉OK逐句推进，暂停时定格
+        if (e.detail.isPlaying) startKaraoke();
+        else stopKaraoke();
     });
 
     on('fm:loading', function (e) {
@@ -763,6 +825,9 @@ const widgetId =
         if (!isSeeking) setProgressUI(d.progress);
         ui.currentTime.innerText = d.currentTimeStr;
         ui.totalTime.innerText = d.durationStr;
+        // 记录最新播放时间，并确保播放中的卡拉OK循环未被停止
+        if (typeof d.currentTime === 'number') local.lastTime = d.currentTime;
+        if (mgr.getState().isPlaying && !local.karaokeRaf) startKaraoke();
     });
 
     on('fm:volume', function (e) {
@@ -982,5 +1047,42 @@ const widgetId =
     @keyframes eq-bounce {
         0%, 100% { height: 4px; }
         50%      { height: 14px; }
+    }
+
+    /* ── 歌词卡拉OK颜色过渡 ────────────────────────────────
+       颜色由 musicConfig.lyricsColors 经内联 CSS 变量覆盖，
+       缺省使用下面的默认值。 */
+    .music-player-widget {
+        --lrc-future: #94a3b8; /* 未演唱文本 */
+        --lrc-current: #fb7185; /* 当前演唱高亮（渐显填充） */
+        --lrc-past: #e11d48; /* 已演唱文本 */
+    }
+
+    .lrc-container .lrc-line {
+        color: var(--lrc-future);
+        font-size: 0.875rem;
+        line-height: 1.6;
+        transition: color 0.35s ease, font-weight 0.3s ease, transform 0.3s ease;
+        -webkit-font-smoothing: antialiased;
+    }
+    .lrc-container .lrc-line:not(.is-active):hover {
+        color: var(--lrc-current);
+    }
+    .lrc-container .lrc-line.is-past {
+        color: var(--lrc-past) !important;
+    }
+    /* 当前演唱行：左侧随 --lrc-p 渐显为高亮色，右侧保持未演唱色 */
+    .lrc-container .lrc-line.is-active {
+        color: transparent;
+        background-image: linear-gradient(
+            90deg,
+            var(--lrc-current) 0 var(--lrc-p, 0%),
+            var(--lrc-future) var(--lrc-p, 0%) 100%
+        );
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 700;
+        transform: scale(1.05);
     }
 </style>
