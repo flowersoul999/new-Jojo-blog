@@ -461,16 +461,27 @@ const { album } = Astro.props;
     function layoutCards() {
       if (!flow) return;
       const fw = flow.clientWidth;
-      const fh = flow.clientHeight;
       if (fw <= 0) return;
-      flow.style.height = "100%";
+      const stageH = flow.clientHeight || window.innerHeight;
+      // 画板内容高度：比可视区略高，让照片可以从上方铺到下方，
+      // 下方留出可滚动空间，照片也能被拖到折叠区之外。
+      const boardH = Math.max(stageH, Math.round(window.innerHeight * 1.05));
       const cw = fw / 2;
-      const ch = fh / 2;
+      const ch = boardH / 2;
       cards.forEach((card) => {
-        const off = card.offset;
-        card.el.style.left = `${cw + card.base.x + off.x}px`;
-        card.el.style.top = `${ch + card.base.y + off.y}px`;
+        card.el.style.left = `${cw + card.base.x + card.offset.x}px`;
+        card.el.style.top = `${ch + card.base.y + card.offset.y}px`;
       });
+      // 依据卡片最底位置伸缩画板高度，确保可滚动且不被截断
+      let maxBottom = 0;
+      cards.forEach((c) => {
+        const b = (parseFloat(c.el.style.top) || 0) + c.el.offsetHeight;
+        if (b > maxBottom) maxBottom = b;
+      });
+      const targetH = Math.max(boardH, Math.round(maxBottom + 32));
+      if (flow.style.height !== `${targetH}px`) {
+        flow.style.height = `${targetH}px`;
+      }
     }
 
     // ---- 全屏放大查看（挂到 body，规避父级 transform 限制）----
@@ -615,6 +626,7 @@ const { album } = Astro.props;
         info.sy = e.clientY;
         info.baseLeft = parseInt(el.style.left, 10) || 0;
         info.baseTop = parseInt(el.style.top, 10) || 0;
+        info.scrollDy = 0;
         info.pointerId = e.pointerId;
         info.pressTime = e.timeStamp;
         el.classList.add("ps-dragging");
@@ -625,18 +637,31 @@ const { album } = Astro.props;
         const dx = e.clientX - info.sx;
         const dy = e.clientY - info.sy;
         if (Math.hypot(dx, dy) > 6) info.moved = true;
-        if (info.moved) {
-          let nl = info.baseLeft + dx;
-          let nt = info.baseTop + dy;
-          if (flow) {
-            const maxL = Math.max(0, flow.clientWidth - el.offsetWidth);
-            const maxT = Math.max(0, flow.clientHeight - el.offsetHeight);
-            nl = Math.min(Math.max(0, nl), maxL);
-            nt = Math.min(Math.max(0, nt), maxT);
+        if (!info.moved) return;
+        // 指针靠近画板上下边缘时联动滚动，滚动量累积进卡片位移，照片能一路拖到折叠区外
+        if (stage) {
+          const rect = stage.getBoundingClientRect();
+          const zone = 64;
+          if (e.clientY > rect.bottom - zone) {
+            const step = Math.min(16, Math.max(1, (e.clientY - (rect.bottom - zone)) / 3));
+            info.scrollDy += step;
+            stage.scrollTop += step;
+          } else if (e.clientY < rect.top + zone) {
+            const step = Math.min(16, Math.max(1, (rect.top + zone - e.clientY) / 3));
+            info.scrollDy -= step;
+            stage.scrollTop -= step;
           }
-          el.style.left = `${nl}px`;
-          el.style.top = `${nt}px`;
         }
+        let nl = info.baseLeft + dx;
+        let nt = info.baseTop + dy + info.scrollDy;
+        if (flow) {
+          const maxL = Math.max(0, flow.scrollWidth - el.offsetWidth);
+          const maxT = Math.max(0, flow.clientHeight - el.offsetHeight);
+          nl = Math.min(Math.max(0, nl), maxL);
+          nt = Math.min(Math.max(0, nt), maxT);
+        }
+        el.style.left = `${nl}px`;
+        el.style.top = `${nt}px`;
       });
       const end = (e: PointerEvent) => {
         if (!info.active) return;
@@ -678,9 +703,10 @@ const { album } = Astro.props;
       const photos = data.photos || [];
       if (photos.length === 0) return;
 
-      // 先计算容器尺寸，再排布
+      // 先计算容器尺寸，再排布（画板高度与 layoutCards 保持一致，便于照片铺满上下）
       const fw = flow.clientWidth || window.innerWidth;
-      const fh = (flow.clientHeight || window.innerHeight) || 600;
+      const stageH = flow.clientHeight || window.innerHeight;
+      const fh = Math.max(stageH, Math.round(window.innerHeight * 1.05)) || 600;
 
       photos.forEach((meta, index) => {
         const tilt = ((hashStr(meta.src || String(index)) * 7) % 6) - 3;
