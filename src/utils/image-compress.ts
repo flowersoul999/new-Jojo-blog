@@ -37,7 +37,8 @@ async function decodeImage(file: File): Promise<DecodedImage> {
 		img.decoding = "async";
 		await new Promise<void>((resolve, reject) => {
 			img.onload = () => resolve();
-			img.onerror = () => reject(new Error("无法解码该图片，可能格式不受支持或文件已损坏"));
+			img.onerror = () =>
+				reject(new Error("无法解码该图片，可能格式不受支持或文件已损坏"));
 			img.src = url;
 		});
 		return { source: img, width: img.naturalWidth, height: img.naturalHeight };

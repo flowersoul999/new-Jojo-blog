@@ -1,5 +1,7 @@
 "use client";
 
+// 图片压缩工具（算法与质量参数和 jojo-blog 完全一致：WebP 0.8）
+import { compressImage } from "@utils/image-compress";
 import {
 	Eye,
 	FileUp,
@@ -18,8 +20,6 @@ import {
 import { type ReactElement, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { buildPostMarkdown, parsePostMarkdown } from "./frontmatter";
-// 图片压缩工具（算法与质量参数和 jojo-blog 完全一致：WebP 0.8）
-import { compressImage } from "@utils/image-compress";
 
 // ---------- 类型 ----------
 
@@ -406,10 +406,9 @@ export default function WritePage(): ReactElement {
 				name: file.name,
 			});
 			try {
-				const { dataUrl, width, height, size } = await compressImage(
-					file,
-					{ quality: IMAGE_QUALITY },
-				);
+				const { dataUrl, width, height, size } = await compressImage(file, {
+					quality: IMAGE_QUALITY,
+				});
 				newItems.push({
 					id: Math.random().toString(36).slice(2, 10),
 					type: "file",
@@ -422,7 +421,9 @@ export default function WritePage(): ReactElement {
 				});
 			} catch (err) {
 				console.error("图片压缩失败:", file.name, err);
-				toast.error(`${file.name} 压缩失败（${formatSize(file.size)}），已跳过`);
+				toast.error(
+					`${file.name} 压缩失败（${formatSize(file.size)}），已跳过`,
+				);
 				failed++;
 			}
 		}
@@ -726,9 +727,7 @@ export default function WritePage(): ReactElement {
 					// 写入后 dev 可能立刻全量刷新，尽快落盘快照
 					sessionStorage.setItem(JOB_KEY, JSON.stringify({ ...job }));
 				}
-				setPublishProgress((p) =>
-					p ? { ...p, done: p.done + 1 } : p,
-				);
+				setPublishProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
 			}
 
 			// 2. 正文占位符替换为最终路径
@@ -1108,7 +1107,8 @@ export default function WritePage(): ReactElement {
 								className="h-full rounded-full bg-brand transition-all"
 								style={{
 									width: `${
-										(publishProgress.done / Math.max(publishProgress.total, 1)) *
+										(publishProgress.done /
+											Math.max(publishProgress.total, 1)) *
 										100
 									}%`,
 								}}
@@ -1155,44 +1155,44 @@ export default function WritePage(): ReactElement {
 						<div className="card p-4">
 							<h2 className="text-sm font-semibold">封面</h2>
 							<div
-									className={`bg-card mt-3 h-36 cursor-pointer overflow-hidden rounded-xl border ${
-										dragTarget === "cover"
-											? "border-brand bg-brand/5 ring-2 ring-brand/40"
-											: ""
-									}`}
-									{...makeDropHandlers("cover", async (e) => {
-										const added = await addFiles(e.dataTransfer.files);
-										if (added[0]) setCover(added[0]);
-									})}
-									onClick={() => coverFileRef.current?.click()}
-								>
-									{coverPreview ? (
-										<div className="group relative h-full w-full">
-											<img
-												src={coverPreview}
-												alt="cover"
-												className="h-full w-full object-cover"
-											/>
-											<button
-												type="button"
-												className="absolute right-1.5 top-1.5 hidden rounded-full bg-black/60 p-1 text-white group-hover:block"
-												onClick={(e) => {
-													e.stopPropagation();
-													setCover(null);
-												}}
-											>
-												<X className="h-3.5 w-3.5" />
-											</button>
-										</div>
-									) : (
-										<div className="grid h-full w-full place-items-center text-3xl text-neutral-400 hover:bg-black/5">
-											+
-										</div>
-									)}
-								</div>
-								<p className="mt-1.5 text-[11px] text-secondary">
-									点击或拖入图片设置封面（自动压缩为 WebP）
-								</p>
+								className={`bg-card mt-3 h-36 cursor-pointer overflow-hidden rounded-xl border ${
+									dragTarget === "cover"
+										? "border-brand bg-brand/5 ring-2 ring-brand/40"
+										: ""
+								}`}
+								{...makeDropHandlers("cover", async (e) => {
+									const added = await addFiles(e.dataTransfer.files);
+									if (added[0]) setCover(added[0]);
+								})}
+								onClick={() => coverFileRef.current?.click()}
+							>
+								{coverPreview ? (
+									<div className="group relative h-full w-full">
+										<img
+											src={coverPreview}
+											alt="cover"
+											className="h-full w-full object-cover"
+										/>
+										<button
+											type="button"
+											className="absolute right-1.5 top-1.5 hidden rounded-full bg-black/60 p-1 text-white group-hover:block"
+											onClick={(e) => {
+												e.stopPropagation();
+												setCover(null);
+											}}
+										>
+											<X className="h-3.5 w-3.5" />
+										</button>
+									</div>
+								) : (
+									<div className="grid h-full w-full place-items-center text-3xl text-neutral-400 hover:bg-black/5">
+										+
+									</div>
+								)}
+							</div>
+							<p className="mt-1.5 text-[11px] text-secondary">
+								点击或拖入图片设置封面（自动压缩为 WebP）
+							</p>
 						</div>
 
 						{/* 元信息 */}
@@ -1237,106 +1237,107 @@ export default function WritePage(): ReactElement {
 
 						{/* 图片管理 */}
 						<div className="card p-4">
-								<h2 className="text-sm font-semibold">图片</h2>
-								{/* 压缩进度指示 */}
-								{processing && (
-									<div className="mt-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-brand">
-										<Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-										<span className="min-w-0 truncate">
-											正在压缩 {processing.index}/{processing.total}：
-											{processing.name}
-										</span>
-										<div className="ml-auto h-1 w-16 shrink-0 overflow-hidden rounded-full bg-brand/20">
-											<div className="h-full w-1/2 animate-pulse rounded-full bg-brand" />
-										</div>
+							<h2 className="text-sm font-semibold">图片</h2>
+							{/* 压缩进度指示 */}
+							{processing && (
+								<div className="mt-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-brand">
+									<Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+									<span className="min-w-0 truncate">
+										正在压缩 {processing.index}/{processing.total}：
+										{processing.name}
+									</span>
+									<div className="ml-auto h-1 w-16 shrink-0 overflow-hidden rounded-full bg-brand/20">
+										<div className="h-full w-1/2 animate-pulse rounded-full bg-brand" />
 									</div>
-								)}
-								<div className="mt-3 flex gap-2">
-									<input
-										type="text"
-										placeholder="粘贴图片 URL…"
-										className="bg-card min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm"
-										value={urlInput}
-										onChange={(e) => setUrlInput(e.target.value)}
-									/>
-									<button
-										type="button"
-										className="rounded-lg border px-3 py-1.5 text-sm"
-										onClick={addUrlImage}
-									>
-										添加
-									</button>
 								</div>
-								<div className="mt-3 grid grid-cols-4 gap-2">
-									<div
-										className={`bg-card grid aspect-square cursor-pointer place-items-center rounded-lg border text-2xl text-neutral-400 hover:bg-brand/10 ${
-											dragTarget === "grid"
-												? "border-brand bg-brand/10 text-brand ring-2 ring-brand/40"
-												: ""
-										}`}
-										onClick={() => imagesFileRef.current?.click()}
-										{...makeDropHandlers("grid", (e) => {
-											void addFiles(e.dataTransfer.files);
-										})}
-									>
-										+
-									</div>
-									{images.map((item) => {
-										const src = item.type === "url" ? item.url : item.dataUrl;
-										const markdown =
-											item.type === "url"
-												? `![](${item.url})`
-												: `![](local-image:${item.id})`;
-										const isCover = cover?.id === item.id;
-										return (
-											<div
-												key={item.id}
-												className={`group relative aspect-square overflow-hidden rounded-lg border ${
-													isCover ? "ring-2 ring-brand" : ""
-												}`}
-											>
-												<img
-													src={src}
-													alt=""
-													className="h-full w-full cursor-grab object-cover active:cursor-grabbing"
-													draggable
-													onDragStart={(e) => {
-														e.dataTransfer.setData("text/plain", markdown);
-														e.dataTransfer.setData("text/markdown", markdown);
-													}}
-													onClick={() => insertMarkdown(markdown)}
-													title={
-														item.type === "file"
-															? `${item.filename} · ${item.width}×${item.height} · ${formatSize(item.size)}，点击插入正文，或拖到编辑器`
-															: "点击插入正文，或拖到编辑器"
-													}
-												/>
-												{isCover && (
-													<span className="absolute left-1 top-1 rounded bg-brand px-1.5 py-0.5 text-[10px] text-white">
-														封面
-													</span>
-												)}
-												{item.type === "file" && (
-													<span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[9px] leading-none text-white/90">
-														{formatSize(item.size)}
-													</span>
-												)}
-												<button
-													type="button"
-													className="absolute right-1 top-1 hidden rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white group-hover:block"
-													onClick={() => deleteImage(item.id)}
-												>
-													删
-												</button>
-											</div>
-										);
-									})}
-								</div>
-								<p className="mt-2 text-[11px] leading-relaxed text-secondary">
-									点图插入正文，也可拖拽；上传图自动压缩为 WebP（质量 80%），单张不超过
-									{formatSize(MAX_IMAGE_SIZE)}，发布时存到 public/blogs/
-								</p>
+							)}
+							<div className="mt-3 flex gap-2">
+								<input
+									type="text"
+									placeholder="粘贴图片 URL…"
+									className="bg-card min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm"
+									value={urlInput}
+									onChange={(e) => setUrlInput(e.target.value)}
+								/>
+								<button
+									type="button"
+									className="rounded-lg border px-3 py-1.5 text-sm"
+									onClick={addUrlImage}
+								>
+									添加
+								</button>
 							</div>
+							<div className="mt-3 grid grid-cols-4 gap-2">
+								<div
+									className={`bg-card grid aspect-square cursor-pointer place-items-center rounded-lg border text-2xl text-neutral-400 hover:bg-brand/10 ${
+										dragTarget === "grid"
+											? "border-brand bg-brand/10 text-brand ring-2 ring-brand/40"
+											: ""
+									}`}
+									onClick={() => imagesFileRef.current?.click()}
+									{...makeDropHandlers("grid", (e) => {
+										void addFiles(e.dataTransfer.files);
+									})}
+								>
+									+
+								</div>
+								{images.map((item) => {
+									const src = item.type === "url" ? item.url : item.dataUrl;
+									const markdown =
+										item.type === "url"
+											? `![](${item.url})`
+											: `![](local-image:${item.id})`;
+									const isCover = cover?.id === item.id;
+									return (
+										<div
+											key={item.id}
+											className={`group relative aspect-square overflow-hidden rounded-lg border ${
+												isCover ? "ring-2 ring-brand" : ""
+											}`}
+										>
+											<img
+												src={src}
+												alt=""
+												className="h-full w-full cursor-grab object-cover active:cursor-grabbing"
+												draggable
+												onDragStart={(e) => {
+													e.dataTransfer.setData("text/plain", markdown);
+													e.dataTransfer.setData("text/markdown", markdown);
+												}}
+												onClick={() => insertMarkdown(markdown)}
+												title={
+													item.type === "file"
+														? `${item.filename} · ${item.width}×${item.height} · ${formatSize(item.size)}，点击插入正文，或拖到编辑器`
+														: "点击插入正文，或拖到编辑器"
+												}
+											/>
+											{isCover && (
+												<span className="absolute left-1 top-1 rounded bg-brand px-1.5 py-0.5 text-[10px] text-white">
+													封面
+												</span>
+											)}
+											{item.type === "file" && (
+												<span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[9px] leading-none text-white/90">
+													{formatSize(item.size)}
+												</span>
+											)}
+											<button
+												type="button"
+												className="absolute right-1 top-1 hidden rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white group-hover:block"
+												onClick={() => deleteImage(item.id)}
+											>
+												删
+											</button>
+										</div>
+									);
+								})}
+							</div>
+							<p className="mt-2 text-[11px] leading-relaxed text-secondary">
+								点图插入正文，也可拖拽；上传图自动压缩为 WebP（质量
+								80%），单张不超过
+								{formatSize(MAX_IMAGE_SIZE)}，发布时存到 public/blogs/
+							</p>
+						</div>
 					</div>
 				</div>
 			</div>

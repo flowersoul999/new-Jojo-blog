@@ -13,7 +13,10 @@ if (!siteConfig.pages.diary) {
 }
 
 // 心情 → 展示信息 + 专属配色（标签底色、卡片左侧色条随之变化）
-const MOOD_MAP: Record<string, { label: string; emoji: string; color: string }> = {
+const MOOD_MAP: Record<
+	string,
+	{ label: string; emoji: string; color: string }
+> = {
 	"super-happy": { label: "炒鸡开心", emoji: "🤩", color: "#fb7185" }, // 玫瑰红
 	happy: { label: "开心", emoji: "😊", color: "#f59e0b" }, // 琥珀橙
 	neutral: { label: "平平淡淡", emoji: "😐", color: "#94a3b8" }, // 银灰
