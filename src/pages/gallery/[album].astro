@@ -45,7 +45,7 @@ const scatterPayload = JSON.stringify({
 });
 ---
 
-<MainGridLayout title={albumMeta.name} description={albumMeta.description || ""}>
+<MainGridLayout title={albumMeta.name} description={albumMeta.description || ""} hideSidebars>
   {
     photoItems.length > 0 ? (
       albumMeta.password ? (

@@ -1,12 +1,12 @@
 ---
 /**
- * 有边界的软木照片板（相册详情页本体）
+ * 全屏软木照片板（相册详情页本体）
  *
- * 与行内软木板 AlbumBoard 风格一致，但位于独立详情页：
- * - 有边界的软木板，嵌入页面正文流中，不铺满全屏、不隐藏左右侧栏
- * - 照片按顺序从上往下排列，页面可正常上下滚动看到每一张
- * - 单击照片放大居中，旁边出现彩色便签，显示标签 / 日期 / 描述
- * - 再次单击照片或 ESC 还原；右上角返回按钮回到相册列表
+ * 沉浸式全屏画布：
+ * - 相册详情页隐藏左右侧边栏，照片板 min-height: 100svh 占满整屏
+ * - 画布仍在文档流内，向上滚动可回到页面顶部（首页那屏）
+ * - 照片按顺序排列，页面可正常上下滚动看到每一张
+ * - 每张照片右下角叠放标签（半透明胶囊），单击照片居中放大，再次单击或 ESC 还原
  *
  * 页面数据：相册页在模板中埋 <script type="application/json" data-scatter-data>，
  * 加密相册解密后通过 password:decrypted 事件启动。
@@ -18,7 +18,10 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    margin: 1.25rem 0 0.5rem;
+    /* 占满整屏（仍在文档流内，向上滚动可回到页面顶部） */
+    min-height: 100vh;
+    min-height: 100svh;
+    margin: 0;
     overflow: hidden;
     border-radius: var(--radius-large, 1rem);
     border: 1px solid rgba(150, 118, 52, 0.3);
@@ -111,7 +114,7 @@
     position: relative;
     flex: 1 1 auto;
     padding: 1.25rem;
-    overflow: hidden;
+    overflow: visible;
   }
   .ps-flow {
     display: grid;
@@ -195,43 +198,29 @@
     pointer-events: none;
   }
 
-  .ps-note {
-    position: fixed;
-    z-index: 46;
-    width: 210px;
-    min-height: 96px;
-    padding: 14px 16px;
-    color: #3a3530;
-    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
-    display: none;
-  }
-  .ps-note.is-visible {
-    display: block;
-    animation: ps-note-in 0.35s cubic-bezier(0.22, 1.3, 0.36, 1) both;
-  }
-  .ps-note-date {
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    color: rgba(58, 53, 48, 0.6);
-    margin-bottom: 6px;
-  }
-  .ps-note-tags {
+  /* 照片右下角标签：叠在照片上，半透明胶囊，始终可见 */
+  .ps-meta {
+    position: absolute;
+    right: 10px;
+    bottom: 28px;
     display: flex;
     flex-wrap: wrap;
-    gap: 5px;
-    margin-bottom: 8px;
+    justify-content: flex-end;
+    gap: 4px;
+    max-width: 82%;
+    z-index: 2;
+    pointer-events: none;
   }
-  .ps-note-tag {
-    font-size: 0.68rem;
-    padding: 1px 9px;
+  .ps-meta-tag {
+    font-size: 0.62rem;
+    line-height: 1;
+    padding: 4px 8px;
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.12);
-    color: rgba(58, 53, 48, 0.85);
-  }
-  .ps-note-desc {
-    font-size: 0.86rem;
-    line-height: 1.6;
-    word-break: break-word;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    white-space: nowrap;
   }
 
   .ps-empty {
@@ -245,18 +234,7 @@
     text-align: center;
   }
 
-  @media (min-width: 768px) {
-    .ps-note {
-      right: 5%;
-    }
-  }
   @media (max-width: 767.98px) {
-    .ps-note {
-      left: 14px;
-      right: 14px;
-      width: auto;
-      bottom: 26px;
-    }
     .ps-flow {
       grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
     }
@@ -270,16 +248,6 @@
     to {
       opacity: 1;
       transform: translateY(0) scale(1);
-    }
-  }
-  @keyframes ps-note-in {
-    from {
-      opacity: 0;
-      transform: scale(0.5) rotate(-3deg);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) rotate(0);
     }
   }
 </style>
@@ -300,8 +268,6 @@
   <div class="ps-stage">
     <div class="ps-flow" data-ps-flow></div>
   </div>
-
-  <div class="ps-note" data-ps-note></div>
 </div>
 
 <script>
@@ -309,8 +275,6 @@
     const boardEl = document.querySelector<HTMLElement>("[data-ps-board]");
     if (!boardEl) return;
     const board = boardEl;
-
-    const NOTE_COLORS = ["#fff3b0", "#ffd6e0", "#cdeffd", "#d8f3dc", "#f3d9fa", "#ffe5c2"];
 
     type Photo = { src: string; description?: string; date?: string; tags?: string[] };
     type Payload = {
@@ -322,7 +286,6 @@
     };
 
     const flow = board.querySelector<HTMLElement>("[data-ps-flow]");
-    const noteEl = board.querySelector<HTMLElement>("[data-ps-note]");
     const backBtn = board.querySelector<HTMLButtonElement>("[data-ps-back]");
     const titleEl = board.querySelector<HTMLElement>("[data-ps-title]");
 
@@ -330,7 +293,6 @@
       el: HTMLElement;
       img: HTMLImageElement;
       meta: Photo;
-      noteColor: string;
     };
 
     let payload: Payload | null = null;
@@ -361,7 +323,6 @@
       if (!zoomed) return;
       zoomed.el.classList.remove("is-zoomed");
       zoomed = null;
-      noteEl?.classList.remove("is-visible");
     }
 
     function zoom(card: Card) {
@@ -373,45 +334,23 @@
       zoomed = card;
       card.el.classList.add("is-zoomed");
 
-      const naturalW = card.img.naturalWidth || 4;
-      const naturalH = card.img.naturalHeight || 3;
+      // 图片可能尚未加载完成：naturalWidth 为 0 时回退到当前布局尺寸，
+      // 避免算出 NaN 导致放大尺寸异常
+      const naturalW =
+        (card.img.complete && card.img.naturalWidth) ||
+        card.img.clientWidth ||
+        card.img.width ||
+        4;
+      const naturalH =
+        (card.img.complete && card.img.naturalHeight) ||
+        card.img.clientHeight ||
+        card.img.height ||
+        3;
       const isMobile = window.innerWidth < 768;
       const maxW = window.innerWidth - (isMobile ? 36 : 140);
-      const maxH = window.innerHeight - (isMobile ? 260 : 140);
+      const maxH = window.innerHeight - (isMobile ? 160 : 120);
       const scale = Math.min(maxW / naturalW, maxH / naturalH, 1.25);
       card.el.style.width = `${Math.round(naturalW * scale)}px`;
-
-      if (!noteEl) return;
-      const tags = card.meta.tags?.length ? card.meta.tags : albumTags();
-      const date = card.meta.date || payload?.date || "";
-      const desc = card.meta.description || "";
-      noteEl.style.backgroundColor = card.noteColor;
-      noteEl.innerHTML = `
-        ${date ? `<div class="ps-note-date"></div>` : ""}
-        ${tags.length > 0 ? `<div class="ps-note-tags"></div>` : ""}
-        ${desc ? `<div class="ps-note-desc"></div>` : ""}
-      `;
-      const dEl = noteEl.querySelector(".ps-note-date");
-      if (dEl) dEl.textContent = date;
-      const tgEl = noteEl.querySelector(".ps-note-tags");
-      if (tgEl) {
-        for (const t of tags) {
-          const chip = document.createElement("span");
-          chip.className = "ps-note-tag";
-          chip.textContent = `# ${t}`;
-          tgEl.appendChild(chip);
-        }
-      }
-      const dsEl = noteEl.querySelector(".ps-note-desc");
-      if (dsEl) dsEl.textContent = desc;
-
-      if (!date && tags.length === 0 && !desc) {
-        noteEl.classList.remove("is-visible");
-      } else {
-        noteEl.classList.remove("is-visible");
-        void noteEl.offsetWidth;
-        noteEl.classList.add("is-visible");
-      }
     }
 
     function render(data: Payload) {
@@ -445,7 +384,18 @@
         const strip = document.createElement("div");
         strip.className = "ps-strip";
 
-        frame.append(img, strip);
+        // 照片右下角标签：优先照片自带标签，否则回退到相册标签
+        const metaTags = meta.tags?.length ? meta.tags : albumTags();
+        const metaEl = document.createElement("div");
+        metaEl.className = "ps-meta";
+        for (const t of metaTags) {
+          const chip = document.createElement("span");
+          chip.className = "ps-meta-tag";
+          chip.textContent = `# ${t}`;
+          metaEl.appendChild(chip);
+        }
+
+        frame.append(metaEl, img, strip);
         el.append(tape, tack, frame);
         flow.appendChild(el);
 
@@ -453,7 +403,6 @@
           el,
           img,
           meta,
-          noteColor: NOTE_COLORS[index % NOTE_COLORS.length],
         };
         el.addEventListener("click", () => zoom(card));
       });
