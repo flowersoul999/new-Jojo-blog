@@ -238,8 +238,8 @@ function serializeMenus(menus: Props["config"]["menus"]) {
 	// 页面空闲后再初始化，避免首屏主线程被重脚本占用
 	function scheduleInit() {
 		const run = () => setTimeout(initWidget, 0);
-		if (window.requestIdleCallback) {
-			requestIdleCallback(run, { timeout: 3000 });
+		if (typeof window.requestIdleCallback === "function") {
+			window.requestIdleCallback(run, { timeout: 3000 });
 		} else {
 			setTimeout(run, 500);
 		}
