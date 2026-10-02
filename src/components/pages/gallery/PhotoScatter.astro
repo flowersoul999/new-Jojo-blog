@@ -612,8 +612,12 @@ const { album } = Astro.props;
       }
       // 记录当前打开的查看器句柄，closeLbox 依赖它，缺失会导致任何关闭方式都失效
       lbox = { ov, box, note };
+      // 记录打开时刻：触发本次打开的那一下 click，其 target 是卡片而非照片，
+      // 若不忽略会在捕获阶段被当成"点空白"而立刻误关。350ms 内不响应关闭。
+      const lboxOpenedAt = performance.now();
       // 点击照片/便签以外的任意空白区域都关闭（document 捕获阶段，不受层级遮挡影响）
       lboxDocClose = (e: Event) => {
+        if (performance.now() - lboxOpenedAt < 350) return;
         const t = e.target as HTMLElement | null;
         if (!t) return;
         if (box.contains(t) || (hasNote && note.contains(t))) return;
