@@ -221,27 +221,8 @@ const activePaths = [
 	}
 
 	.navbar-link::after {
-		content: "";
-		position: absolute;
-		left: 50%;
-		bottom: 0.42rem;
-		width: 0;
-		height: 0.18rem;
-		border-radius: 999px;
-		background: linear-gradient(
-			90deg,
-			var(--primary),
-			color-mix(in oklab, var(--primary) 55%, #22d3ee)
-		);
-		box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 35%, transparent);
-		transform: translateX(-50%);
-		transition: width 0.35s ease;
-		pointer-events: none;
-	}
-
-	.navbar-link:hover::after,
-	.navbar-link.nav-link-active::after {
-		width: 42%;
+		/* rainzt.cn：不用下划线，高亮靠浅色圆角块（见 navbar.css） */
+		content: none;
 	}
 
 	.navbar-link:hover,
@@ -250,14 +231,8 @@ const activePaths = [
 		background: color-mix(in oklab, var(--primary) 12%, transparent);
 	}
 
-	.navbar-link:hover .navbar-icon,
-	.navbar-link.nav-link-active .navbar-icon {
-		transform: scale(1.18) rotate(-8deg);
-	}
-
 	.navbar-icon {
 		transition:
-			transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
 			color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
 			filter 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 	}

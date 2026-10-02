@@ -340,17 +340,18 @@ body.wallpaper-transparent #navbar-wrapper #navbar[data-full-width="true"] > div
 }
 
 #navbar.firefly-navbar > .firefly-nav-shell {
-    background: color-mix(in oklab, var(--card-bg) 18%, transparent) !important;
+    /* rainzt.cn 风格：透明贴顶一条，壁纸透出，不带卡片感 */
+    background: transparent !important;
     border: 0 !important;
-    border-bottom: 1px solid color-mix(in oklab, var(--nav-accent-primary) 8%, transparent) !important;
+    border-bottom: 1px solid transparent !important;
     border-radius: 0 !important;
-    box-shadow: 0 4px 16px rgb(0 0 0 / 0.02) !important;
-    backdrop-filter: blur(8px) saturate(1.08) !important;
-    -webkit-backdrop-filter: blur(8px) saturate(1.08) !important;
-    padding-top: 0.85rem;
-    padding-bottom: 0.85rem;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
     height: auto;
-    min-height: 5rem;
+    min-height: 4.2rem;
     transition:
         padding 0.4s cubic-bezier(0.4, 0, 0.2, 1),
         background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
@@ -359,36 +360,35 @@ body.wallpaper-transparent #navbar-wrapper #navbar[data-full-width="true"] > div
 
 #navbar.firefly-navbar.scrolled > .firefly-nav-shell,
 #navbar.firefly-navbar.navbar-sticky-shadow > .firefly-nav-shell {
-    background: color-mix(in oklab, var(--card-bg) 78%, transparent) !important;
-    border-bottom: 1px solid color-mix(in oklab, var(--nav-accent-primary) 24%, transparent) !important;
-    box-shadow:
-        0 8px 28px rgb(0 0 0 / 0.14),
-        0 0 42px color-mix(in oklab, var(--nav-accent-primary) 9%, transparent) !important;
-    backdrop-filter: blur(var(--navbar-glass-blur, 18px)) saturate(1.2) !important;
-    -webkit-backdrop-filter: blur(var(--navbar-glass-blur, 18px)) saturate(1.2) !important;
-    padding-top: 0.6rem;
-    padding-bottom: 0.6rem;
+    /* 滚动后加一层淡毛玻璃，保证可读性但保持通透 */
+    background: color-mix(in oklab, var(--card-bg) 62%, transparent) !important;
+    border-bottom: 1px solid color-mix(in oklab, var(--nav-accent-primary) 16%, transparent) !important;
+    box-shadow: 0 4px 18px rgb(0 0 0 / 0.06) !important;
+    backdrop-filter: blur(var(--navbar-glass-blur, 14px)) saturate(1.15) !important;
+    -webkit-backdrop-filter: blur(var(--navbar-glass-blur, 14px)) saturate(1.15) !important;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
 }
 
 #wallpaper-wrapper~* #navbar.firefly-navbar > .firefly-nav-shell,
 body:has(#wallpaper-wrapper) #navbar.firefly-navbar > .firefly-nav-shell,
 body.wallpaper-transparent #navbar.firefly-navbar > .firefly-nav-shell {
-    background: color-mix(in oklab, var(--card-bg) 14%, transparent) !important;
-    border-bottom: 1px solid color-mix(in oklab, var(--nav-accent-primary) 7%, transparent) !important;
-    box-shadow: 0 4px 14px rgb(0 0 0 / 0.025) !important;
-    backdrop-filter: blur(6px) saturate(1.06) !important;
-    -webkit-backdrop-filter: blur(6px) saturate(1.06) !important;
+    background: transparent !important;
+    border-bottom: 1px solid transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 #wallpaper-wrapper~* #navbar.firefly-navbar.scrolled > .firefly-nav-shell,
 body:has(#wallpaper-wrapper) #navbar.firefly-navbar.scrolled > .firefly-nav-shell,
 body.wallpaper-transparent #navbar.firefly-navbar.scrolled > .firefly-nav-shell,
 body:has(#wallpaper-wrapper) #navbar.firefly-navbar.navbar-sticky-shadow > .firefly-nav-shell {
-    background: color-mix(in oklab, var(--card-bg) 68%, transparent) !important;
-    border-bottom-color: color-mix(in oklab, var(--nav-accent-primary) 22%, transparent) !important;
-    box-shadow: 0 8px 28px rgb(0 0 0 / 0.12) !important;
-    backdrop-filter: blur(var(--navbar-glass-blur, 18px)) saturate(1.2) !important;
-    -webkit-backdrop-filter: blur(var(--navbar-glass-blur, 18px)) saturate(1.2) !important;
+    background: color-mix(in oklab, var(--card-bg) 62%, transparent) !important;
+    border-bottom-color: color-mix(in oklab, var(--nav-accent-primary) 16%, transparent) !important;
+    box-shadow: 0 4px 18px rgb(0 0 0 / 0.06) !important;
+    backdrop-filter: blur(var(--navbar-glass-blur, 14px)) saturate(1.15) !important;
+    -webkit-backdrop-filter: blur(var(--navbar-glass-blur, 14px)) saturate(1.15) !important;
 }
 
 #navbar.firefly-navbar .nav-container {
@@ -399,25 +399,23 @@ body:has(#wallpaper-wrapper) #navbar.firefly-navbar.navbar-sticky-shadow > .fire
 
 #navbar.firefly-navbar .nav-brand {
     font-family: var(--font-navbar-title, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
-    font-size: 1.35rem;
-    font-weight: 800;
+    font-size: 1.125rem;
+    font-weight: 750;
     text-decoration: none;
     color: var(--nav-fg-0);
     display: flex;
     align-items: center;
     gap: 0.5rem;
     position: relative;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.3s ease, color 0.3s ease;
     padding: 0.4rem 0.8rem;
-    border-radius: 12px;
+    border-radius: 10px;
     white-space: nowrap;
     justify-self: start;
 }
 
 #navbar.firefly-navbar .nav-brand:hover {
-    transform: scale(1.08) translateY(-2px);
-    background: color-mix(in oklab, var(--nav-accent-primary) 10%, transparent);
-    box-shadow: 0 8px 25px color-mix(in oklab, var(--nav-accent-primary) 25%, transparent);
+    background: color-mix(in oklab, var(--nav-accent-primary) 12%, transparent);
 }
 
 #navbar.firefly-navbar .brand-name {
@@ -426,12 +424,13 @@ body:has(#wallpaper-wrapper) #navbar.firefly-navbar.navbar-sticky-shadow > .fire
 }
 
 #navbar.firefly-navbar .nav-links {
+    /* rainzt.cn：菜单不套卡片壳，直接平铺在透明顶栏上 */
     display: flex;
-    gap: 0.2rem;
-    background: color-mix(in oklab, var(--card-bg) 8%, transparent);
-    padding: 0.25rem;
-    border-radius: 14px;
-    border: 1px solid color-mix(in oklab, var(--nav-accent-primary) 7%, transparent);
+    gap: 0.1rem;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    border: 0;
     justify-self: end;
     max-width: 100%;
     overflow: visible;
@@ -439,17 +438,18 @@ body:has(#wallpaper-wrapper) #navbar.firefly-navbar.navbar-sticky-shadow > .fire
 }
 
 #navbar.firefly-navbar .nav-link {
+    /* 纯文字粗体、紧凑、圆角块高亮 */
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    padding: 0.55rem 0.82rem;
-    color: var(--nav-fg-2);
+    gap: 0.3rem;
+    padding: 0.5rem 0.7rem;
+    color: var(--nav-fg-1);
     text-decoration: none;
-    font-size: 0.88rem;
-    font-weight: 600;
-    border-radius: 12px;
-    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 9px;
+    transition: background-color 0.25s ease, color 0.25s ease;
     position: relative;
     overflow: hidden;
     min-width: max-content;
@@ -479,63 +479,17 @@ body:has(#wallpaper-wrapper) #navbar.firefly-navbar.navbar-sticky-shadow > .fire
     margin-left: 0;
 }
 
-#navbar.firefly-navbar .nav-link::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--nav-accent-primary) 18%, transparent), transparent);
-    transition: left 0.6s ease;
-}
-
-#navbar.firefly-navbar .nav-link:hover::before {
-    left: 100%;
-}
-
-#navbar.firefly-navbar .nav-link::after {
-    content: "";
-    position: absolute;
-    bottom: 6px;
-    left: 50%;
-    width: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--nav-accent-primary), var(--nav-accent-tertiary));
-    transition: all 0.35s ease;
-    transform: translateX(-50%);
-    border-radius: 2px;
-}
-
-#navbar.firefly-navbar .nav-link:hover::after,
-#navbar.firefly-navbar .nav-link.active::after,
-#navbar.firefly-navbar .nav-link.nav-link-active::after {
-    width: 40%;
-}
-
 #navbar.firefly-navbar .nav-link .nav-icon {
-    display: inline-flex !important;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.85rem;
-    opacity: 0.7;
-    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    font-weight: 800;
+    /* rainzt.cn：菜单纯文字，不显示图标/符号 */
+    display: none !important;
 }
 
-#navbar.firefly-navbar .nav-link:hover .nav-icon,
-#navbar.firefly-navbar .nav-link.active .nav-icon,
-#navbar.firefly-navbar .nav-link.nav-link-active .nav-icon {
-    opacity: 1;
-    transform: scale(1.3) rotate(-10deg);
-}
-
+/* 高亮：浅色圆角底色块，不用下划线/扫光/浮起 */
 #navbar.firefly-navbar .nav-link:hover,
 #navbar.firefly-navbar .nav-link.active,
 #navbar.firefly-navbar .nav-link.nav-link-active {
     color: var(--nav-accent-primary);
-    background: color-mix(in oklab, var(--nav-accent-primary) 14%, transparent);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px color-mix(in oklab, var(--nav-accent-primary) 26%, transparent);
+    background: color-mix(in oklab, var(--nav-accent-primary) 12%, transparent);
 }
 
 #navbar.firefly-navbar .nav-actions {
@@ -551,50 +505,34 @@ body:has(#wallpaper-wrapper) #navbar.firefly-navbar.navbar-sticky-shadow > .fire
 
 #navbar.firefly-navbar .nav-actions > button,
 #navbar.firefly-navbar .nav-actions > a {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    border: 1px solid color-mix(in oklab, var(--nav-accent-primary) 22%, transparent);
-    background: color-mix(in oklab, var(--nav-accent-primary) 7%, transparent);
+    /* rainzt.cn：统一 44×44 方形图标按钮 */
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in oklab, var(--nav-accent-primary) 18%, transparent);
+    background: color-mix(in oklab, var(--nav-accent-primary) 6%, transparent);
     color: var(--nav-fg-1);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: var(--cursor-pointer, pointer);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    font-size: 1rem;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    font-size: 1.05rem;
     position: relative;
     overflow: hidden;
 }
 
 #navbar.firefly-navbar .nav-actions > button::before,
 #navbar.firefly-navbar .nav-actions > a::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    background: var(--nav-accent-primary);
-    border-radius: 50%;
-    transition: all 0.5s ease;
-    transform: translate(-50%, -50%);
-}
-
-#navbar.firefly-navbar .nav-actions > button:hover::before,
-#navbar.firefly-navbar .nav-actions > a:hover::before {
-    width: 150%;
-    height: 150%;
-    opacity: 0.15;
+    /* rainzt.cn：按钮不做圆形扩散扫光 */
+    content: none;
 }
 
 #navbar.firefly-navbar .nav-actions > button:hover,
 #navbar.firefly-navbar .nav-actions > a:hover {
-    border-color: var(--nav-accent-primary);
+    border-color: color-mix(in oklab, var(--nav-accent-primary) 40%, transparent);
     color: var(--nav-accent-primary);
-    background: color-mix(in oklab, var(--nav-accent-primary) 14%, transparent);
-    transform: scale(1.15) rotate(15deg);
-    box-shadow: 0 0 30px color-mix(in oklab, var(--nav-accent-primary) 42%, transparent);
+    background: color-mix(in oklab, var(--nav-accent-primary) 12%, transparent);
 }
 
 #navbar.firefly-navbar .nav-actions > .menu-btn {
@@ -1081,8 +1019,8 @@ body:has(#wallpaper-wrapper) #navbar.firefly-navbar.navbar-sticky-shadow > .fire
     }
 
     #navbar.firefly-navbar .nav-link {
-        padding-inline: 0.6rem;
-        font-size: 0.84rem;
+        padding-inline: 0.55rem;
+        font-size: 0.95rem;
     }
 
     #navbar.firefly-navbar .nav-icon {
