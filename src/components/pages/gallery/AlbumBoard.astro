@@ -1,12 +1,11 @@
 ---
 /**
- * 内嵌软木照片板（点击相册卡片后原位展开，不跳转新页面）
+ * 内嵌散落照片板（点击相册卡片后原位展开，不跳转新页面）—— 完整复刻旧博客布局
  *
- * 有边界的照片板：在相册列表下方展开一块带边框与阴影的软木板，
- * 不铺满全屏；照片按顺序从上往下排列，面板可上下滚动。
- * - 淡黄色布料软木板背景 + 胶带/图钉把拍立得照片固定在板上
- * - 单击照片放大居中，旁边出现彩色便签，显示标签 / 日期 / 描述
- * - 再次单击照片或 ESC 还原；点击右上角「收起」回到相册列表
+ * 有边界的照片板：在相册列表下方展开一块带边框与阴影的软木板，照片按
+ * "斐波那契螺旋 + 随机倾斜"散落排布，支持任意拖拽摆放；超出部分面板内可滚动。
+ * - 轻点（短按）照片 → 全屏模糊遮罩放大到接近原图尺寸，弹出可拖拽彩纸便签
+ * - 点击遮罩或 ESC 还原；点击右上角「收起」回到相册列表
  *
  * 页面数据：相册列表页在 `<galleryIndex>` 里埋 `data-albums-json`，
  * 点击卡片时读取对应相册数据并调用本组件的 open()。
@@ -63,22 +62,14 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		}
 	}
 
-	/* 淡黄色布料软木板：底色 + 经纬织纹 + 布面起伏明暗 */
+	/* 淡黄色布料软木板 */
 	.ab-board-bg {
 		position: absolute;
 		inset: 0;
 		background-color: #f6e8c1;
 		background-image:
-			repeating-linear-gradient(
-				0deg,
-				rgba(150, 118, 52, 0.06) 0 1px,
-				rgba(150, 118, 52, 0) 1px 4px
-			),
-			repeating-linear-gradient(
-				90deg,
-				rgba(150, 118, 52, 0.06) 0 1px,
-				rgba(150, 118, 52, 0) 1px 4px
-			),
+			repeating-linear-gradient(0deg, rgba(150, 118, 52, 0.06) 0 1px, rgba(150, 118, 52, 0) 1px 4px),
+			repeating-linear-gradient(90deg, rgba(150, 118, 52, 0.06) 0 1px, rgba(150, 118, 52, 0) 1px 4px),
 			radial-gradient(120% 90% at 18% 12%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%),
 			radial-gradient(130% 110% at 88% 92%, rgba(168, 132, 54, 0.28), rgba(168, 132, 54, 0) 62%),
 			linear-gradient(160deg, #fdf5da 0%, #f7e9c2 48%, #eedcac 100%);
@@ -134,7 +125,7 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		transform: scale(1.04);
 	}
 
-	/* 可滚动舞台：照片在 padding 内按顺序从上往下铺，超出部分面板内滚动 */
+	/* 可滚动散落舞台 */
 	.ab-stage {
 		position: relative;
 		flex: 1 1 auto;
@@ -146,50 +137,41 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		scrollbar-width: thin;
 	}
 	.ab-flow {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr));
-		align-content: start;
-		gap: 1.1rem;
+		position: relative;
+		min-height: 100%;
 	}
 
-	/* 拍立得卡片：流式排列（不再是 absolute 散落） */
+	/* 散落拍立得卡片 */
 	.ab-card {
-		position: relative;
-		cursor: zoom-in;
+		position: absolute;
+		width: 180px;
+		cursor: grab;
 		user-select: none;
 		-webkit-user-select: none;
-		touch-action: pan-y;
-		animation: ab-pop 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) both;
-		transition:
-			box-shadow 0.2s ease,
-			transform 0.28s ease;
+		touch-action: none;
+		transition: box-shadow 0.2s ease, transform 0.16s ease, opacity 0.4s ease;
+		opacity: 0;
+		transform: rotate(var(--tilt, 0deg));
+	}
+	.ab-card.ab-in {
+		opacity: 1;
 	}
 	.ab-card:hover {
-		transform: translateY(-3px) rotate(var(--tilt, 0deg));
+		transform: rotate(var(--tilt, 0deg)) translateY(-4px) scale(1.03);
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
 	}
-
-	.ab-card.is-zoomed {
-		position: fixed;
-		left: 50%;
-		top: 50%;
-		z-index: 45;
-		transform: translate(-50%, -50%) rotate(0deg);
-		z-index: 45;
-		cursor: zoom-out;
+	.ab-card.ab-dragging {
+		cursor: grabbing;
+		transform: rotate(var(--tilt, 0deg)) scale(1.05);
+		transition: box-shadow 0.2s ease;
+		z-index: 30;
 	}
 
 	.ab-frame {
 		position: relative;
 		padding: 8px 8px 0;
 		background: #fff;
-		box-shadow:
-			0 10px 30px rgba(0, 0, 0, 0.24),
-			0 2px 8px rgba(0, 0, 0, 0.12);
-	}
-	.ab-card:hover .ab-frame {
-		box-shadow:
-			0 14px 38px rgba(0, 0, 0, 0.3),
-			0 2px 8px rgba(0, 0, 0, 0.14);
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.12);
 	}
 	.ab-frame img {
 		display: block;
@@ -199,13 +181,13 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		background: #e9e9ee;
 		-webkit-user-drag: none;
 		user-select: none;
+		pointer-events: none;
 	}
 	.ab-strip {
 		height: 22px;
 		background: #fff;
 	}
 
-	/* 胶带：贴在拍立得上方一条半透明胶带 */
 	.ab-tape {
 		position: absolute;
 		top: -12px;
@@ -233,47 +215,6 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		pointer-events: none;
 	}
 
-	/* 大图便签 */
-	.ab-note {
-		position: fixed;
-		z-index: 46;
-		width: 210px;
-		min-height: 96px;
-		padding: 14px 16px;
-		color: #3a3530;
-		box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
-		display: none;
-	}
-	.ab-note.is-visible {
-		display: block;
-		animation: ab-note-in 0.35s cubic-bezier(0.22, 1.3, 0.36, 1) both;
-	}
-	.ab-note-date {
-		font-size: 0.68rem;
-		letter-spacing: 0.08em;
-		color: rgba(58, 53, 48, 0.6);
-		margin-bottom: 6px;
-	}
-	.ab-note-tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 5px;
-		margin-bottom: 8px;
-	}
-	.ab-note-tag {
-		font-size: 0.68rem;
-		padding: 1px 9px;
-		border-radius: 999px;
-		background: rgba(0, 0, 0, 0.12);
-		color: rgba(58, 53, 48, 0.85);
-	}
-	.ab-note-desc {
-		font-size: 0.86rem;
-		line-height: 1.6;
-		word-break: break-word;
-	}
-
-	/* 空状态 */
 	.ab-empty {
 		display: flex;
 		flex-direction: column;
@@ -286,41 +227,112 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		text-align: center;
 	}
 
-	@media (min-width: 768px) {
-		.ab-note {
-			right: 5%;
-		}
+	/* ---- 全屏放大查看（挂到 body 下）---- */
+	.ab-ov {
+		position: fixed;
+		inset: 0;
+		z-index: 900;
+		background: rgba(20, 18, 14, 0.55);
+		backdrop-filter: blur(14px);
+		-webkit-backdrop-filter: blur(14px);
+		opacity: 0;
+		transition: opacity 0.28s ease;
+		cursor: zoom-out;
 	}
-	@media (max-width: 767.98px) {
-		.ab-note {
-			left: 14px;
-			right: 14px;
-			width: auto;
-			bottom: 26px;
-		}
-		.ab-flow {
-			grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
-		}
+	.ab-ov.ab-ov-on {
+		opacity: 1;
+	}
+	.ab-ov-box {
+		position: fixed;
+		z-index: 901;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		padding: 8px 8px 0;
+		background: #fff;
+		box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+		opacity: 0;
+		transition: opacity 0.28s ease, transform 0.28s ease;
+		cursor: zoom-out;
+	}
+	.ab-ov-box img {
+		display: block;
+		max-width: 90vw;
+		max-height: 82vh;
+		object-fit: contain;
+		background: #e9e9ee;
+		-webkit-user-drag: none;
+		user-select: none;
+	}
+	.ab-ov-strip {
+		height: 22px;
+		background: #fff;
+	}
+	.ab-ov-box.ab-ov-on {
+		opacity: 1;
 	}
 
-	@keyframes ab-pop {
-		from {
-			opacity: 0;
-			transform: scale(0.6) rotate(var(--tilt, 0deg));
-		}
-		to {
-			opacity: 1;
-			transform: scale(1) rotate(var(--tilt, 0deg));
-		}
+	/* 可拖拽彩纸便签 */
+	.ab-ov-note {
+		position: fixed;
+		z-index: 902;
+		width: 230px;
+		min-height: 96px;
+		padding: 16px 18px;
+		color: #3a3530;
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.26);
+		cursor: grab;
+		touch-action: none;
+		opacity: 0;
+		transition: opacity 0.28s ease, transform 0.28s ease;
 	}
-	@keyframes ab-note-in {
-		from {
-			opacity: 0;
-			transform: scale(0.5) rotate(-3deg);
+	.ab-ov-note.ab-ov-on {
+		opacity: 1;
+		transform: rotate(-1.5deg);
+	}
+	.ab-ov-note.ab-ovdragging {
+		cursor: grabbing;
+		transform: rotate(0deg) scale(1.02);
+		transition: none;
+	}
+	.ab-ov-note-date {
+		font-size: 0.68rem;
+		letter-spacing: 0.08em;
+		color: rgba(58, 53, 48, 0.6);
+		margin-bottom: 6px;
+	}
+	.ab-ov-note-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+		margin-bottom: 8px;
+	}
+	.ab-ov-note-tag {
+		font-size: 0.68rem;
+		padding: 1px 9px;
+		border-radius: 999px;
+		background: rgba(0, 0, 0, 0.12);
+		color: rgba(58, 53, 48, 0.85);
+	}
+	.ab-ov-note-desc {
+		font-size: 0.86rem;
+		line-height: 1.6;
+		word-break: break-word;
+	}
+
+	@media (max-width: 767.98px) {
+		.ab-card {
+			width: 140px;
 		}
-		to {
-			opacity: 1;
-			transform: scale(1) rotate(0);
+		.ab-ov-note {
+			left: 12px;
+			right: 12px;
+			width: auto;
+			bottom: 18px;
+		}
+		.ab-ov-box img {
+			max-width: 100vw;
+			max-height: 70vh;
 		}
 	}
 </style>
@@ -342,8 +354,6 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		<div class="ab-flow" data-ab-flow></div>
 		<div class="ab-empty" data-ab-empty hidden>📷 {emptyText}</div>
 	</div>
-
-	<div class="ab-note" data-ab-note></div>
 </div>
 
 <script>
@@ -363,7 +373,6 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		};
 
 		const flow = panel.querySelector<HTMLElement>("[data-ab-flow]");
-		const noteEl = panel.querySelector<HTMLElement>("[data-ab-note]");
 		const closeBtn = panel.querySelector<HTMLButtonElement>("[data-ab-close]");
 		const titleEl = panel.querySelector<HTMLElement>("[data-ab-title]");
 		const emptyEl = panel.querySelector<HTMLElement>("[data-ab-empty]");
@@ -372,12 +381,14 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 			el: HTMLElement;
 			img: HTMLImageElement;
 			meta: Photo;
+			base: { x: number; y: number };
+			offset: { x: number; y: number };
 			noteColor: string;
-			tilt: number;
 		};
 
 		let payload: Payload | null = null;
-		let zoomed: Card | null = null;
+		const cards: Card[] = [];
+		let lbox: { ov: HTMLElement; box: HTMLElement; note: HTMLElement } | null = null;
 
 		function hashStr(s: string): number {
 			let h = 0;
@@ -388,78 +399,253 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 			return Math.abs(h);
 		}
 
-		function unzoom() {
-			if (!zoomed) return;
-			zoomed.el.classList.remove("is-zoomed");
-			zoomed = null;
-			noteEl?.classList.remove("is-visible");
+		function albumTags(): string[] {
+			return Array.isArray(payload?.tags) ? payload!.tags.map(String) : [];
 		}
 
-		function zoom(card: Card) {
-			if (zoomed === card) {
-				unzoom();
-				return;
+		function getStablePosition(uniqueId: string, width: number, height: number) {
+			let hash = 0;
+			for (let i = 0; i < uniqueId.length; i++) {
+				const code = uniqueId.charCodeAt(i);
+				hash = (hash << 5) - hash + code;
+				hash &= hash;
 			}
-			if (zoomed) unzoom();
-			zoomed = card;
-			card.el.classList.add("is-zoomed");
+			const stableIndex = Math.abs(hash) % 10000;
+			const maxRadius = Math.min(width, height) / 2 - 90;
+			const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+			const t = (stableIndex % 1000) / 1000;
+			const radius = Math.pow(t, 0.8) * maxRadius;
+			const angle = stableIndex * goldenAngle;
+			const jitterSeed = Math.abs(hash) % 1000;
+			const jitterX = (jitterSeed % 24) - 12;
+			const jitterY = ((jitterSeed * 7) % 24) - 12;
+			const rotation = ((jitterSeed * 13) % 60) - 30;
+			return {
+				x: radius * Math.cos(angle) + jitterX,
+				y: radius * Math.sin(angle) + jitterY,
+				rotation,
+			};
+		}
 
-			// 放大到视口内的合适尺寸（保持图片比例）
-			const naturalW = card.img.naturalWidth || 4;
-			const naturalH = card.img.naturalHeight || 3;
-			const isMobile = window.innerWidth < 768;
-			const maxW = window.innerWidth - (isMobile ? 36 : 120);
-			const maxH = window.innerHeight - (isMobile ? 260 : 140);
-			const scale = Math.min(maxW / naturalW, maxH / naturalH, 1.25);
-			card.el.style.width = `${Math.round(naturalW * scale)}px`;
+		function loadOffset(urlSrc: string) {
+			try {
+				const saved = localStorage.getItem(`gallery-ab-offset-${urlSrc}`);
+				if (saved) {
+					const p = JSON.parse(saved);
+					return { x: p.x || 0, y: p.y || 0 };
+				}
+			} catch {
+				/* ignore */
+			}
+			return { x: 0, y: 0 };
+		}
 
-			if (!noteEl) return;
-			const tags = card.meta.tags?.length ? card.meta.tags : payload?.tags || [];
-			const date = card.meta.date || "";
-			const desc = card.meta.description || "";
-			noteEl.style.backgroundColor = card.noteColor;
-			noteEl.innerHTML = `
-				${date ? `<div class="ab-note-date"></div>` : ""}
-				${tags.length > 0 ? `<div class="ab-note-tags"></div>` : ""}
-				${desc ? `<div class="ab-note-desc"></div>` : ""}
-			`;
-			const dEl = noteEl.querySelector(".ab-note-date");
-			if (dEl) dEl.textContent = date;
-			const tgEl = noteEl.querySelector(".ab-note-tags");
+		function layoutCards() {
+			if (!flow) return;
+			const fw = flow.clientWidth;
+			const fh = flow.clientHeight;
+			if (fw <= 0) return;
+			flow.style.height = "100%";
+			const cw = fw / 2;
+			const ch = fh / 2;
+			cards.forEach((card) => {
+				const off = card.offset;
+				card.el.style.left = `${cw + card.base.x + off.x}px`;
+				card.el.style.top = `${ch + card.base.y + off.y}px`;
+			});
+		}
+
+		// ---- 全屏放大查看 ----
+		function closeLbox(doRemove: boolean) {
+			if (!lbox) return;
+			const { ov, box, note } = lbox;
+			const done = () => {
+				ov.remove();
+				box.remove();
+				note.remove();
+				document.body.classList.remove("ab-lbox-open");
+			};
+			ov.classList.remove("ab-ov-on");
+			box.classList.remove("ab-ov-on");
+			note.classList.remove("ab-ov-on");
+			if (doRemove) setTimeout(done, 260);
+			else done();
+			lbox = null;
+		}
+
+		function openLbox(card: Card) {
+			closeLbox(true);
+			const img = card.img;
+			const naturalW = (img.complete && img.naturalWidth) || card.img.width || 400;
+			const naturalH = (img.complete && img.naturalHeight) || card.img.height || 300;
+			const meta = card.meta;
+			const tags = meta.tags?.length ? meta.tags : albumTags();
+
+			const ov = document.createElement("div");
+			ov.className = "ab-ov";
+			ov.addEventListener("click", () => closeLbox(true));
+
+			const box = document.createElement("div");
+			box.className = "ab-ov-box";
+			box.addEventListener("click", () => closeLbox(true));
+			const big = document.createElement("img");
+			big.src = img.src;
+			big.alt = meta.description || "照片";
+			big.draggable = false;
+			big.onload = () => {
+				const w = big.naturalWidth || naturalW;
+				const h = big.naturalHeight || naturalH;
+				const isMobile = window.innerWidth < 768;
+				const maxW = window.innerWidth - (isMobile ? 20 : 80);
+				const maxH = window.innerHeight - (isMobile ? 200 : 120);
+				const scale = Math.min(maxW / w, maxH / h, 1);
+				big.style.width = `${Math.round(w * scale)}px`;
+				big.style.height = "auto";
+				box.style.transform = "translate(-50%,-50%) scale(1)";
+			};
+			const strip = document.createElement("div");
+			strip.className = "ab-ov-strip";
+			box.append(big, strip);
+
+			const note = document.createElement("div");
+			note.className = "ab-ov-note";
+			const noteDrag: any = { active: false };
+			note.style.backgroundColor = card.noteColor;
+			let inner = "";
+			if (meta.date) inner += `<div class="ab-ov-note-date"></div>`;
+			if (tags.length > 0) inner += `<div class="ab-ov-note-tags"></div>`;
+			if (meta.description) inner += `<div class="ab-ov-note-desc"></div>`;
+			note.innerHTML = inner;
+			const dEl = note.querySelector(".ab-ov-note-date");
+			if (dEl) dEl.textContent = meta.date || "";
+			const tgEl = note.querySelector(".ab-ov-note-tags");
 			if (tgEl) {
-				for (const t of tags) {
+				for (const tg of tags) {
 					const chip = document.createElement("span");
-					chip.className = "ab-note-tag";
-					chip.textContent = `# ${t}`;
+					chip.className = "ab-ov-note-tag";
+					chip.textContent = `# ${tg}`;
 					tgEl.appendChild(chip);
 				}
 			}
-			const dsEl = noteEl.querySelector(".ab-note-desc");
-			if (dsEl) dsEl.textContent = desc;
+			const dsEl = note.querySelector(".ab-ov-note-desc");
+			if (dsEl) dsEl.textContent = meta.description || "";
+			const hasNote = !!meta.date || tags.length > 0 || !!meta.description;
 
-			if (!date && tags.length === 0 && !desc) {
-				noteEl.classList.remove("is-visible");
-			} else {
-				noteEl.classList.remove("is-visible");
-				void noteEl.offsetWidth;
-				noteEl.classList.add("is-visible");
-			}
+			const placeNote = () => {
+				if (!hasNote) return;
+				const m = window.innerWidth < 768;
+				note.style.left = m ? "12px" : `${Math.min(Math.max(16, window.innerWidth * 0.72), window.innerWidth - 246)}px`;
+				note.style.top = m ? "auto" : `${Math.max(16, window.innerHeight * 0.18)}px`;
+				note.style.bottom = m ? "18px" : "auto";
+				note.style.right = m ? "12px" : "auto";
+			};
+			placeNote();
+
+			note.addEventListener("pointerdown", (e) => {
+				noteDrag.active = true;
+				noteDrag.sx = e.clientX;
+				noteDrag.sy = e.clientY;
+				noteDrag.left = parseFloat(note.style.left) || note.getBoundingClientRect().left;
+				noteDrag.top = parseFloat(note.style.top) || note.getBoundingClientRect().top;
+				note.classList.add("ab-ovdragging");
+				note.setPointerCapture(e.pointerId);
+			});
+			note.addEventListener("pointermove", (e) => {
+				if (!noteDrag.active) return;
+				note.style.left = `${noteDrag.left + (e.clientX - noteDrag.sx)}px`;
+				note.style.top = `${noteDrag.top + (e.clientY - noteDrag.sy)}px`;
+				note.style.right = "auto";
+				note.style.bottom = "auto";
+			});
+			note.addEventListener("pointerup", () => {
+				noteDrag.active = false;
+				note.classList.remove("ab-ovdragging");
+			});
+
+			if (hasNote) document.body.append(ov, box, note);
+			else document.body.append(ov, box);
+			document.body.classList.add("ab-lbox-open");
+			requestAnimationFrame(() => requestAnimationFrame(() => {
+				ov.classList.add("ab-ov-on");
+				box.classList.add("ab-ov-on");
+				if (hasNote) note.classList.add("ab-ov-on");
+			}));
 		}
 
-		function clearStage() {
+		// ---- 卡片拖拽（pointer，区分轻点与拖动）----
+		function attachDrag(card: Card) {
+			const el = card.el;
+			const info: any = { active: false };
+
+			el.addEventListener("pointerdown", (e) => {
+				info.active = true;
+				info.moved = false;
+				info.sx = e.clientX;
+				info.sy = e.clientY;
+				info.baseLeft = parseInt(el.style.left, 10) || 0;
+				info.baseTop = parseInt(el.style.top, 10) || 0;
+				info.pressTime = e.timeStamp;
+				el.classList.add("ab-dragging");
+				el.setPointerCapture(e.pointerId);
+			});
+			el.addEventListener("pointermove", (e) => {
+				if (!info.active) return;
+				const dx = e.clientX - info.sx;
+				const dy = e.clientY - info.sy;
+				if (Math.hypot(dx, dy) > 6) info.moved = true;
+				if (info.moved) {
+					let nl = info.baseLeft + dx;
+					let nt = info.baseTop + dy;
+					if (flow) {
+						const maxL = Math.max(0, flow.clientWidth - el.offsetWidth);
+						const maxT = Math.max(0, flow.clientHeight - el.offsetHeight);
+						nl = Math.min(Math.max(0, nl), maxL);
+						nt = Math.min(Math.max(0, nt), maxT);
+					}
+					el.style.left = `${nl}px`;
+					el.style.top = `${nt}px`;
+				}
+			});
+			const end = (e: PointerEvent) => {
+				if (!info.active) return;
+				const wasClick = !info.moved && e.timeStamp - info.pressTime <= 150;
+				info.active = false;
+				el.classList.remove("ab-dragging");
+				if (wasClick) {
+					openLbox(card);
+					return;
+				}
+				const fw = flow?.clientWidth || 0;
+				const cw = fw / 2;
+				const ch = (flow?.clientHeight || 0) / 2;
+				if (fw > 0) {
+					card.offset.x = (parseFloat(el.style.left) || cw) - (cw + card.base.x);
+					card.offset.y = (parseFloat(el.style.top) || ch) - (ch + card.base.y);
+					try {
+						localStorage.setItem(`gallery-ab-offset-${card.img.src}`, JSON.stringify(card.offset));
+					} catch {
+						/* ignore */
+					}
+				}
+			};
+			el.addEventListener("pointerup", (e) => end(e));
+			el.addEventListener("pointercancel", (e) => end(e));
+		}
+
+		// ---- 渲染散落照片板 ----
+		function render(data: Payload) {
+			payload = data;
+			cards.length = 0;
+			if (titleEl && data.name) titleEl.textContent = data.name;
 			if (!flow) return;
 			flow.innerHTML = "";
-			zoomed = null;
-			noteEl?.classList.remove("is-visible");
-		}
-
-		function render(data: Payload) {
-			clearStage();
-			payload = data;
+			if (emptyEl) emptyEl.hidden = (data.photos || []).length !== 0;
 
 			const photos = data.photos || [];
-			if (emptyEl) emptyEl.hidden = photos.length !== 0;
-			if (photos.length === 0 || !flow) return;
+			if (photos.length === 0) return;
+
+			const fw = flow.clientWidth || window.innerWidth;
+			const fh = flow.clientHeight || 600;
 
 			photos.forEach((meta, index) => {
 				const tilt = ((hashStr(meta.src || String(index)) * 7) % 6) - 3;
@@ -467,22 +653,18 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 				el.className = "ab-card";
 				el.style.setProperty("--tilt", `${tilt}deg`);
 				el.style.setProperty("--tape-rot", `${((hashStr(meta.src || String(index)) * 7) % 14) - 7}deg`);
-				el.style.animationDelay = `${Math.min(index * 55, 600)}ms`;
 
 				const frame = document.createElement("div");
 				frame.className = "ab-frame";
-
 				const tape = document.createElement("div");
 				tape.className = "ab-tape";
 				const tack = document.createElement("div");
 				tack.className = "ab-tack";
-
 				const img = document.createElement("img");
 				img.src = meta.src;
 				img.alt = meta.description || `照片 ${index + 1}`;
 				img.draggable = false;
 				img.decoding = "async";
-
 				const strip = document.createElement("div");
 				strip.className = "ab-strip";
 
@@ -490,23 +672,31 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 				el.append(tape, tack, frame);
 				flow.appendChild(el);
 
+				const pos = getStablePosition(meta.src || String(index), fw, fh);
 				const card: Card = {
 					el,
 					img,
 					meta,
+					base: { x: pos.x, y: pos.y },
+					offset: loadOffset(meta.src || ""),
 					noteColor: NOTE_COLORS[index % NOTE_COLORS.length],
-					tilt,
 				};
-
-				el.addEventListener("click", () => zoom(card));
+				cards.push(card);
+				attachDrag(card);
 			});
+
+			requestAnimationFrame(() => requestAnimationFrame(() => {
+				layoutCards();
+				cards.forEach((c, i) => {
+					setTimeout(() => c.el.classList.add("ab-in"), i * 30);
+				});
+			}));
 		}
 
 		function open(data: Payload) {
 			if (titleEl && data.name) titleEl.textContent = data.name;
 			panel.classList.add("ab-open");
 			panel.setAttribute("aria-hidden", "false");
-			// 隐藏左右侧栏，让画布占据当前屏幕；并把画布滚到视野内
 			document.body.classList.add("ab-canvas-open");
 			panel.scrollIntoView({ block: "start", behavior: "smooth" });
 			requestAnimationFrame(() => {
@@ -515,10 +705,14 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		}
 
 		function close() {
+			if (lbox) closeLbox(true);
 			panel.classList.remove("ab-open");
 			panel.setAttribute("aria-hidden", "true");
 			document.body.classList.remove("ab-canvas-open");
-			clearStage();
+			payload = null;
+			cards.length = 0;
+			if (flow) flow.innerHTML = "";
+			if (emptyEl) emptyEl.hidden = true;
 		}
 
 		closeBtn?.addEventListener("click", close);
@@ -526,8 +720,15 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		document.addEventListener("keydown", (e) => {
 			if (e.key !== "Escape" || !panel.classList.contains("ab-open")) return;
 			e.preventDefault();
-			if (zoomed) unzoom();
+			if (lbox) closeLbox(true);
 			else close();
+		});
+
+		let resizeTimer: number;
+		window.addEventListener("resize", () => {
+			if (!panel.classList.contains("ab-open")) return;
+			clearTimeout(resizeTimer);
+			resizeTimer = window.setTimeout(() => layoutCards(), 120);
 		});
 
 		// 对外暴露：相册列表页点击卡片时调用

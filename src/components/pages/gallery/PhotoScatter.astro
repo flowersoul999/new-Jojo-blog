@@ -1,12 +1,13 @@
 ---
 /**
- * 全屏软木照片板（相册详情页本体）
+ * 全屏散落照片墙（相册详情页）—— 完整复刻旧博客布局
  *
  * 沉浸式全屏画布：
  * - 相册详情页隐藏左右侧边栏，照片板 min-height: 100svh 占满整屏
- * - 画布仍在文档流内，向上滚动可回到页面顶部（首页那屏）
- * - 照片按顺序排列，页面可正常上下滚动看到每一张
- * - 每张照片右下角叠放标签（半透明胶囊），单击照片居中放大，再次单击或 ESC 还原
+ * - 照片按"斐波那契螺旋 + 随机倾斜"散落排布，错落有致
+ * - 每张照片支持鼠标/触摸任意拖拽摆放（位置保存在本地），超出部分画布内可滚动
+ * - 轻点（短按）照片 → 全屏模糊遮罩放大到接近原图尺寸，旁边弹出可拖拽的彩纸便签
+ *   （显示日期 / 标签 / 描述），点击遮罩或 ESC 还原
  *
  * 页面数据：相册页在模板中埋 <script type="application/json" data-scatter-data>，
  * 加密相册解密后通过 password:decrypted 事件启动。
@@ -18,7 +19,6 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    /* 占满整屏（仍在文档流内，向上滚动可回到页面顶部） */
     min-height: 100vh;
     min-height: 100svh;
     margin: 0;
@@ -46,16 +46,8 @@
     inset: 0;
     background-color: #f6e8c1;
     background-image:
-      repeating-linear-gradient(
-        0deg,
-        rgba(150, 118, 52, 0.06) 0 1px,
-        rgba(150, 118, 52, 0) 1px 4px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        rgba(150, 118, 52, 0.06) 0 1px,
-        rgba(150, 118, 52, 0) 1px 4px
-      ),
+      repeating-linear-gradient(0deg, rgba(150, 118, 52, 0.06) 0 1px, rgba(150, 118, 52, 0) 1px 4px),
+      repeating-linear-gradient(90deg, rgba(150, 118, 52, 0.06) 0 1px, rgba(150, 118, 52, 0) 1px 4px),
       radial-gradient(120% 90% at 18% 12%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%),
       radial-gradient(130% 110% at 88% 92%, rgba(168, 132, 54, 0.28), rgba(168, 132, 54, 0) 62%),
       linear-gradient(160deg, #fdf5da 0%, #f7e9c2 48%, #eedcac 100%);
@@ -110,52 +102,50 @@
     transform: scale(1.04);
   }
 
+  /* 散落舞台：作为卡片定位的包含块，超出部分可滚动 */
   .ps-stage {
     position: relative;
     flex: 1 1 auto;
+    overflow: auto;
     padding: 1.25rem;
-    overflow: visible;
+    scrollbar-width: thin;
   }
   .ps-flow {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
-    align-content: start;
-    gap: 1.1rem;
+    position: relative;
+    min-height: 100%;
   }
 
+  /* 散落拍立得卡片 */
   .ps-card {
-    position: relative;
-    cursor: zoom-in;
+    position: absolute;
+    width: 180px;
+    cursor: grab;
     user-select: none;
     -webkit-user-select: none;
-    touch-action: auto;
-    animation: ps-pop 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) both;
-    transition: box-shadow 0.2s ease, transform 0.28s ease;
+    touch-action: none;
+    transition: box-shadow 0.2s ease, transform 0.16s ease, opacity 0.4s ease;
+    opacity: 0;
+    transform: rotate(var(--tilt, 0deg));
+  }
+  .ps-card.ps-in {
+    opacity: 1;
   }
   .ps-card:hover {
-    transform: translateY(-3px) rotate(var(--tilt, 0deg));
+    transform: rotate(var(--tilt, 0deg)) translateY(-4px) scale(1.03);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
   }
-  .ps-card.is-zoomed {
-    position: fixed;
-    left: 50%;
-    top: 50%;
-    z-index: 45;
-    transform: translate(-50%, -50%) rotate(0deg);
-    cursor: zoom-out;
+  .ps-card.ps-dragging {
+    cursor: grabbing;
+    transform: rotate(var(--tilt, 0deg)) scale(1.05);
+    transition: box-shadow 0.2s ease;
+    z-index: 30;
   }
 
   .ps-frame {
     position: relative;
     padding: 8px 8px 0;
     background: #fff;
-    box-shadow:
-      0 10px 30px rgba(0, 0, 0, 0.24),
-      0 2px 8px rgba(0, 0, 0, 0.12);
-  }
-  .ps-card:hover .ps-frame {
-    box-shadow:
-      0 14px 38px rgba(0, 0, 0, 0.3),
-      0 2px 8px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.12);
   }
   .ps-frame img {
     display: block;
@@ -165,6 +155,7 @@
     background: #e9e9ee;
     -webkit-user-drag: none;
     user-select: none;
+    pointer-events: none;
   }
   .ps-strip {
     height: 22px;
@@ -198,7 +189,7 @@
     pointer-events: none;
   }
 
-  /* 照片右下角标签：叠在照片上，半透明胶囊，始终可见 */
+  /* 照片右下角标签 */
   .ps-meta {
     position: absolute;
     right: 10px;
@@ -234,20 +225,112 @@
     text-align: center;
   }
 
-  @media (max-width: 767.98px) {
-    .ps-flow {
-      grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
-    }
+  /* ---- 全屏放大查看（挂到 body 下，规避父级 transform 的影响） ---- */
+  .ps-ov {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    background: rgba(20, 18, 14, 0.55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    opacity: 0;
+    transition: opacity 0.28s ease;
+    cursor: zoom-out;
+  }
+  .ps-ov.ps-ov-on {
+    opacity: 1;
+  }
+  .ps-ov-box {
+    position: fixed;
+    z-index: 901;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 8px 8px 0;
+    background: #fff;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.28s ease, transform 0.28s ease;
+    cursor: zoom-out;
+  }
+  .ps-ov-box img {
+    display: block;
+    max-width: 90vw;
+    max-height: 82vh;
+    object-fit: contain;
+    background: #e9e9ee;
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+  .ps-ov-strip {
+    height: 22px;
+    background: #fff;
+  }
+  .ps-ov-box.ps-ov-on {
+    opacity: 1;
   }
 
-  @keyframes ps-pop {
-    from {
-      opacity: 0;
-      transform: translateY(12px) scale(0.9);
+  /* 可拖拽彩纸便签 */
+  .ps-ov-note {
+    position: fixed;
+    z-index: 902;
+    width: 230px;
+    min-height: 96px;
+    padding: 16px 18px;
+    color: #3a3530;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.26);
+    cursor: grab;
+    touch-action: none;
+    opacity: 0;
+    transition: opacity 0.28s ease, transform 0.28s ease;
+  }
+  .ps-ov-note.ps-ov-on {
+    opacity: 1;
+    transform: rotate(-1.5deg);
+  }
+  .ps-ov-note.ps-ovdragging {
+    cursor: grabbing;
+    transform: rotate(0deg) scale(1.02);
+    transition: none;
+  }
+  .ps-ov-note-date {
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: rgba(58, 53, 48, 0.6);
+    margin-bottom: 6px;
+  }
+  .ps-ov-note-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 8px;
+  }
+  .ps-ov-note-tag {
+    font-size: 0.68rem;
+    padding: 1px 9px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.12);
+    color: rgba(58, 53, 48, 0.85);
+  }
+  .ps-ov-note-desc {
+    font-size: 0.86rem;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+
+  @media (max-width: 767.98px) {
+    .ps-card {
+      width: 140px;
     }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
+    .ps-ov-note {
+      left: 12px;
+      right: 12px;
+      width: auto;
+      bottom: 18px;
+    }
+    .ps-ov-box img {
+      max-width: 100vw;
+      max-height: 70vh;
     }
   }
 </style>
@@ -265,7 +348,7 @@
     </button>
   </div>
 
-  <div class="ps-stage">
+  <div class="ps-stage" data-ps-stage>
     <div class="ps-flow" data-ps-flow></div>
   </div>
 </div>
@@ -274,7 +357,8 @@
   (() => {
     const boardEl = document.querySelector<HTMLElement>("[data-ps-board]");
     if (!boardEl) return;
-    const board = boardEl;
+
+    const NOTE_COLORS = ["#fff3b0", "#ffd6e0", "#cdeffd", "#d8f3dc", "#f3d9fa", "#ffe5c2"];
 
     type Photo = { src: string; description?: string; date?: string; tags?: string[] };
     type Payload = {
@@ -285,18 +369,23 @@
       photos: Photo[];
     };
 
-    const flow = board.querySelector<HTMLElement>("[data-ps-flow]");
-    const backBtn = board.querySelector<HTMLButtonElement>("[data-ps-back]");
-    const titleEl = board.querySelector<HTMLElement>("[data-ps-title]");
+    const stage = boardEl.querySelector<HTMLElement>("[data-ps-stage]");
+    const flow = boardEl.querySelector<HTMLElement>("[data-ps-flow]");
+    const backBtn = boardEl.querySelector<HTMLButtonElement>("[data-ps-back]");
+    const titleEl = boardEl.querySelector<HTMLElement>("[data-ps-title]");
 
     type Card = {
       el: HTMLElement;
       img: HTMLImageElement;
       meta: Photo;
+      base: { x: number; y: number };
+      offset: { x: number; y: number };
+      noteColor: string;
     };
 
     let payload: Payload | null = null;
-    let zoomed: Card | null = null;
+    const cards: Card[] = [];
+    let lbox: { ov: HTMLElement; box: HTMLElement; note: HTMLElement } | null = null;
 
     function hashStr(s: string): number {
       let h = 0;
@@ -319,48 +408,268 @@
       return Array.isArray(payload?.tags) ? payload!.tags.map(String) : [];
     }
 
-    function unzoom() {
-      if (!zoomed) return;
-      zoomed.el.classList.remove("is-zoomed");
-      zoomed = null;
-    }
-
-    function zoom(card: Card) {
-      if (zoomed === card) {
-        unzoom();
-        return;
+    // ---- 稳定的螺旋散落位置（复刻旧博客算法）----
+    function getStablePosition(uniqueId: string, width: number, height: number) {
+      let hash = 0;
+      for (let i = 0; i < uniqueId.length; i++) {
+        const code = uniqueId.charCodeAt(i);
+        hash = (hash << 5) - hash + code;
+        hash &= hash;
       }
-      if (zoomed) unzoom();
-      zoomed = card;
-      card.el.classList.add("is-zoomed");
-
-      // 图片可能尚未加载完成：naturalWidth 为 0 时回退到当前布局尺寸，
-      // 避免算出 NaN 导致放大尺寸异常
-      const naturalW =
-        (card.img.complete && card.img.naturalWidth) ||
-        card.img.clientWidth ||
-        card.img.width ||
-        4;
-      const naturalH =
-        (card.img.complete && card.img.naturalHeight) ||
-        card.img.clientHeight ||
-        card.img.height ||
-        3;
-      const isMobile = window.innerWidth < 768;
-      const maxW = window.innerWidth - (isMobile ? 36 : 140);
-      const maxH = window.innerHeight - (isMobile ? 160 : 120);
-      const scale = Math.min(maxW / naturalW, maxH / naturalH, 1.25);
-      card.el.style.width = `${Math.round(naturalW * scale)}px`;
+      const stableIndex = Math.abs(hash) % 10000;
+      const maxRadius = Math.min(width, height) / 2 - 90;
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+      const t = (stableIndex % 1000) / 1000;
+      const radius = Math.pow(t, 0.8) * maxRadius;
+      const angle = stableIndex * goldenAngle;
+      const jitterSeed = Math.abs(hash) % 1000;
+      const jitterX = (jitterSeed % 24) - 12;
+      const jitterY = ((jitterSeed * 7) % 24) - 12;
+      const rotation = ((jitterSeed * 13) % 60) - 30;
+      return {
+        x: radius * Math.cos(angle) + jitterX,
+        y: radius * Math.sin(angle) + jitterY,
+        rotation,
+      };
     }
 
+    function loadOffset(urlSrc: string) {
+      try {
+        const saved = localStorage.getItem(`gallery-ps-offset-${urlSrc}`);
+        if (saved) {
+          const p = JSON.parse(saved);
+          return { x: p.x || 0, y: p.y || 0 };
+        }
+      } catch {
+        /* ignore */
+      }
+      return { x: 0, y: 0 };
+    }
+
+    // ---- 定位所有卡片 ----
+    function layoutCards() {
+      if (!flow) return;
+      const fw = flow.clientWidth;
+      const fh = flow.clientHeight;
+      if (fw <= 0) return;
+      flow.style.height = "100%";
+      const cw = fw / 2;
+      const ch = fh / 2;
+      cards.forEach((card) => {
+        const off = card.offset;
+        card.el.style.left = `${cw + card.base.x + off.x}px`;
+        card.el.style.top = `${ch + card.base.y + off.y}px`;
+      });
+    }
+
+    // ---- 全屏放大查看（挂到 body，规避父级 transform 限制）----
+    function closeLbox(doRemove: boolean) {
+      if (!lbox) return;
+      const { ov, box, note } = lbox;
+      const done = () => {
+        ov.remove();
+        box.remove();
+        note.remove();
+        document.body.classList.remove("ps-lbox-open");
+      };
+      ov.classList.remove("ps-ov-on");
+      box.classList.remove("ps-ov-on");
+      note.classList.remove("ps-ov-on");
+      if (doRemove) {
+        setTimeout(done, 260);
+      } else {
+        done();
+      }
+      lbox = null;
+      (window as any).__psLightboxOpen = false;
+    }
+
+    function openLbox(card: Card) {
+      closeLbox(true);
+      const img = card.img;
+      const naturalW = (img.complete && img.naturalWidth) || card.img.width || 400;
+      const naturalH = (img.complete && img.naturalHeight) || card.img.height || 300;
+      const meta = card.meta;
+
+      const tags = meta.tags?.length ? meta.tags : albumTags();
+
+      const ov = document.createElement("div");
+      ov.className = "ps-ov";
+      ov.addEventListener("click", () => closeLbox(true));
+
+      const box = document.createElement("div");
+      box.className = "ps-ov-box";
+      box.addEventListener("click", () => closeLbox(true));
+      const big = document.createElement("img");
+      big.src = img.src;
+      big.alt = meta.description || "照片";
+      big.draggable = false;
+      big.onload = () => {
+        // 按视口限制缩放，贴近原图但不超界
+        const w = big.naturalWidth || naturalW;
+        const h = big.naturalHeight || naturalH;
+        const isMobile = window.innerWidth < 768;
+        const maxW = window.innerWidth - (isMobile ? 20 : 80);
+        const maxH = window.innerHeight - (isMobile ? 200 : 120);
+        const scale = Math.min(maxW / w, maxH / h, 1);
+        big.style.width = `${Math.round(w * scale)}px`;
+        big.style.height = "auto";
+        box.style.transform = "translate(-50%,-50%) scale(1)";
+      };
+      const strip = document.createElement("div");
+      strip.className = "ps-ov-strip";
+      box.append(big, strip);
+
+      // 彩纸便签（可拖拽）
+      const note = document.createElement("div");
+      note.className = "ps-ov-note";
+      const noteDrag: any = { active: false };
+      note.style.backgroundColor = card.noteColor;
+      let inner = "";
+      if (meta.date) inner += `<div class="ps-ov-note-date"></div>`;
+      if (tags.length > 0) inner += `<div class="ps-ov-note-tags"></div>`;
+      if (meta.description) inner += `<div class="ps-ov-note-desc"></div>`;
+      note.innerHTML = inner;
+      const dEl = note.querySelector(".ps-ov-note-date");
+      if (dEl) dEl.textContent = meta.date || "";
+      const tgEl = note.querySelector(".ps-ov-note-tags");
+      if (tgEl) {
+        for (const tg of tags) {
+          const chip = document.createElement("span");
+          chip.className = "ps-ov-note-tag";
+          chip.textContent = `# ${tg}`;
+          tgEl.appendChild(chip);
+        }
+      }
+      const dsEl = note.querySelector(".ps-ov-note-desc");
+      if (dsEl) dsEl.textContent = meta.description || "";
+      // 无任何内容则不弹便签
+      const hasNote = !!meta.date || tags.length > 0 || !!meta.description;
+
+      const placeNote = () => {
+        if (!hasNote) return;
+        const m = window.innerWidth < 768;
+        note.style.left = m ? "12px" : `${Math.min(Math.max(16, window.innerWidth * 0.72), window.innerWidth - 246)}px`;
+        note.style.top = m ? "auto" : `${Math.max(16, window.innerHeight * 0.18)}px`;
+        note.style.bottom = m ? "18px" : "auto";
+        note.style.right = m ? "12px" : "auto";
+      };
+      placeNote();
+
+      // 便签拖拽（非移动端默认固定，仍允许拖动）
+      note.addEventListener("pointerdown", (e) => {
+        noteDrag.active = true;
+        noteDrag.sx = e.clientX;
+        noteDrag.sy = e.clientY;
+        noteDrag.left = parseFloat(note.style.left) || note.getBoundingClientRect().left;
+        noteDrag.top = parseFloat(note.style.top) || note.getBoundingClientRect().top;
+        note.classList.add("ps-ovdragging");
+        note.setPointerCapture(e.pointerId);
+      });
+      note.addEventListener("pointermove", (e) => {
+        if (!noteDrag.active) return;
+        note.style.left = `${noteDrag.left + (e.clientX - noteDrag.sx)}px`;
+        note.style.top = `${noteDrag.top + (e.clientY - noteDrag.sy)}px`;
+        note.style.right = "auto";
+        note.style.bottom = "auto";
+      });
+      note.addEventListener("pointerup", () => {
+        noteDrag.active = false;
+        note.classList.remove("ps-ovdragging");
+      });
+
+      if (hasNote) {
+        document.body.append(ov, box, note);
+      } else {
+        document.body.append(ov, box);
+      }
+      document.body.classList.add("ps-lbox-open");
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        ov.classList.add("ps-ov-on");
+        box.classList.add("ps-ov-on");
+        if (hasNote) note.classList.add("ps-ov-on");
+      }));
+      (window as any).__psLightboxOpen = true;
+    }
+
+    // ---- 卡片拖拽（pointer，区分轻点与拖动）----
+    function attachDrag(card: Card) {
+      const el = card.el;
+      const info: any = { active: false };
+
+      el.addEventListener("pointerdown", (e) => {
+        info.active = true;
+        info.moved = false;
+        info.sx = e.clientX;
+        info.sy = e.clientY;
+        info.baseLeft = parseInt(el.style.left, 10) || 0;
+        info.baseTop = parseInt(el.style.top, 10) || 0;
+        info.pointerId = e.pointerId;
+        info.pressTime = e.timeStamp;
+        el.classList.add("ps-dragging");
+        el.setPointerCapture(e.pointerId);
+      });
+      el.addEventListener("pointermove", (e) => {
+        if (!info.active) return;
+        const dx = e.clientX - info.sx;
+        const dy = e.clientY - info.sy;
+        if (Math.hypot(dx, dy) > 6) info.moved = true;
+        if (info.moved) {
+          let nl = info.baseLeft + dx;
+          let nt = info.baseTop + dy;
+          if (flow) {
+            const maxL = Math.max(0, flow.clientWidth - el.offsetWidth);
+            const maxT = Math.max(0, flow.clientHeight - el.offsetHeight);
+            nl = Math.min(Math.max(0, nl), maxL);
+            nt = Math.min(Math.max(0, nt), maxT);
+          }
+          el.style.left = `${nl}px`;
+          el.style.top = `${nt}px`;
+        }
+      });
+      const end = (e: PointerEvent) => {
+        if (!info.active) return;
+        const wasClick = !info.moved && e.timeStamp - info.pressTime <= 150;
+        info.active = false;
+        el.classList.remove("ps-dragging");
+        if (wasClick) {
+          openLbox(card);
+          return;
+        }
+        // 保存拖拽偏移
+        const fw = flow?.clientWidth || 0;
+        const fh = flow?.clientHeight || 0;
+        const r = flow?.getBoundingClientRect();
+        const cw = fw / 2;
+        const ch = fh / 2;
+        if (fw > 0) {
+          card.offset.x = (parseFloat(el.style.left) || cw) - (cw + card.base.x);
+          card.offset.y = (parseFloat(el.style.top) || ch) - (ch + card.base.y);
+          try {
+            localStorage.setItem(`gallery-ps-offset-${card.img.src}`, JSON.stringify(card.offset));
+          } catch {
+            /* ignore */
+          }
+        }
+      };
+      el.addEventListener("pointerup", (e) => end(e));
+      el.addEventListener("pointercancel", (e) => end(e));
+    }
+
+    // ---- 渲染散落照片墙 ----
     function render(data: Payload) {
       payload = data;
+      cards.length = 0;
       if (titleEl && data.name) titleEl.textContent = data.name;
-
-      const photos = data.photos || [];
       if (!flow) return;
       flow.innerHTML = "";
+
+      const photos = data.photos || [];
       if (photos.length === 0) return;
+
+      // 先计算容器尺寸，再排布
+      const fw = flow.clientWidth || window.innerWidth;
+      const fh = (flow.clientHeight || window.innerHeight) || 600;
 
       photos.forEach((meta, index) => {
         const tilt = ((hashStr(meta.src || String(index)) * 7) % 6) - 3;
@@ -368,7 +677,6 @@
         el.className = "ps-card";
         el.style.setProperty("--tilt", `${tilt}deg`);
         el.style.setProperty("--tape-rot", `${((hashStr(meta.src || String(index)) * 7) % 14) - 7}deg`);
-        el.style.animationDelay = `${Math.min(index * 55, 600)}ms`;
 
         const frame = document.createElement("div");
         frame.className = "ps-frame";
@@ -384,7 +692,6 @@
         const strip = document.createElement("div");
         strip.className = "ps-strip";
 
-        // 照片右下角标签：优先照片自带标签，否则回退到相册标签
         const metaTags = meta.tags?.length ? meta.tags : albumTags();
         const metaEl = document.createElement("div");
         metaEl.className = "ps-meta";
@@ -399,13 +706,26 @@
         el.append(tape, tack, frame);
         flow.appendChild(el);
 
+        const pos = getStablePosition(meta.src || String(index), fw, fh);
         const card: Card = {
           el,
           img,
           meta,
+          base: { x: pos.x, y: pos.y },
+          offset: loadOffset(meta.src || ""),
+          noteColor: NOTE_COLORS[index % NOTE_COLORS.length],
         };
-        el.addEventListener("click", () => zoom(card));
+        cards.push(card);
+        attachDrag(card);
       });
+
+      // 等布局稳定后定位并淡入
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        layoutCards();
+        cards.forEach((c, i) => {
+          setTimeout(() => c.el.classList.add("ps-in"), i * 30);
+        });
+      }));
     }
 
     function readPayload(): Payload | null {
@@ -424,8 +744,17 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      e.preventDefault();
-      if (zoomed) unzoom();
+      if (lbox) {
+        closeLbox(true);
+        return;
+      }
+      if ((window as any).__psLightboxOpen) closeLbox(true);
+    });
+
+    let resizeTimer: number;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => layoutCards(), 120);
     });
 
     // 详情页存在封装数据就渲染（加密相册解密后再启动一次）
