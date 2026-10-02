@@ -279,31 +279,6 @@ const { album } = Astro.props;
     opacity: 1;
   }
 
-  /* 放大查看的显式关闭按钮 */
-  .ps-ov-close {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 30px;
-    height: 30px;
-    z-index: 3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.55);
-    color: #fff;
-    cursor: pointer;
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
-    transition: transform 0.18s ease, background 0.18s ease;
-  }
-  .ps-ov-close:hover {
-    transform: scale(1.1);
-    background: rgba(0, 0, 0, 0.75);
-  }
-
   /* 可拖拽彩纸便签 */
   .ps-ov-note {
     position: fixed;
@@ -546,7 +521,6 @@ const { album } = Astro.props;
 
       const box = document.createElement("div");
       box.className = "ps-ov-box";
-      box.addEventListener("click", () => closeLbox(true));
       const big = document.createElement("img");
       big.src = img.src;
       big.alt = meta.description || "照片";
@@ -566,19 +540,6 @@ const { album } = Astro.props;
       const strip = document.createElement("div");
       strip.className = "ps-ov-strip";
       box.append(big, strip);
-
-      // 显式关闭按钮
-      const closeBtn = document.createElement("button");
-      closeBtn.type = "button";
-      closeBtn.className = "ps-ov-close";
-      closeBtn.setAttribute("aria-label", "关闭");
-      closeBtn.innerHTML =
-        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-      closeBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        closeLbox(true);
-      });
-      box.append(closeBtn);
 
       // 彩纸便签（可拖拽）
       const note = document.createElement("div");
