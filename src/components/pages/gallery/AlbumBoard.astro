@@ -237,7 +237,8 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		-webkit-backdrop-filter: blur(14px);
 		opacity: 0;
 		transition: opacity 0.28s ease;
-		cursor: zoom-out;
+		cursor: pointer;
+		pointer-events: auto;
 	}
 	.ab-ov.ab-ov-on {
 		opacity: 1;
@@ -253,7 +254,7 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
 		opacity: 0;
 		transition: opacity 0.28s ease, transform 0.28s ease;
-		cursor: zoom-out;
+		cursor: default;
 	}
 	.ab-ov-box img {
 		display: block;
@@ -393,6 +394,7 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		let payload: Payload | null = null;
 		const cards: Card[] = [];
 		let lbox: { ov: HTMLElement; box: HTMLElement; note: HTMLElement } | null = null;
+			let lboxDocClose: ((e: Event) => void) | null = null;
 
 		function hashStr(s: string): number {
 			let h = 0;
@@ -469,6 +471,10 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 		// ---- 全屏放大查看 ----
 		function closeLbox(doRemove: boolean) {
 			if (!lbox) return;
+			if (lboxDocClose) {
+				document.removeEventListener("click", lboxDocClose, true);
+				lboxDocClose = null;
+			}
 			const { ov, box, note } = lbox;
 			const done = () => {
 				ov.remove();
@@ -574,6 +580,14 @@ const { title, emptyText = "这个相册还没有照片哦" } = Astro.props;
 
 			if (hasNote) document.body.append(ov, box, note);
 			else document.body.append(ov, box);
+			// 点击照片/便签以外的任意空白区域都关闭（document 捕获阶段，不受层级遮挡影响）
+			lboxDocClose = (e: Event) => {
+				const t = e.target as HTMLElement | null;
+				if (!t) return;
+				if (box.contains(t) || (hasNote && note.contains(t))) return;
+				closeLbox(true);
+			};
+			document.addEventListener("click", lboxDocClose, true);
 			document.body.classList.add("ab-lbox-open");
 			requestAnimationFrame(() => requestAnimationFrame(() => {
 				ov.classList.add("ab-ov-on");
