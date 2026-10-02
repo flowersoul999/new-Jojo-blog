@@ -18,6 +18,8 @@ import {
 import { type ReactElement, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { buildPostMarkdown, parsePostMarkdown } from "./frontmatter";
+// 图片压缩工具（算法与质量参数和 jojo-blog 完全一致：WebP 0.8）
+import { compressImage } from "@utils/image-compress";
 
 // ---------- 类型 ----------
 
@@ -28,10 +30,12 @@ type ImageItem =
 	| {
 			id: string;
 			type: "file";
-			file: File;
-			previewUrl: string;
-			filename: string;
-			hash?: string;
+			filename: string; // 压缩后的文件名（扩展名为 .webp）
+			dataUrl: string; // 压缩后的 WebP dataURL（同时用作预览与上传）
+			width: number; // 压缩后宽度
+			height: number; // 压缩后高度
+			size: number; // 压缩后字节数
+			hash?: string; // 原始文件 SHA-256，用于会话内去重与幂等上传
 	  };
 
 type PostForm = {
@@ -86,6 +90,12 @@ type PublishJob = {
 const JOB_KEY = "aemeath-write-publish-job";
 const DRAFTS_KEY = "aemeath-write-drafts";
 
+// 图片压缩质量（与 jojo-blog 的 diary-image-uploader 保持一致：WebP 80%）
+const IMAGE_QUALITY = 0.8;
+// 单张图片大小上限：超过则拒绝。防止超大图在解码/压缩时拖垮浏览器内存，
+// 也避免上传超出 GitHub Contents API 的 base64 体积限制
+const MAX_IMAGE_SIZE = 15 * 1024 * 1024;
+
 // ---------- 工具 ----------
 
 function todayDate(): string {
@@ -107,21 +117,19 @@ function emptyForm(): PostForm {
 	};
 }
 
-async function sha256Hex(file: File): Promise<string> {
-	const buffer = await file.arrayBuffer();
+async function sha256Hex(data: Blob): Promise<string> {
+	const buffer = await data.arrayBuffer();
 	const digest = await crypto.subtle.digest("SHA-256", buffer);
 	return Array.from(new Uint8Array(digest))
 		.map((b) => b.toString(16).padStart(2, "0"))
 		.join("");
 }
 
-function fileToBase64(file: File): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
-		reader.onerror = () => reject(reader.error);
-		reader.readAsDataURL(file);
-	});
+/** 人类可读的文件大小（B / KB / MB） */
+function formatSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
 function slugify(name: string): string {
@@ -226,6 +234,23 @@ export default function WritePage(): ReactElement {
 
 	// UI 状态
 	const [publishing, setPublishing] = useState(false);
+	// 图片压缩进度：index 当前文件序号，total 本次总文件数，name 当前文件名
+	const [processing, setProcessing] = useState<{
+		index: number;
+		total: number;
+		name: string;
+	} | null>(null);
+	// 发布上传进度：done 已完成张数，total 待处理张数，label 阶段文案
+	const [publishProgress, setPublishProgress] = useState<{
+		done: number;
+		total: number;
+		label: string;
+	} | null>(null);
+	// 拖拽高亮目标（cover=封面区，grid=图片网格）
+	const [dragTarget, setDragTarget] = useState<"none" | "cover" | "grid">(
+		"none",
+	);
+	const dragCountRef = useRef(0);
 	const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 	const [showDrafts, setShowDrafts] = useState(false);
 	const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -242,7 +267,7 @@ export default function WritePage(): ReactElement {
 	const coverPreview = cover
 		? cover.type === "url"
 			? cover.url
-			: cover.previewUrl
+			: cover.dataUrl
 		: "";
 
 	// ---------- 初始化：认证 + 文章列表 + 草稿 ----------
@@ -298,15 +323,43 @@ export default function WritePage(): ReactElement {
 	}, []);
 
 	// ---------- 图片处理 ----------
+	// 拖拽高亮辅助：dragenter/dragleave 用计数器避免在子元素间移动时高亮闪烁
+	const makeDropHandlers = (
+		target: "cover" | "grid",
+		onDrop?: (e: React.DragEvent<HTMLElement>) => void,
+	) => ({
+		onDragEnter: (e: React.DragEvent<HTMLElement>) => {
+			e.preventDefault();
+			dragCountRef.current += 1;
+			setDragTarget(target);
+		},
+		onDragOver: (e: React.DragEvent<HTMLElement>) => e.preventDefault(),
+		onDragLeave: (e: React.DragEvent<HTMLElement>) => {
+			e.preventDefault();
+			dragCountRef.current = Math.max(0, dragCountRef.current - 1);
+			if (dragCountRef.current === 0) setDragTarget("none");
+		},
+		onDrop: (e: React.DragEvent<HTMLElement>) => {
+			e.preventDefault();
+			dragCountRef.current = 0;
+			setDragTarget("none");
+			onDrop?.(e);
+		},
+	});
+
+	// 添加图片：统一入口（点击选择 / 拖拽 / 粘贴都走这里）
+	// 图片先按 jojo-blog 的算法压缩为 WebP（quality 0.8），再进入图片列表；
+	// 压缩失败 / 超限 / 非图片文件会被拦截并提示，不影响其它图片继续处理
 	const addFiles = async (files: FileList | File[]): Promise<ImageItem[]> => {
-		const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
-		if (arr.length === 0) return [];
+		const arr = Array.from(files);
+		const imageFiles = arr.filter((f) => f.type.startsWith("image/"));
+		const skippedNotImage = arr.length - imageFiles.length;
+		if (skippedNotImage > 0) {
+			toast.warning(`${skippedNotImage} 个文件不是图片，已自动忽略`);
+		}
+		if (imageFiles.length === 0) return [];
 
-		const computed = await Promise.all(
-			arr.map(async (file) => ({ file, hash: await sha256Hex(file) })),
-		);
-
-		// 与当前会话中已添加的图片按 hash 去重
+		// 与当前会话中已添加的图片按原始文件 hash 去重
 		const existingHashes = new Set(
 			images
 				.filter(
@@ -316,24 +369,70 @@ export default function WritePage(): ReactElement {
 				.map((it) => it.hash),
 		);
 		const seen = new Set<string>();
-		const fresh = computed.filter(({ hash }) => {
-			if (existingHashes.has(hash) || seen.has(hash)) return false;
+
+		const newItems: ImageItem[] = [];
+		let failed = 0;
+		let duplicate = 0;
+		for (let i = 0; i < imageFiles.length; i++) {
+			const file = imageFiles[i];
+
+			// 超大图直接拒绝，避免解码/压缩时内存溢出
+			if (file.size > MAX_IMAGE_SIZE) {
+				toast.error(
+					`${file.name} 超过大小上限（${formatSize(MAX_IMAGE_SIZE)}），已跳过`,
+				);
+				failed++;
+				continue;
+			}
+
+			let hash = "";
+			try {
+				hash = await sha256Hex(file);
+			} catch {
+				toast.error(`${file.name} 读取失败，已跳过`);
+				failed++;
+				continue;
+			}
+			if (existingHashes.has(hash) || seen.has(hash)) {
+				duplicate++;
+				continue;
+			}
 			seen.add(hash);
-			return true;
-		});
-		if (fresh.length === 0) {
-			toast.info("图片已存在，不重复添加");
-			return [];
+
+			// 压缩进度提示
+			setProcessing({
+				index: newItems.length + failed + duplicate + 1,
+				total: imageFiles.length,
+				name: file.name,
+			});
+			try {
+				const { dataUrl, width, height, size } = await compressImage(
+					file,
+					{ quality: IMAGE_QUALITY },
+				);
+				newItems.push({
+					id: Math.random().toString(36).slice(2, 10),
+					type: "file",
+					filename: file.name.replace(/\.[^.]+$/, ".webp"),
+					dataUrl,
+					width,
+					height,
+					size,
+					hash,
+				});
+			} catch (err) {
+				console.error("图片压缩失败:", file.name, err);
+				toast.error(`${file.name} 压缩失败（${formatSize(file.size)}），已跳过`);
+				failed++;
+			}
 		}
-		const newItems: ImageItem[] = fresh.map(({ file, hash }) => ({
-			id: Math.random().toString(36).slice(2, 10),
-			type: "file" as const,
-			file,
-			previewUrl: URL.createObjectURL(file),
-			filename: file.name,
-			hash,
-		}));
-		setImages((prev) => [...newItems, ...prev]);
+		setProcessing(null);
+
+		if (duplicate > 0) toast.info(`${duplicate} 张图片已存在，不重复添加`);
+		if (newItems.length > 0) {
+			setImages((prev) => [...newItems, ...prev]);
+			toast.success(`已添加 ${newItems.length} 张图片（已自动压缩为 WebP）`);
+		}
 		return newItems;
 	};
 
@@ -352,13 +451,7 @@ export default function WritePage(): ReactElement {
 	};
 
 	const deleteImage = (id: string) => {
-		setImages((prev) => {
-			for (const it of prev) {
-				if (it.id === id && it.type === "file")
-					URL.revokeObjectURL(it.previewUrl);
-			}
-			return prev.filter((it) => it.id !== id);
-		});
+		setImages((prev) => prev.filter((it) => it.id !== id));
 		setCover((c) => (c?.id === id ? null : c));
 	};
 
@@ -583,14 +676,20 @@ export default function WritePage(): ReactElement {
 		setCover(job.cover ? toUrlItem(job.cover) : null);
 	};
 
-	const runJob = async (job: PublishJob, liveFiles: Map<string, File>) => {
+	const runJob = async (job: PublishJob, liveFiles: Map<string, string>) => {
 		setPublishing(true);
 		try {
-			// 1. 图片：快照已确认 / 目标 URL 已存在则跳过；否则用本次会话里的 File 上传
+			// 1. 图片：快照已确认 / 目标 URL 已存在则跳过；否则用本次会话里的压缩 dataURL 上传
 			const all: JobImage[] = [
 				...job.images,
 				...(job.cover ? [job.cover] : []),
 			];
+			const fileJobs = all.filter((img) => img.kind === "file");
+			setPublishProgress({
+				done: 0,
+				total: fileJobs.length,
+				label: "正在上传图片…",
+			});
 			const handled = new Set<string>();
 			for (const img of all) {
 				if (img.kind === "url" || handled.has(img.id)) continue;
@@ -600,8 +699,8 @@ export default function WritePage(): ReactElement {
 					if (exists) {
 						img.confirmed = true;
 					} else {
-						const file = liveFiles.get(img.id);
-						if (!file) {
+						const dataUrl = liveFiles.get(img.id);
+						if (!dataUrl) {
 							throw new Error(
 								"页面已刷新且部分图片尚未上传，请重新添加图片后再发布",
 							);
@@ -613,7 +712,7 @@ export default function WritePage(): ReactElement {
 							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify({
 								path: `public/blogs/${job.slug}/${filename}`,
-								content: await fileToBase64(file),
+								content: dataUrl.split(",")[1] || "",
 								encoding: "base64",
 								message: `Upload image ${filename}`,
 							}),
@@ -627,6 +726,9 @@ export default function WritePage(): ReactElement {
 					// 写入后 dev 可能立刻全量刷新，尽快落盘快照
 					sessionStorage.setItem(JOB_KEY, JSON.stringify({ ...job }));
 				}
+				setPublishProgress((p) =>
+					p ? { ...p, done: p.done + 1 } : p,
+				);
 			}
 
 			// 2. 正文占位符替换为最终路径
@@ -674,6 +776,11 @@ export default function WritePage(): ReactElement {
 				/* 读取失败则按新写入处理 */
 			}
 			if (remote !== fullMd.replace(/\r\n/g, "\n")) {
+				setPublishProgress({
+					done: 0,
+					total: 1,
+					label: job.action === "edit" ? "正在更新文章…" : "正在发布文章…",
+				});
 				toast.info(job.action === "edit" ? "正在更新文章…" : "正在发布文章…");
 				const res = await fetch("/api/content/write/", {
 					method: "POST",
@@ -696,6 +803,7 @@ export default function WritePage(): ReactElement {
 			toast.error(err instanceof Error ? err.message : "发布失败");
 		} finally {
 			setPublishing(false);
+			setPublishProgress(null);
 		}
 	};
 
@@ -751,10 +859,10 @@ export default function WritePage(): ReactElement {
 		};
 		sessionStorage.setItem(JOB_KEY, JSON.stringify(job));
 
-		// 本次会话内的 File 引用（刷新后丢失，届时依赖 HEAD 检查跳过已传图片）
-		const liveFiles = new Map<string, File>();
+		// 本次会话内的压缩 dataURL 引用（刷新后丢失，届时依赖 HEAD 检查跳过已传图片）
+		const liveFiles = new Map<string, string>();
 		for (const it of [...images, ...(cover ? [cover] : [])]) {
-			if (it.type === "file") liveFiles.set(it.id, it.file);
+			if (it.type === "file") liveFiles.set(it.id, it.dataUrl);
 		}
 		await runJob(job, liveFiles);
 	};
@@ -990,6 +1098,25 @@ export default function WritePage(): ReactElement {
 					</div>
 				)}
 
+				{/* 发布 / 上传进度 */}
+				{publishProgress && (
+					<div className="mb-4 flex items-center gap-3 rounded-xl border border-brand/30 bg-brand/5 px-4 py-2.5 text-sm text-brand">
+						<Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+						<span className="min-w-0 truncate">{publishProgress.label}</span>
+						<div className="ml-auto h-1.5 w-32 shrink-0 overflow-hidden rounded-full bg-brand/15">
+							<div
+								className="h-full rounded-full bg-brand transition-all"
+								style={{
+									width: `${
+										(publishProgress.done / Math.max(publishProgress.total, 1)) *
+										100
+									}%`,
+								}}
+							/>
+						</div>
+					</div>
+				)}
+
 				{/* 主体 */}
 				<div className="flex flex-col gap-6 lg:flex-row">
 					{/* 左：编辑器 */}
@@ -1028,42 +1155,44 @@ export default function WritePage(): ReactElement {
 						<div className="card p-4">
 							<h2 className="text-sm font-semibold">封面</h2>
 							<div
-								className="bg-card mt-3 h-36 cursor-pointer overflow-hidden rounded-xl border"
-								onDragOver={(e) => e.preventDefault()}
-								onDrop={async (e) => {
-									e.preventDefault();
-									const added = await addFiles(e.dataTransfer.files);
-									if (added[0]) setCover(added[0]);
-								}}
-								onClick={() => coverFileRef.current?.click()}
-							>
-								{coverPreview ? (
-									<div className="group relative h-full w-full">
-										<img
-											src={coverPreview}
-											alt="cover"
-											className="h-full w-full object-cover"
-										/>
-										<button
-											type="button"
-											className="absolute right-1.5 top-1.5 hidden rounded-full bg-black/60 p-1 text-white group-hover:block"
-											onClick={(e) => {
-												e.stopPropagation();
-												setCover(null);
-											}}
-										>
-											<X className="h-3.5 w-3.5" />
-										</button>
-									</div>
-								) : (
-									<div className="grid h-full w-full place-items-center text-3xl text-neutral-400 hover:bg-black/5">
-										+
-									</div>
-								)}
-							</div>
-							<p className="mt-1.5 text-[11px] text-secondary">
-								点击或拖入图片设置封面
-							</p>
+									className={`bg-card mt-3 h-36 cursor-pointer overflow-hidden rounded-xl border ${
+										dragTarget === "cover"
+											? "border-brand bg-brand/5 ring-2 ring-brand/40"
+											: ""
+									}`}
+									{...makeDropHandlers("cover", async (e) => {
+										const added = await addFiles(e.dataTransfer.files);
+										if (added[0]) setCover(added[0]);
+									})}
+									onClick={() => coverFileRef.current?.click()}
+								>
+									{coverPreview ? (
+										<div className="group relative h-full w-full">
+											<img
+												src={coverPreview}
+												alt="cover"
+												className="h-full w-full object-cover"
+											/>
+											<button
+												type="button"
+												className="absolute right-1.5 top-1.5 hidden rounded-full bg-black/60 p-1 text-white group-hover:block"
+												onClick={(e) => {
+													e.stopPropagation();
+													setCover(null);
+												}}
+											>
+												<X className="h-3.5 w-3.5" />
+											</button>
+										</div>
+									) : (
+										<div className="grid h-full w-full place-items-center text-3xl text-neutral-400 hover:bg-black/5">
+											+
+										</div>
+									)}
+								</div>
+								<p className="mt-1.5 text-[11px] text-secondary">
+									点击或拖入图片设置封面（自动压缩为 WebP）
+								</p>
 						</div>
 
 						{/* 元信息 */}
@@ -1108,81 +1237,106 @@ export default function WritePage(): ReactElement {
 
 						{/* 图片管理 */}
 						<div className="card p-4">
-							<h2 className="text-sm font-semibold">图片</h2>
-							<div className="mt-3 flex gap-2">
-								<input
-									type="text"
-									placeholder="粘贴图片 URL…"
-									className="bg-card min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm"
-									value={urlInput}
-									onChange={(e) => setUrlInput(e.target.value)}
-								/>
-								<button
-									type="button"
-									className="rounded-lg border px-3 py-1.5 text-sm"
-									onClick={addUrlImage}
-								>
-									添加
-								</button>
-							</div>
-							<div className="mt-3 grid grid-cols-4 gap-2">
-								<div
-									className="bg-card grid aspect-square cursor-pointer place-items-center rounded-lg border text-2xl text-neutral-400 hover:bg-brand/10"
-									onClick={() => imagesFileRef.current?.click()}
-									onDragOver={(e) => e.preventDefault()}
-									onDrop={(e) => {
-										e.preventDefault();
-										void addFiles(e.dataTransfer.files);
-									}}
-								>
-									+
-								</div>
-								{images.map((item) => {
-									const src = item.type === "url" ? item.url : item.previewUrl;
-									const markdown =
-										item.type === "url"
-											? `![](${item.url})`
-											: `![](local-image:${item.id})`;
-									const isCover = cover?.id === item.id;
-									return (
-										<div
-											key={item.id}
-											className={`group relative aspect-square overflow-hidden rounded-lg border ${
-												isCover ? "ring-2 ring-brand" : ""
-											}`}
-										>
-											<img
-												src={src}
-												alt=""
-												className="h-full w-full cursor-grab object-cover active:cursor-grabbing"
-												draggable
-												onDragStart={(e) => {
-													e.dataTransfer.setData("text/plain", markdown);
-													e.dataTransfer.setData("text/markdown", markdown);
-												}}
-												onClick={() => insertMarkdown(markdown)}
-												title="点击插入正文，或拖到编辑器"
-											/>
-											{isCover && (
-												<span className="absolute left-1 top-1 rounded bg-brand px-1.5 py-0.5 text-[10px] text-white">
-													封面
-												</span>
-											)}
-											<button
-												type="button"
-												className="absolute right-1 top-1 hidden rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white group-hover:block"
-												onClick={() => deleteImage(item.id)}
-											>
-												删
-											</button>
+								<h2 className="text-sm font-semibold">图片</h2>
+								{/* 压缩进度指示 */}
+								{processing && (
+									<div className="mt-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-brand">
+										<Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+										<span className="min-w-0 truncate">
+											正在压缩 {processing.index}/{processing.total}：
+											{processing.name}
+										</span>
+										<div className="ml-auto h-1 w-16 shrink-0 overflow-hidden rounded-full bg-brand/20">
+											<div className="h-full w-1/2 animate-pulse rounded-full bg-brand" />
 										</div>
-									);
-								})}
+									</div>
+								)}
+								<div className="mt-3 flex gap-2">
+									<input
+										type="text"
+										placeholder="粘贴图片 URL…"
+										className="bg-card min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm"
+										value={urlInput}
+										onChange={(e) => setUrlInput(e.target.value)}
+									/>
+									<button
+										type="button"
+										className="rounded-lg border px-3 py-1.5 text-sm"
+										onClick={addUrlImage}
+									>
+										添加
+									</button>
+								</div>
+								<div className="mt-3 grid grid-cols-4 gap-2">
+									<div
+										className={`bg-card grid aspect-square cursor-pointer place-items-center rounded-lg border text-2xl text-neutral-400 hover:bg-brand/10 ${
+											dragTarget === "grid"
+												? "border-brand bg-brand/10 text-brand ring-2 ring-brand/40"
+												: ""
+										}`}
+										onClick={() => imagesFileRef.current?.click()}
+										{...makeDropHandlers("grid", (e) => {
+											void addFiles(e.dataTransfer.files);
+										})}
+									>
+										+
+									</div>
+									{images.map((item) => {
+										const src = item.type === "url" ? item.url : item.dataUrl;
+										const markdown =
+											item.type === "url"
+												? `![](${item.url})`
+												: `![](local-image:${item.id})`;
+										const isCover = cover?.id === item.id;
+										return (
+											<div
+												key={item.id}
+												className={`group relative aspect-square overflow-hidden rounded-lg border ${
+													isCover ? "ring-2 ring-brand" : ""
+												}`}
+											>
+												<img
+													src={src}
+													alt=""
+													className="h-full w-full cursor-grab object-cover active:cursor-grabbing"
+													draggable
+													onDragStart={(e) => {
+														e.dataTransfer.setData("text/plain", markdown);
+														e.dataTransfer.setData("text/markdown", markdown);
+													}}
+													onClick={() => insertMarkdown(markdown)}
+													title={
+														item.type === "file"
+															? `${item.filename} · ${item.width}×${item.height} · ${formatSize(item.size)}，点击插入正文，或拖到编辑器`
+															: "点击插入正文，或拖到编辑器"
+													}
+												/>
+												{isCover && (
+													<span className="absolute left-1 top-1 rounded bg-brand px-1.5 py-0.5 text-[10px] text-white">
+														封面
+													</span>
+												)}
+												{item.type === "file" && (
+													<span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[9px] leading-none text-white/90">
+														{formatSize(item.size)}
+													</span>
+												)}
+												<button
+													type="button"
+													className="absolute right-1 top-1 hidden rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white group-hover:block"
+													onClick={() => deleteImage(item.id)}
+												>
+													删
+												</button>
+											</div>
+										);
+									})}
+								</div>
+								<p className="mt-2 text-[11px] leading-relaxed text-secondary">
+									点图插入正文，也可拖拽；上传图自动压缩为 WebP（质量 80%），单张不超过
+									{formatSize(MAX_IMAGE_SIZE)}，发布时存到 public/blogs/
+								</p>
 							</div>
-							<p className="mt-2 text-[11px] leading-relaxed text-secondary">
-								点图插入正文，也可拖拽；上传图发布时自动存到 public/blogs/
-							</p>
-						</div>
 					</div>
 				</div>
 			</div>
