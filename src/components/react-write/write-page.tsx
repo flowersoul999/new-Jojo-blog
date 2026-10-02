@@ -19,7 +19,11 @@ import {
 // - 读写全部走站点 /api/content/* 端点（本地 DEV 直接写文件，线上经 GitHub Contents API）
 import { type ReactElement, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { buildPostMarkdown, parsePostMarkdown } from "./frontmatter";
+import {
+	buildPostMarkdown,
+	defaultPostMeta,
+	parsePostMarkdown,
+} from "./frontmatter";
 
 // ---------- 类型 ----------
 
@@ -746,9 +750,10 @@ export default function WritePage(): ReactElement {
 					: job.cover.publicPath
 				: "";
 
-			// 3. 组装 frontmatter + 正文
+			// 3. 组装 frontmatter + 正文（高级字段由 defaultPostMeta 默认值补齐，Phase 3 开放编辑）
 			const fullMd = buildPostMarkdown(
 				{
+					...defaultPostMeta(),
 					title: job.title.trim(),
 					published: job.date,
 					description: job.description,

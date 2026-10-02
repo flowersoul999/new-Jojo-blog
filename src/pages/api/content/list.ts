@@ -3,6 +3,7 @@ import {
 	GITHUB_REPO,
 	isLocalDev,
 	listLocalDir,
+	listLocalDirRecursive,
 	requireAuth,
 } from "@/utils/editor-auth";
 
@@ -43,9 +44,17 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 	}
 
 	try {
+		// 是否递归列出（生产走 Git Trees API，本地走递归 walk）
+		const recursive = url.searchParams.get("recursive") === "1";
+
 		// 本地开发模式：直接读取本地文件系统
 		if (isLocalDev) {
 			const path = url.searchParams.get("path") || "src/content/posts";
+			if (recursive) {
+				return new Response(JSON.stringify(listLocalDirRecursive(path)), {
+					headers: { "Content-Type": "application/json" },
+				});
+			}
 			const items = listLocalDir(path);
 			return new Response(JSON.stringify(items), {
 				headers: { "Content-Type": "application/json" },
@@ -56,6 +65,66 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 
 		// 从 query 参数获取路径，默认为文章目录
 		const path = url.searchParams.get("path") || "src/content/posts";
+
+		// 递归模式：一次拉取整棵 git tree，按 path 前缀过滤
+		if (recursive) {
+			const treeResponse = await fetch(
+				`https://api.github.com/repos/${owner}/${name}/git/trees/${branch}?recursive=1`,
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/vnd.github+json",
+						"User-Agent": "Aemeath-Blog",
+					},
+				},
+			);
+			if (!treeResponse.ok) {
+				const errorText = await treeResponse.text();
+				return new Response(
+					JSON.stringify({ ok: false, error: errorText }),
+					{
+						status: treeResponse.status,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+			const treeData = await treeResponse.json();
+			if (treeData.truncated) {
+				return new Response(
+					JSON.stringify({
+						ok: false,
+						error: "仓库文件树过大，GitHub 截断了结果，请使用非递归模式",
+					}),
+					{
+						status: 500,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+			const basePath = path.replace(/^\/+/, "").replace(/\/+$/, "");
+			const prefix = basePath ? `${basePath}/` : "";
+			const items: Array<{
+				name: string;
+				path: string;
+				type: "file" | "dir";
+				size: number;
+			}> = [];
+			for (const entry of treeData.tree || []) {
+				if (entry.type !== "blob") continue;
+				if (prefix && !entry.path.startsWith(prefix)) continue;
+				const rel = prefix ? entry.path.slice(prefix.length) : entry.path;
+				if (!rel) continue;
+				items.push({
+					name: rel.split("/").pop() || rel,
+					path: entry.path,
+					type: "file",
+					size: entry.size || 0,
+				});
+			}
+			return new Response(JSON.stringify(items), {
+				headers: { "Content-Type": "application/json" },
+			});
+		}
 
 		// 调用 GitHub Contents API 列出目录或文件
 		const response = await fetch(

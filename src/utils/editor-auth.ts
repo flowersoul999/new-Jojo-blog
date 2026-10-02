@@ -125,6 +125,40 @@ export function listLocalDir(relPath: string): Array<{
 }
 
 /**
+ * 递归列出目录下所有文件（扁平列表，供 recursive=1 的 list API 使用）
+ * 仅返回文件项（不含目录），path 为仓库相对路径
+ */
+export function listLocalDirRecursive(
+	relPath: string,
+): Array<{ path: string; type: "file"; size: number }> {
+	const root = resolveLocalPath(relPath || ".");
+	if (!fs.existsSync(root)) return [];
+	const result: Array<{ path: string; type: "file"; size: number }> = [];
+	const walk = (abs: string) => {
+		for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
+			const full = path.join(abs, entry.name);
+			if (entry.isDirectory()) {
+				walk(full);
+			} else {
+				let stat: fs.Stats;
+				try {
+					stat = fs.statSync(full);
+				} catch {
+					continue;
+				}
+				result.push({
+					path: path.relative(PROJECT_ROOT, full).replace(/\\/g, "/"),
+					type: "file",
+					size: stat.size,
+				});
+			}
+		}
+	};
+	walk(root);
+	return result;
+}
+
+/**
  * 读取文件内容（本地）
  */
 export function readLocalFile(relPath: string):

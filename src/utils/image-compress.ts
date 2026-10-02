@@ -112,3 +112,11 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 		reader.readAsDataURL(blob);
 	});
 }
+
+/** 解码图片文件为可绘制源（供 image-crop 等复用，保证全站解码一致） */
+export async function decodeImageFile(file: File): Promise<DecodedImage> {
+	return decodeImage(file);
+}
+
+/** 将 canvas/blob 转为 dataURL（供 image-crop 复用） */
+export { blobToDataUrl };
