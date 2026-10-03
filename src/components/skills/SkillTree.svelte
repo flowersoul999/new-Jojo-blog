@@ -2,18 +2,24 @@
 /**
  * 技能树主组件
  *
- * 视觉规则：节点亮度 = 掌握度。Lv0 未接触（虚线灰）→ Lv5 大师（实心主题色 + 呼吸光晕）。
- * 所有颜色都由 --primary 与 --card-bg 混出来，因此会自动跟随站点主题色和明暗模式。
+ * 结构：纵向树。顶部是起点，向下逐层深入，L0 最浅、L8 最深。
+ * 同一层里的技术难度与占比相同，每层自带一条横枝，节点挂在枝上。
+ * 点亮动画从高到低逐层推进：每层延迟 --ti * 170ms，层内节点再按 --i 依次亮起。
+ *
+ * 视觉规则：节点亮度 = 掌握度。Lv0 虚线圈 → Lv5 实心主题色 + 呼吸光晕。
+ * 所有颜色都由 --primary 与 --card-bg 混出，因此会自动跟随站点主题色和明暗模式。
  */
 import { onMount } from "svelte";
 import {
 	ALL_NODES,
-	BRANCHES,
 	LEVELS,
 	MAX_LEVEL,
 	NODE_MAP,
 	ROOT,
+	TIER_OF_NODE,
+	TIERS,
 	TOTAL_NODES,
+	tierRatio,
 } from "@/data/skills";
 
 const STORAGE_KEY = "aemeath-skill-tree";
@@ -50,7 +56,6 @@ function loadOverrides(): Record<string, number> {
 }
 
 let levels = $state<Record<string, number>>({ ...DEFAULT_LEVELS });
-let ready = $state(false);
 let view = $state<"tree" | "compact">("tree");
 let filter = $state<"all" | "done" | "todo">("all");
 let activeId = $state<string | null>(null);
@@ -64,10 +69,9 @@ onMount(() => {
 		levels = { ...DEFAULT_LEVELS, ...overrides };
 		dirty = true;
 	}
-	ready = true;
 });
 
-/** 树的整体显隐：进入视口后节点按 --i 依次点亮 */
+/** 进入视口后从顶层开始逐层点亮 */
 $effect(() => {
 	const el = treeEl;
 	if (!el || typeof IntersectionObserver === "undefined") {
@@ -81,7 +85,7 @@ $effect(() => {
 				io.disconnect();
 			}
 		},
-		{ threshold: 0.05 },
+		{ threshold: 0.02 },
 	);
 	io.observe(el);
 	return () => io.disconnect();
@@ -100,8 +104,8 @@ function lvOf(id: string): number {
 }
 
 function setLevel(id: string, lv: number) {
-	const next = Math.max(0, Math.min(MAX_LEVEL, lv));
-	levels = { ...levels, [id]: next };
+	if (lv < 0 || lv > MAX_LEVEL) return;
+	levels = { ...levels, [id]: lv };
 	dirty = true;
 	persist();
 }
@@ -124,13 +128,8 @@ function clearAll() {
 	persist();
 }
 
-/** 只有 Lv0/Lv1 的算「还没真正上手」 */
-function needsWork(id: string): boolean {
-	return lvOf(id) <= 1;
-}
-
 function visible(id: string): boolean {
-	if (filter === "todo") return needsWork(id);
+	if (filter === "todo") return lvOf(id) <= 1;
 	if (filter === "done") return lvOf(id) >= 3;
 	return true;
 }
@@ -145,13 +144,17 @@ const stats = $derived.by(() => {
 		if (lv > 0) lit += 1;
 		if (lv >= 3) solid += 1;
 	}
-	const pct = Math.round((sum / (TOTAL_NODES * MAX_LEVEL)) * 100);
-	return { sum, lit, solid, pct };
+	return {
+		sum,
+		lit,
+		solid,
+		pct: Math.round((sum / (TOTAL_NODES * MAX_LEVEL)) * 100),
+	};
 });
 
 const RING = 2 * Math.PI * 52;
 
-function branchStat(nodes: { id: string }[]) {
+function tierStat(nodes: { id: string }[]) {
 	let sum = 0;
 	let lit = 0;
 	for (const n of nodes) {
@@ -166,14 +169,24 @@ function branchStat(nodes: { id: string }[]) {
 	};
 }
 
+/** 筛选后仍要显示的层 */
+const visibleTiers = $derived.by(() =>
+	TIERS.map((t) => ({
+		tier: t,
+		list: t.nodes.filter((n) => visible(n.id)),
+	})).filter((v) => v.list.length > 0),
+);
+
 const activeNode = $derived(activeId ? NODE_MAP[activeId] : null);
 const activeLv = $derived(activeNode ? lvOf(activeNode.id) : 0);
-const activeBranch = $derived(
-	activeId
-		? (BRANCHES.find((b) => b.nodes.some((n) => n.id === activeId)) ?? null)
-		: null,
-);
+const activeTier = $derived(activeId ? TIERS[TIER_OF_NODE[activeId]] : null);
 const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
+/** 同层技术等权重：本层占比 ÷ 本层技能数 */
+const activeWeight = $derived(
+	activeTier
+		? ((tierRatio(activeTier) * 100) / activeTier.nodes.length).toFixed(2)
+		: "0",
+);
 </script>
 
 <div class="sk-hero">
@@ -181,7 +194,7 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		<p class="sk-eyebrow">我的技能树</p>
 		<h2 class="sk-title">从前端小白，到能定方案的人</h2>
 		<p class="sk-sub">
-			{TOTAL_NODES} 个技能节点，按学习依赖长成一棵树。亮度就是掌握度，越亮越熟。
+			{TIERS.length} 层技术，从上到下逐层深入。同一层里的技术难度与占比相同，节点越亮表示掌握得越扎实。
 		</p>
 	</div>
 
@@ -222,22 +235,20 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 
 <div class="sk-toolbar">
 	<div class="sk-seg" role="group" aria-label="视图切换">
-		<button
-			type="button"
-			class:on={view === "tree"}
-			onclick={() => (view = "tree")}
-		>树状</button>
-		<button
-			type="button"
-			class:on={view === "compact"}
-			onclick={() => (view = "compact")}
-		>紧凑</button>
+		<button type="button" class:on={view === "tree"} onclick={() => (view = "tree")}>树状</button>
+		<button type="button" class:on={view === "compact"} onclick={() => (view = "compact")}
+			>紧凑</button
+		>
 	</div>
 
 	<div class="sk-seg" role="group" aria-label="筛选">
 		<button type="button" class:on={filter === "all"} onclick={() => (filter = "all")}>全部</button>
-		<button type="button" class:on={filter === "done"} onclick={() => (filter = "done")}>已熟练</button>
-		<button type="button" class:on={filter === "todo"} onclick={() => (filter = "todo")}>待攻克</button>
+		<button type="button" class:on={filter === "done"} onclick={() => (filter = "done")}
+			>已熟练</button
+		>
+		<button type="button" class:on={filter === "todo"} onclick={() => (filter = "todo")}
+			>待攻克</button
+		>
 	</div>
 
 	<div class="sk-toolbar-right">
@@ -263,46 +274,43 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		<p class="sk-root-note">{ROOT.note}</p>
 	</div>
 
-	<div class="sk-branches">
-		{#each BRANCHES as branch, bi (branch.id)}
-			{@const st = branchStat(branch.nodes)}
-			{@const list = branch.nodes.filter((n) => visible(n.id))}
-			<article class="sk-branch" style={`--bh:${bi * 33};--bd:${bi * 60}ms`}>
-				<span class="sk-branch-cap" aria-hidden="true"></span>
+	{#each visibleTiers as row (row.tier.tier)}
+		{@const st = tierStat(row.list)}
+		<section class="sk-tier" style={`--ti:${row.tier.tier}`}>
+			<span class="sk-tier-drop" aria-hidden="true"></span>
 
-				<header class="sk-branch-head">
-					<div class="sk-branch-top">
-						<h3>{branch.name}</h3>
-						<span class="sk-branch-count">{st.lit}/{st.total}</span>
-					</div>
-					<p class="sk-branch-sub">{branch.subtitle}</p>
-					<div class="sk-branch-bar">
-						<span style={`width:${st.pct}%`}></span>
-					</div>
-				</header>
+			<header class="sk-tier-head">
+				<div class="sk-tier-line1">
+					<span class="sk-tier-no">L{row.tier.tier}</span>
+					<span class="sk-tier-stage">{row.tier.stage}</span>
+					<span class="sk-tier-ratio">占 {(tierRatio(row.tier) * 100).toFixed(1)}%</span>
+				</div>
+				<p class="sk-tier-purpose">{row.tier.purpose}</p>
+				<div class="sk-tier-meta">
+					<div class="sk-tier-bar"><span style={`width:${st.pct}%`}></span></div>
+					<span class="sk-tier-count">{st.lit}/{st.total} · {st.pct}%</span>
+				</div>
+			</header>
 
-				<div class="sk-spine">
-					{#if list.length === 0}
-						<p class="sk-empty">这个筛选下没有节点</p>
-					{/if}
-					{#each list as node, ni (node.id)}
-						{@const lv = lvOf(node.id)}
+			<div class="sk-rail">
+				{#each row.list as node, ni (node.id)}
+					{@const lv = lvOf(node.id)}
+					<div class="sk-slot" style={`--i:${ni}`}>
 						<button
 							type="button"
 							class="sk-node"
 							data-lv={lv}
-							style={`--i:${ni}`}
-							aria-label={`${node.name}，当前 ${lv} 级 ${LEVELS[lv].name}`}
+							aria-label={`${node.name}，${row.tier.stage}层，当前 ${lv} 级 ${LEVELS[lv].name}`}
 							onclick={() => (activeId = node.id)}
 						>
 							<span class="sk-node-name">{node.name}</span>
 							<span class="sk-node-lv">L{lv}</span>
 						</button>
-					{/each}
-				</div>
-			</article>
-		{/each}
-	</div>
+					</div>
+				{/each}
+			</div>
+		</section>
+	{/each}
 </div>
 
 <div class="sk-legend">
@@ -316,22 +324,16 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 </div>
 
 <p class="sk-foot">
-	等级是你自己的主观判断，改完存在浏览器本地；想改默认值直接编辑
+	每层占比 = 该层技能数 ÷ 总技能数，同层技术等权重。点节点可以看学习要点并调整自己的等级，改动存在浏览器本地；默认值改
 	<code>src/data/skills.ts</code> 里的 <code>level</code> 字段。
 </p>
 
-{#if activeNode}
-	<div
-		class="sk-drawer-mask"
-		role="presentation"
-		onclick={() => (activeId = null)}
-	></div>
+{#if activeNode && activeTier}
+	<div class="sk-drawer-mask" role="presentation" onclick={() => (activeId = null)}></div>
 	<aside class="sk-drawer" role="dialog" aria-modal="true" aria-label={activeNode.name}>
 		<header class="sk-drawer-head">
 			<div>
-				{#if activeBranch}
-					<p class="sk-drawer-branch">{activeBranch.name}</p>
-				{/if}
+				<p class="sk-drawer-branch">L{activeTier.tier} · {activeTier.stage} · {activeNode.track}</p>
 				<h3>{activeNode.name}</h3>
 			</div>
 			<button
@@ -364,6 +366,11 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 				>L{def.level}</button>
 			{/each}
 		</div>
+
+		<p class="sk-drawer-weight">
+			本层占比 {(tierRatio(activeTier) * 100).toFixed(1)}%，层内 {activeTier.nodes.length}
+			个技术等权重，单个约 {activeWeight}%。
+		</p>
 
 		{#if activeNode.tips && activeNode.tips.length}
 			<div class="sk-drawer-tips">
@@ -549,14 +556,15 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 
 	/* ===================== 树根 ===================== */
 	.sk-tree {
+		--step: 170ms;
+		position: relative;
 		margin-top: 1.75rem;
 	}
 	.sk-root {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 1.5rem;
+		gap: 0.55rem;
 	}
 	.sk-root-badge {
 		position: relative;
@@ -586,102 +594,171 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		font-size: 0.78rem;
 		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
 	}
-
-	/* ===================== 分支网格 ===================== */
-	.sk-branches {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
-		gap: 1.1rem;
-		align-items: start;
+	/* 树根下方的第一段主干 */
+	.sk-root::after {
+		content: "";
+		width: 2px;
+		height: 1.9rem;
+		transform: scaleY(0);
+		transform-origin: top;
+		background: linear-gradient(
+			to bottom,
+			color-mix(in srgb, var(--primary) 55%, transparent),
+			color-mix(in srgb, var(--primary) 10%, transparent)
+		);
 	}
-	.sk-branch {
+
+	/* ===================== 层级 ===================== */
+	.sk-tier {
 		position: relative;
-		padding: 1.15rem 1.1rem 1rem;
-		border-radius: 20px;
-		border: 1px solid var(--line-divider);
-		background: var(--card-bg);
-		box-shadow: var(--card-shadow, 0 2px 14px rgb(0 0 0 / 6%));
-		transition: border-color 260ms ease, box-shadow 260ms ease;
+		padding-top: 1.9rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
 	}
-	.sk-branch:hover {
-		border-color: color-mix(in srgb, var(--primary) 38%, transparent);
-		box-shadow: 0 16px 38px rgb(0 0 0 / 10%);
-	}
-	/* 分支顶部的小圆点：视觉上像从树根垂下来的一根枝条 */
-	.sk-branch-cap {
+	/* 层头上方的树干 */
+	.sk-tier-drop {
 		position: absolute;
-		top: -0.32rem;
+		top: 0;
 		left: 50%;
-		transform: translateX(-50%);
-		width: 0.62rem;
-		height: 0.62rem;
-		border-radius: 999px;
-		background: oklch(0.72 0.14 calc(var(--hue) + var(--bh)));
-		box-shadow: 0 0 0 4px var(--card-bg);
+		width: 2px;
+		height: 1.9rem;
+		transform: translateX(-50%) scaleY(0);
+		transform-origin: top;
+		background: linear-gradient(
+			to bottom,
+			color-mix(in srgb, var(--primary) 8%, transparent),
+			color-mix(in srgb, var(--primary) 45%, transparent)
+		);
 	}
 
-	.sk-branch-head {
-		margin-bottom: 0.85rem;
-	}
-	.sk-branch-top {
+	.sk-tier-head {
+		position: relative;
+		z-index: 1;
 		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 0.5rem;
+		flex-direction: column;
+		gap: 0.4rem;
+		width: min(100%, 26rem);
+		padding: 0.7rem 1rem 0.75rem;
+		border-radius: 16px;
+		border: 1px solid color-mix(in srgb, var(--primary) 26%, transparent);
+		background: var(--card-bg);
+		box-shadow: 0 4px 18px rgb(0 0 0 / 6%);
 	}
-	.sk-branch-top h3 {
-		margin: 0;
-		font-size: 1.02rem;
+	.sk-tier-line1 {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		flex-wrap: wrap;
+	}
+	.sk-tier-no {
+		flex: none;
+		padding: 0.06rem 0.42rem;
+		border-radius: 6px;
+		background: var(--primary);
+		color: #fff;
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+	}
+	.sk-tier-stage {
+		font-size: 0.95rem;
 		font-weight: 800;
 		color: var(--deep-text);
 	}
-	.sk-branch-count {
-		flex: none;
+	.sk-tier-ratio {
+		margin-left: auto;
 		font-size: 0.72rem;
 		font-weight: 700;
-		color: oklch(0.55 0.14 calc(var(--hue) + var(--bh)));
+		color: var(--primary);
 	}
-	.sk-branch-sub {
-		margin: 0.2rem 0 0.6rem;
-		font-size: 0.75rem;
+	.sk-tier-purpose {
+		margin: 0;
+		font-size: 0.76rem;
 		line-height: 1.6;
 		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
 	}
-	.sk-branch-bar {
-		height: 0.32rem;
+	.sk-tier-meta {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.sk-tier-bar {
+		flex: 1 1 auto;
+		height: 0.3rem;
 		border-radius: 999px;
 		background: color-mix(in srgb, var(--deep-text) 8%, transparent);
 		overflow: hidden;
 	}
-	.sk-branch-bar span {
+	.sk-tier-bar span {
 		display: block;
 		height: 100%;
 		border-radius: 999px;
-		background: oklch(0.66 0.15 calc(var(--hue) + var(--bh)));
+		background: var(--primary);
 		transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1);
 	}
-
-	/* ===================== 枝条与节点 ===================== */
-	.sk-spine {
-		position: relative;
-		padding-left: 1.6rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
+	.sk-tier-count {
+		flex: none;
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: color-mix(in srgb, var(--deep-text) 52%, transparent);
 	}
-	.sk-spine::before {
+	/* 层头下方的短干，连到本层横枝 */
+	.sk-tier-head::after {
 		content: "";
 		position: absolute;
-		left: 0.42rem;
-		top: 0.55rem;
-		bottom: 0.55rem;
+		left: 50%;
+		bottom: -0.9rem;
 		width: 2px;
-		border-radius: 2px;
+		height: 0.9rem;
+		transform: translateX(-50%) scaleY(0);
+		transform-origin: top;
+		background: color-mix(in srgb, var(--primary) 45%, transparent);
+	}
+
+	/* ===================== 横枝与节点 ===================== */
+	.sk-rail {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+		gap: 0.85rem 0;
+		width: 100%;
+		padding-top: 0.9rem;
+	}
+	.sk-slot {
+		position: relative;
+		display: flex;
+		justify-content: center;
+		padding: 1.15rem 0.3rem 0;
+	}
+	/* 每行连续的横枝 */
+	.sk-slot::before {
+		content: "";
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 2px;
+		transform: scaleX(0);
+		transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 		background: linear-gradient(
-			to bottom,
-			oklch(0.66 0.15 calc(var(--hue) + var(--bh))),
-			color-mix(in srgb, var(--primary) 8%, transparent)
+			to right,
+			color-mix(in srgb, var(--primary) 16%, transparent),
+			color-mix(in srgb, var(--primary) 40%, transparent),
+			color-mix(in srgb, var(--primary) 16%, transparent)
 		);
+	}
+	/* 横枝垂到节点的短枝 */
+	.sk-slot::after {
+		content: "";
+		position: absolute;
+		top: 0;
+		left: 50%;
+		width: 2px;
+		height: 1.15rem;
+		transform: translateX(-50%) scaleY(0);
+		transform-origin: top;
+		transition: transform 300ms ease;
+		background: color-mix(in srgb, var(--primary) 34%, transparent);
 	}
 
 	.sk-node {
@@ -689,53 +766,50 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		width: 100%;
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.42rem 0.65rem;
-		border-radius: 11px;
+		justify-content: center;
+		gap: 0.4rem;
+		padding: 0.44rem 0.6rem;
+		border-radius: 12px;
 		border: 1px solid var(--sk-border);
 		background: var(--sk-bg);
 		color: var(--sk-fg);
-		font-size: 0.8rem;
+		font-size: 0.79rem;
 		font-weight: 600;
-		text-align: left;
+		text-align: center;
 		cursor: pointer;
 		box-shadow: var(--sk-glow, none);
-		transition: transform 180ms ease, box-shadow 220ms ease, border-color 220ms ease,
+		transition:
+			transform 180ms ease,
+			box-shadow 220ms ease,
+			border-color 220ms ease,
 			background 220ms ease;
 	}
-	/* 枝条上的横向小枝 */
+	/* 节点与短枝的衔接点 */
 	.sk-node::before {
 		content: "";
 		position: absolute;
-		left: -0.94rem;
-		top: 50%;
-		width: 0.62rem;
-		height: 1.5px;
-		background: color-mix(in srgb, var(--primary) 32%, transparent);
-	}
-	/* 枝条连接点 */
-	.sk-node::after {
-		content: "";
-		position: absolute;
-		left: -1.1rem;
-		top: 50%;
-		width: 5px;
-		height: 5px;
+		top: -0.27rem;
+		left: 50%;
+		width: 0.44rem;
+		height: 0.44rem;
 		border-radius: 999px;
-		transform: translate(-50%, -50%);
-		background: color-mix(in srgb, var(--primary) 55%, transparent);
-		transition: background 220ms ease, box-shadow 220ms ease;
+		transform: translateX(-50%);
+		background: var(--primary);
+		box-shadow: 0 0 0 3px var(--card-bg);
+		opacity: 0.5;
+		transition: opacity 220ms ease;
+	}
+	.sk-node[data-lv="0"]::before {
+		opacity: 0.22;
 	}
 	.sk-node:hover {
-		transform: translateX(3px);
+		transform: translateY(-2px);
 		border-color: var(--primary);
 	}
-	.sk-node:hover::after {
-		background: var(--primary);
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+	.sk-node:hover::before {
+		opacity: 1;
 	}
 	.sk-node-name {
-		flex: 1 1 auto;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -743,12 +817,11 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 	}
 	.sk-node-lv {
 		flex: none;
-		font-size: 0.66rem;
+		font-size: 0.64rem;
 		font-weight: 700;
-		letter-spacing: 0.02em;
-		padding: 0.1rem 0.35rem;
+		padding: 0.08rem 0.3rem;
 		border-radius: 6px;
-		background: color-mix(in srgb, var(--sk-fg) 12%, transparent);
+		background: color-mix(in srgb, var(--sk-fg) 14%, transparent);
 		opacity: 0.85;
 	}
 
@@ -788,7 +861,6 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		--sk-glow:
 			0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent),
 			0 8px 26px color-mix(in srgb, var(--primary) 46%, transparent);
-		animation: sk-breathe 3.4s ease-in-out infinite;
 	}
 
 	@keyframes sk-breathe {
@@ -797,75 +869,111 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 			opacity: 1;
 		}
 		50% {
-			opacity: 0.82;
+			opacity: 0.78;
 		}
 	}
 
-	.sk-empty {
-		margin: 0.2rem 0;
-		font-size: 0.76rem;
-		color: color-mix(in srgb, var(--deep-text) 45%, transparent);
+	/* ===================== 从高到低逐层点亮 ===================== */
+	.sk-tier-head,
+	.sk-node {
+		opacity: 0;
+	}
+	.sk-tier-head {
+		transform: translateY(-10px);
+	}
+	.sk-node {
+		transform: translateY(-8px) scale(0.94);
 	}
 
-	/* ===================== 入场点亮 ===================== */
-	.sk-tree .sk-node,
-	.sk-tree .sk-branch {
-		opacity: 0;
-		transform: translateY(10px);
+	.sk-tree.revealed .sk-root::after {
+		transform: scaleY(1);
+		transition: transform 320ms ease;
 	}
-	.sk-tree.revealed .sk-node,
-	.sk-tree.revealed .sk-branch {
+	.sk-tree.revealed .sk-tier-drop {
+		transform: translateX(-50%) scaleY(1);
+		transition: transform 320ms ease;
+		transition-delay: calc(var(--ti) * var(--step) - 90ms);
+	}
+	.sk-tree.revealed .sk-tier-head {
 		opacity: 1;
-		transform: translateY(0);
+		transform: none;
 		transition:
-			opacity 460ms ease,
-			transform 460ms cubic-bezier(0.22, 1, 0.36, 1),
-			box-shadow 220ms ease,
-			border-color 220ms ease,
-			background 220ms ease;
+			opacity 420ms ease,
+			transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+		transition-delay: calc(var(--ti) * var(--step));
 	}
-	.sk-tree.revealed .sk-branch {
-		transition-delay: var(--bd);
+	.sk-tree.revealed .sk-tier-head::after {
+		transform: translateX(-50%) scaleY(1);
+		transition: transform 260ms ease;
+		transition-delay: calc(var(--ti) * var(--step) + 180ms);
+	}
+	.sk-tree.revealed .sk-slot::before {
+		transform: scaleX(1);
+		transition-delay: calc(var(--ti) * var(--step) + 200ms);
+	}
+	.sk-tree.revealed .sk-slot::after {
+		transform: translateX(-50%) scaleY(1);
+		transition-delay: calc(var(--ti) * var(--step) + 280ms + var(--i) * 45ms);
 	}
 	.sk-tree.revealed .sk-node {
-		transition-delay: calc(var(--bd) + var(--i) * 26ms);
+		opacity: 1;
+		transform: none;
+		transition-delay: calc(var(--ti) * var(--step) + 320ms + var(--i) * 45ms);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.sk-tree .sk-node,
-		.sk-tree .sk-branch {
+		.sk-tier-head,
+		.sk-node {
 			opacity: 1;
 			transform: none;
+		}
+		.sk-root::after,
+		.sk-tier-drop,
+		.sk-tier-head::after,
+		.sk-slot::before,
+		.sk-slot::after {
+			transform: none;
+		}
+		.sk-tier-head,
+		.sk-node,
+		.sk-root::after,
+		.sk-tier-drop,
+		.sk-tier-head::after,
+		.sk-slot::before,
+		.sk-slot::after {
+			transition: none;
+			animation: none;
+		}
+		.sk-root-pulse {
 			animation: none;
 		}
 	}
 
 	/* ===================== 紧凑视图 ===================== */
-	.sk-tree.is-compact .sk-branches {
-		grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-	}
-	.sk-tree.is-compact .sk-branch {
-		padding: 0.9rem 0.85rem 0.8rem;
-	}
-	.sk-tree.is-compact .sk-spine {
-		padding-left: 0;
-		flex-direction: row;
-		flex-wrap: wrap;
+	.sk-tree.is-compact .sk-rail {
+		grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
 		gap: 0.3rem;
+		padding-top: 0;
 	}
-	.sk-tree.is-compact .sk-spine::before,
+	.sk-tree.is-compact .sk-slot {
+		padding: 0;
+	}
+	.sk-tree.is-compact .sk-slot::before,
+	.sk-tree.is-compact .sk-slot::after,
 	.sk-tree.is-compact .sk-node::before,
-	.sk-tree.is-compact .sk-node::after {
+	.sk-tree.is-compact .sk-tier-head::after {
 		display: none;
 	}
 	.sk-tree.is-compact .sk-node {
-		width: auto;
-		padding: 0.24rem 0.5rem;
+		padding: 0.26rem 0.5rem;
 		font-size: 0.72rem;
 		border-radius: 999px;
 	}
-	.sk-tree.is-compact .sk-node:hover {
-		transform: translateY(-2px);
+	.sk-tree.is-compact .sk-tier {
+		padding-top: 1rem;
+	}
+	.sk-tree.is-compact .sk-tier-drop {
+		height: 1rem;
 	}
 
 	/* ===================== 图例 ===================== */
@@ -874,7 +982,7 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		flex-wrap: wrap;
 		gap: 0.4rem 1rem;
 		align-items: center;
-		margin-top: 1.5rem;
+		margin-top: 1.75rem;
 		padding-top: 1rem;
 		border-top: 1px solid var(--line-divider);
 	}
@@ -967,8 +1075,7 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		margin: 0 0 0.2rem;
 		font-size: 0.7rem;
 		font-weight: 700;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
+		letter-spacing: 0.1em;
 		color: var(--primary);
 	}
 	.sk-drawer-head h3 {
@@ -1105,6 +1212,13 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		border-color: var(--primary);
 	}
 
+	.sk-drawer-weight {
+		margin: 0.9rem 0 0;
+		font-size: 0.74rem;
+		line-height: 1.6;
+		color: color-mix(in srgb, var(--deep-text) 50%, transparent);
+	}
+
 	.sk-drawer-tips {
 		margin-top: 1.2rem;
 	}
@@ -1152,7 +1266,6 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 			height: 6rem;
 		}
 		.sk-metrics {
-			grid-template-columns: repeat(3, minmax(0, 1fr));
 			gap: 0.5rem;
 		}
 		.sk-metric {
@@ -1161,14 +1274,18 @@ const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
 		.sk-metric strong {
 			font-size: 1.05rem;
 		}
-		.sk-branches {
-			grid-template-columns: 1fr;
+		.sk-rail {
+			grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
 		}
-		.sk-branch-cap {
-			display: none;
+		.sk-node {
+			padding: 0.4rem 0.45rem;
+			font-size: 0.74rem;
 		}
 		.sk-node-name {
 			white-space: normal;
+		}
+		.sk-tier-head {
+			width: 100%;
 		}
 		.sk-toolbar-right {
 			margin-left: 0;
