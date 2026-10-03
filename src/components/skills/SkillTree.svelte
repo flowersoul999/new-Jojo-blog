@@ -27,7 +27,12 @@ import {
 	type Skill,
 	TOTAL_SKILLS,
 } from "@/data/skills";
-import { GROUP_COLORS, iconColor, TECH_ICONS } from "@/data/techIcons";
+import {
+	GROUP_COLORS,
+	type IconState,
+	iconColor,
+	TECH_ICONS,
+} from "@/data/techIcons";
 
 const STORAGE_KEY = "aemeath-skill-tree";
 const MAX_POINTS = TOTAL_SKILLS * MAX_LEVEL;
@@ -233,6 +238,15 @@ function stateOf(s: Skill): "locked" | "ready" | "learning" | "max" {
 	if (lv >= MAX_LEVEL) return "max";
 	if (lv > 0) return "learning";
 	return "ready";
+}
+
+/**
+ * 图标配色只分三态：有点数 → 鲜艳品牌色；没点数 → 灰（锁定态更淡）。
+ * 灰是刻意的：一眼就能看出哪些学了、哪些没学。
+ */
+function iconState(s: Skill): IconState {
+	if ((levels[s.id] ?? 0) > 0) return "lit";
+	return stateOf(s) === "locked" ? "locked" : "unlit";
 }
 
 const stats = $derived.by(() => {
@@ -505,7 +519,7 @@ $effect(() => {
 										<svg class="sk-logo" viewBox="0 0 24 24" aria-hidden="true">
 											<path
 												d={TECH_ICONS[s.id]?.d ?? ""}
-												fill={iconColor(s.id, s.group, lv > 0 && st !== "locked", dark)}
+												fill={iconColor(s.id, s.group, iconState(s), dark)}
 											></path>
 										</svg>
 										<span class="sk-lv">{lv}</span>
@@ -554,7 +568,7 @@ $effect(() => {
 					<svg class="sk-detail-logo" viewBox="0 0 24 24" aria-hidden="true">
 						<path
 							d={TECH_ICONS[active.id]?.d ?? ""}
-							fill={iconColor(active.id, active.group, lv > 0 && st !== "locked", dark)}
+							fill={iconColor(active.id, active.group, iconState(active), dark)}
 						></path>
 					</svg>
 					<div>
@@ -631,6 +645,8 @@ $effect(() => {
 		--grid: rgba(150, 128, 76, 0.1);
 		--wire: rgba(176, 146, 78, 0.5);
 		--line: rgba(150, 128, 76, 0.22);
+		/* 亮色 logo（JS 黄这类）在浅色面板上容易糊，给一层极淡的投影提形状 */
+		--logo-shadow: drop-shadow(0 0.5px 1px rgba(74, 67, 53, 0.32));
 		color: var(--ink);
 	}
 
@@ -647,6 +663,7 @@ $effect(() => {
 		--grid: rgba(216, 186, 116, 0.07);
 		--wire: rgba(214, 178, 96, 0.4);
 		--line: rgba(214, 178, 96, 0.16);
+		--logo-shadow: none;
 	}
 
 	/* ===================== 头部 ===================== */
@@ -910,8 +927,9 @@ $effect(() => {
 	}
 	.sk-logo {
 		position: relative;
-		width: 58%;
-		height: 58%;
+		width: 64%;
+		height: 64%;
+		filter: var(--logo-shadow);
 		transition: transform 200ms ease;
 	}
 	.sk-tile:hover .sk-logo {
