@@ -1219,6 +1219,25 @@ const hasMultipleImages =
     display: none;
   }
 
+  /* 3) 用户偏好覆盖页面级 hideSidebars：调色板里明确开启（"true"）会让
+        updateMainGridCols 把 data-sidebar-collapsed 算成 "false"，网格回到多列；
+        但 hideSidebars 页面上没被明确开启的另一侧要继续藏起来（仅平板及以上）。 */
+  @media (min-width: 768px) {
+    #main-grid[data-hide-sidebars="true"][data-sidebar-collapsed="false"] #left-sidebar,
+    #main-grid[data-hide-sidebars="true"][data-sidebar-collapsed="false"] #right-sidebar {
+      display: none;
+    }
+
+    html[data-sidebar-left-visible="true"]
+      #main-grid[data-hide-sidebars="true"][data-sidebar-collapsed="false"]
+      #left-sidebar,
+    html[data-sidebar-right-visible="true"]
+      #main-grid[data-hide-sidebars="true"][data-sidebar-collapsed="false"]
+      #right-sidebar {
+      display: block;
+    }
+  }
+
   @keyframes swupFadeOut {
     from {
       opacity: 1;

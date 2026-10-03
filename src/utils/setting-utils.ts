@@ -1505,7 +1505,9 @@ export function applyBannerCarouselEnabledToDocument(enabled: boolean): void {
 
 // ---------------------------------------------------------------------------
 // 左右侧边栏显隐（调色板「外观」里的开关）
-// 默认两侧都显示：只有被关掉时才在 <html> 上写 data-sidebar-*-visible="false"，
+// 三态语义：localStorage 未写入 = 跟随页面设计（hideSidebars 页面如技能图/面试保持全宽）；
+// 写入 "true"/"false" = 用户明确选择，全局生效，并覆盖页面级 hideSidebars。
+// <html> 上的 data-sidebar-*-visible 与该三态一一对应（未设置时移除属性），
 // CSS 依据该属性隐藏对应侧栏并重算网格列数（见 MainGridLayout 的全局样式）。
 // ---------------------------------------------------------------------------
 
@@ -1521,6 +1523,18 @@ function readStoredVisibility(key: string): boolean {
 	}
 	// 未设置时默认显示，只有明确写入 "false" 才隐藏
 	return localStorage.getItem(key) !== "false";
+}
+
+/** 读取显式偏好：返回 "true" / "false"；未设置过返回 null（跟随页面设计） */
+function readStoredVisibilityRaw(key: string): "true" | "false" | null {
+	if (
+		typeof localStorage === "undefined" ||
+		typeof localStorage.getItem !== "function"
+	) {
+		return null;
+	}
+	const stored = localStorage.getItem(key);
+	return stored === "true" || stored === "false" ? stored : null;
 }
 
 function writeStoredVisibility(key: string, visible: boolean): void {
@@ -1551,22 +1565,34 @@ export function setSidebarRightVisible(visible: boolean): void {
 	applySidebarVisibilityToDocument();
 }
 
-/** 把显隐偏好同步到 <html> 属性；默认显示时移除属性，保持与 SSR 首屏一致 */
+/** 清除显式偏好，回到「跟随页面设计」：技能图/面试等全宽页恢复隐藏侧栏 */
+export function resetSidebarVisibility(): void {
+	if (
+		typeof localStorage !== "undefined" &&
+		typeof localStorage.removeItem === "function"
+	) {
+		localStorage.removeItem(SIDEBAR_LEFT_VISIBLE_KEY);
+		localStorage.removeItem(SIDEBAR_RIGHT_VISIBLE_KEY);
+	}
+	applySidebarVisibilityToDocument();
+}
+
+/** 把显隐偏好同步到 <html> 属性；显式 "true"/"false" 都落属性，未设置时移除 */
 export function applySidebarVisibilityToDocument(): void {
 	if (typeof document === "undefined") {
 		return;
 	}
 	const root = document.documentElement;
-	const sides: Array<[string, boolean]> = [
-		["left", getStoredSidebarLeftVisible()],
-		["right", getStoredSidebarRightVisible()],
+	const sides: Array<[string, "true" | "false" | null]> = [
+		["left", readStoredVisibilityRaw(SIDEBAR_LEFT_VISIBLE_KEY)],
+		["right", readStoredVisibilityRaw(SIDEBAR_RIGHT_VISIBLE_KEY)],
 	];
-	for (const [side, visible] of sides) {
+	for (const [side, stored] of sides) {
 		const attr = `data-sidebar-${side}-visible`;
-		if (visible) {
+		if (stored === null) {
 			root.removeAttribute(attr);
 		} else {
-			root.setAttribute(attr, "false");
+			root.setAttribute(attr, stored);
 		}
 	}
 }

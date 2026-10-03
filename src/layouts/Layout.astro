@@ -599,16 +599,18 @@ const canonicalUrl = new URL(
       })();
 
       // 初始化左右侧边栏显隐偏好 - 在 html 元素上设置属性，CSS 会立即生效。
-      // 默认两侧显示，因此只有被用户关掉时才写入属性，避免污染默认状态。
+      // 三态：localStorage 未写入 = 跟随页面设计（移除属性）；
+      // 显式 "true"/"false" 都写入属性，"true" 会覆盖技能图/面试等页面的 hideSidebars。
       (function applySidebarVisibility() {
         try {
           const root = document.documentElement;
           ["left", "right"].forEach(function (side) {
+            const attr = "data-sidebar-" + side + "-visible";
             const stored = localStorage.getItem("sidebar" + (side === "left" ? "Left" : "Right") + "Visible");
-            if (stored === "false") {
-              root.setAttribute("data-sidebar-" + side + "-visible", "false");
+            if (stored === "true" || stored === "false") {
+              root.setAttribute(attr, stored);
             } else {
-              root.removeAttribute("data-sidebar-" + side + "-visible");
+              root.removeAttribute(attr);
             }
           });
         } catch (e) {
@@ -2079,7 +2081,13 @@ function disableAnimation() {
     const tabletSidebar = mainGrid.getAttribute("data-tablet-sidebar") || "left";
     const showBothSidebarsOnPostPage = mainGrid.getAttribute("data-show-both-sidebars-on-post") === "true";
 
-    const collapsed = !sidebarEnabled || hideSideBars || (isPostPage && sidebarHideOnPost);
+    // 调色板「外观」里的侧边栏开关是三态的：只有用户明确开启（"true"）才覆盖页面级 hideSidebars，
+    // 没动过开关则尊重页面设计（技能图 / 面试等页保持全宽单列）。
+    const userForceLeft = document.documentElement.getAttribute("data-sidebar-left-visible") === "true";
+    const userForceRight = document.documentElement.getAttribute("data-sidebar-right-visible") === "true";
+    const userOverridesHideSidebars = hideSideBars && (userForceLeft || userForceRight);
+
+    const collapsed = !sidebarEnabled || (hideSideBars && !userOverridesHideSidebars) || (isPostPage && sidebarHideOnPost);
     // CSS 依据它隐藏侧栏容器、中和列定位；显隐状态与网格列数必须同步更新
     mainGrid.setAttribute("data-sidebar-collapsed", collapsed ? "true" : "false");
 
@@ -2089,16 +2097,25 @@ function disableAnimation() {
       return;
     }
 
-    const shouldBothSidebars = isPostPage && sidebarPosition !== "both" && showBothSidebarsOnPostPage;
+    // hideSidebars 页面被用户开关强行展开时，实际显示哪几侧由显式偏好决定：
+    // 只开了一侧就按单侧布局算列，两侧都开才用双侧布局。
+    let effectivePosition = sidebarPosition;
+    if (hideSideBars) {
+      if (userForceLeft && !userForceRight) effectivePosition = "left";
+      else if (!userForceLeft && userForceRight) effectivePosition = "right";
+      else if (userForceLeft && userForceRight) effectivePosition = "both";
+    }
+
+    const shouldBothSidebars = isPostPage && effectivePosition !== "both" && showBothSidebarsOnPostPage;
 
     let newGridClasses: string;
 
-    if (sidebarPosition === "both" || shouldBothSidebars) {
-      const effectiveTabletSidebar = (shouldBothSidebars && sidebarPosition === "right") ? "right" : tabletSidebar;
+    if (effectivePosition === "both" || shouldBothSidebars) {
+      const effectiveTabletSidebar = (shouldBothSidebars && effectivePosition === "right") ? "right" : tabletSidebar;
       newGridClasses = effectiveTabletSidebar === "right"
         ? "grid-cols-1 md:grid-cols-[1fr_17.5rem] xl:grid-cols-[17.5rem_1fr_17.5rem]"
         : "grid-cols-1 md:grid-cols-[17.5rem_1fr] xl:grid-cols-[17.5rem_1fr_17.5rem]";
-    } else if (sidebarPosition === "right") {
+    } else if (effectivePosition === "right") {
       newGridClasses = "grid-cols-1 md:grid-cols-[1fr_17.5rem]";
     } else {
       newGridClasses = "grid-cols-1 md:grid-cols-[17.5rem_1fr]";
@@ -2108,7 +2125,7 @@ function disableAnimation() {
     for (const cls of newGridClasses.split(" ")) if (cls) mainGrid.classList.add(cls);
 
     // position为right时，swup导航不会替换静态元素的class，需手动更新列定位
-    if (sidebarPosition === "right") {
+    if (effectivePosition === "right") {
       const rightSidebar = document.getElementById("right-sidebar");
       const swupContainer = document.getElementById("swup-container");
       const swupWrapper = swupContainer?.parentElement;

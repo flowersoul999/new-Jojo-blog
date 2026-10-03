@@ -34,6 +34,7 @@ import {
 	getStoredSidebarRightVisible,
 	getStoredWallpaperMode,
 	getStoredWavesEnabled,
+	resetSidebarVisibility as resetSidebarVisibilityPrefs,
 	setBannerCarouselEnabled,
 	setBannerTitleEnabled,
 	setGradientEnabled,
@@ -455,8 +456,9 @@ function toggleSidebarRightVisible() {
 function resetSidebarVisibility() {
 	sidebarLeftVisible = true;
 	sidebarRightVisible = true;
-	setSidebarLeftVisible(true);
-	setSidebarRightVisible(true);
+	// 恢复默认 = 清掉显式偏好，回到「跟随页面设计」：
+	// 技能图 / 面试等全宽页恢复隐藏侧栏，普通页面恢复显示
+	resetSidebarVisibilityPrefs();
 }
 
 function getStoredIntroEnabled() {
@@ -1538,7 +1540,7 @@ onMount(() => {
                 </button>
                 {/if}
                 <p class="px-1 pt-0.5 text-xs font-normal text-neutral-500 dark:text-neutral-400">
-                    平板与桌面端生效，移动端仍显示页面底部的组件；隐藏侧边栏后正文会自动占满整行
+                    平板与桌面端生效，移动端仍显示页面底部的组件；隐藏侧边栏后正文会自动占满整行。拨动开关后全局生效（技能图、面试等全宽页也会显示侧边栏）；「恢复默认」则回到各页面的原始设计
                 </p>
             </div>
         </div>
