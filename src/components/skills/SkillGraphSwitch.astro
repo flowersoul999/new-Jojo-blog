@@ -11,21 +11,21 @@ interface Props {
 
 const { current } = Astro.props;
 
-/** 想看下一张图时，往这里加一项、再写个页面就行 */
+/** 想看下一张图时，往这里加一项、再写个页面就行（计算机基础排首位，与导航「技能」子菜单一致） */
 const graphs = [
-	{
-		id: "fe",
-		name: "前端技能图",
-		meta: "78 个方块 · 9 层",
-		href: "/skills/",
-		icon: "material-symbols:account-tree-rounded",
-	},
 	{
 		id: "cs",
 		name: "计算机基础",
 		meta: "68 个方块 · 10 层",
 		href: "/cs/",
 		icon: "material-symbols:school",
+	},
+	{
+		id: "fe",
+		name: "前端技能图",
+		meta: "78 个方块 · 9 层",
+		href: "/skills/",
+		icon: "material-symbols:account-tree-rounded",
 	},
 	{
 		id: "be",

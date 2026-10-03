@@ -33,17 +33,25 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		],
 	});
 
-	// 技能树
-	links.push(LinkPresets.Skills);
+	// 技能（四张技能图合并为一个入口，点开第一个是计算机基础）
+	links.push({
+		name: "技能",
+		url: "#",
+		icon: "material-symbols:account-tree-rounded",
+		children: [
+			// 计算机基础技能图（补科班底子：数学 / 组原 / 操作系统 / 网络 / 数据库 …）
+			LinkPresets.CsSkills,
 
-	// 计算机基础技能图（补科班底子：数学 / 组原 / 操作系统 / 网络 / 数据库 …）
-	links.push(LinkPresets.CsSkills);
+			// 前端技能图
+			LinkPresets.Skills,
 
-	// 后端技能图（在前端基础上往全栈转：运行时 / 接口 / 数据 / 安全 / 运维 / 架构）
-	links.push(LinkPresets.BackendSkills);
+			// 后端技能图（在前端基础上往全栈转：运行时 / 接口 / 数据 / 安全 / 运维 / 架构）
+			LinkPresets.BackendSkills,
 
-	// Agent 开发技能图（大模型应用：提示 / RAG / 工具编排 / 评测 / 上线）
-	links.push(LinkPresets.AgentSkills);
+			// Agent 开发技能图（大模型应用：提示 / RAG / 工具编排 / 评测 / 上线）
+			LinkPresets.AgentSkills,
+		],
+	});
 
 	// 面试（求职准备：面经 / 八股 / Hot100 / 手撕题）
 	links.push(LinkPresets.Interview);
