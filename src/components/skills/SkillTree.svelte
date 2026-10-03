@@ -1,123 +1,131 @@
 <script lang="ts">
 /**
- * 技能树主组件 —— 圣诞树形态
+ * 技能树 —— 游戏天赋树形态（大类在外，小类点开）
  *
- * 形态：顶部一颗星（起点），向下 9 层枝条，每层的圆球就是一个技能挂件。
- * 层越深、枝条越长、球越多，整棵树呈上窄下宽的三角形轮廓。
+ * 为什么分两层：
+ *   一层铺 78 个小类的话，屏幕上全是碎方块，看不出「我走到哪了」。
+ *   所以树上只放 10 个大方向（语言 / 类型 / 浏览器 / 框架 / 工程 / 质量 / 视觉 / 服务端 / 架构 / 成长），
+ *   点开某个大类，它下面的小类才展开成清单，可以逐个加点。
  *
- * 亮度：圆球亮度 = 掌握度。Lv0 暗球 → Lv5 实心主题色 + 呼吸光晕。
- * 所有颜色都由 --primary 与 --card-bg 混出，自动跟随站点主题色与明暗模式。
+ * 视觉语言：金属边框方块 + 金色圆角折线 + 箭头 + 右下角点数徽章 + 悬停详情 + 角色属性栏。
+ * 依赖关系见 src/data/skills.ts 里各大类的 dependsOn（数组内全部点亮 1 级才解锁）。
  *
- * 点亮：进入视口后从顶层开始逐层亮起，层延迟 --ti * 150ms，层内再按 --i 依次亮。
- *
- * 数据与层级见 src/data/skills.ts
+ * 交互：
+ *   点大类方块   展开 / 收起小类
+ *   点小类       掌握度 +1（满级后不再增加）
+ *   右键小类     掌握度 -1
+ *   悬停         看详情（等级判定、学习要点）
  */
-import { onMount } from "svelte";
+import { onMount, tick } from "svelte";
+import avatarUrl from "@/assets/images/jojo-avatar.webp";
+import { profileConfig } from "@/config/profileConfig";
 import {
-	ALL_NODES,
+	ALL_SKILLS,
+	CATEGORIES,
+	CATEGORY_MAP,
 	LEVELS,
 	MAX_LEVEL,
-	NODE_MAP,
-	ROOT,
-	TIER_OF_NODE,
+	type SkillCategory,
 	TIERS,
-	TOTAL_NODES,
-	tierRatio,
+	TOTAL_CATEGORIES,
+	TOTAL_SKILLS,
 } from "@/data/skills";
 
 const STORAGE_KEY = "aemeath-skill-tree";
 
-/** 打包时写入的个人预设掌握度 */
+/** 预设：把 data 里的 level 摊平成 { 技能id: 等级 } */
 const DEFAULT_LEVELS: Record<string, number> = Object.fromEntries(
-	ALL_NODES.map((n) => [n.id, n.level]),
+	ALL_SKILLS.map((s) => [s.id, s.level]),
 );
 
-/** 读取本地覆盖值；兼容旧版「字符串数组」格式 */
-function loadOverrides(): Record<string, number> {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) return {};
-		const parsed: unknown = JSON.parse(raw);
-		if (Array.isArray(parsed)) {
-			return Object.fromEntries(
-				parsed
-					.filter((x): x is string => typeof x === "string")
-					.map((x) => [x, 2]),
-			);
-		}
-		if (parsed && typeof parsed === "object") {
-			const out: Record<string, number> = {};
-			for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-				if (typeof v === "number" && v >= 0 && v <= MAX_LEVEL) out[k] = v;
-			}
-			return out;
-		}
-	} catch {
-		/* localStorage 不可用时静默降级为默认值 */
-	}
-	return {};
+/** 称号：按总进度爬升 */
+const TITLES: { min: number; name: string }[] = [
+	{ min: 0, name: "切图仔" },
+	{ min: 15, name: "页面仔" },
+	{ min: 30, name: "前端萌新" },
+	{ min: 45, name: "前端工程师" },
+	{ min: 60, name: "前端老手" },
+	{ min: 75, name: "前端专家" },
+	{ min: 90, name: "技术大师" },
+];
+
+type CatState = "locked" | "ready" | "learned" | "max";
+type Box = { x: number; y: number; w: number; h: number };
+
+/* ===================== 状态 ===================== */
+let levels = $state<Record<string, number>>({ ...DEFAULT_LEVELS });
+let dirty = $state(false);
+/** 当前展开的大类（同时只开一个，避免页面被撑得太长） */
+let expandedId = $state<string | null>(null);
+/** 悬停目标：大类方块 or 小类行 */
+let hover = $state<{ kind: "cat" | "skill"; id: string } | null>(null);
+
+let arena = $state<HTMLElement>();
+let arenaSize = $state({ w: 0, h: 0 });
+let tileBoxes = $state<Record<string, Box>>({});
+let panelBox = $state<Box | null>(null);
+
+/* ===================== 等级读写 ===================== */
+function lvOf(id: string): number {
+	return levels[id] ?? 0;
 }
 
-let levels = $state<Record<string, number>>({ ...DEFAULT_LEVELS });
-let view = $state<"tree" | "compact">("tree");
-let filter = $state<"all" | "done" | "todo">("all");
-let activeId = $state<string | null>(null);
-let revealed = $state(false);
-let stageEl = $state<HTMLElement | undefined>(undefined);
-let dirty = $state(false);
+function pointsOf(cat: SkillCategory): number {
+	let sum = 0;
+	for (const s of cat.skills) sum += lvOf(s.id);
+	return sum;
+}
 
-onMount(() => {
-	const overrides = loadOverrides();
-	if (Object.keys(overrides).length > 0) {
-		levels = { ...DEFAULT_LEVELS, ...overrides };
-		dirty = true;
-	}
-	// 窄屏默认用清单视图，树形留给宽屏
-	if (
-		typeof window !== "undefined" &&
-		window.matchMedia("(max-width: 760px)").matches
-	) {
-		view = "compact";
-	}
-});
+function maxPointsOf(cat: SkillCategory): number {
+	return cat.skills.length * MAX_LEVEL;
+}
 
-/** 进入视口后从顶层开始逐层点亮 */
-$effect(() => {
-	const el = stageEl;
-	if (!el || typeof IntersectionObserver === "undefined") {
-		revealed = true;
-		return;
-	}
-	const io = new IntersectionObserver(
-		(entries) => {
-			if (entries.some((e) => e.isIntersecting)) {
-				revealed = true;
-				io.disconnect();
-			}
-		},
-		{ threshold: 0.02 },
-	);
-	io.observe(el);
-	return () => io.disconnect();
-});
+function avgOf(cat: SkillCategory): number {
+	return cat.skills.length === 0 ? 0 : pointsOf(cat) / cat.skills.length;
+}
+
+/** 大类的综合档位：小类平均掌握度四舍五入 */
+function catLevel(cat: SkillCategory): number {
+	return Math.round(avgOf(cat));
+}
+
+/** 前置大类全部至少点亮 1 点，才解锁本大类 */
+function unlocked(cat: SkillCategory): boolean {
+	return cat.dependsOn.every((d) => {
+		const parent = CATEGORY_MAP[d];
+		return parent ? pointsOf(parent) > 0 : true;
+	});
+}
+
+function catState(cat: SkillCategory): CatState {
+	if (!unlocked(cat)) return "locked";
+	const pts = pointsOf(cat);
+	if (pts <= 0) return "ready";
+	return pts >= maxPointsOf(cat) ? "max" : "learned";
+}
 
 function persist() {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(levels));
 	} catch {
-		/* 忽略隐私模式等写入失败 */
+		/* 忽略：隐私模式等场景写不进去 */
 	}
 }
 
-function lvOf(id: string): number {
-	return levels[id] ?? 0;
-}
-
 function setLevel(id: string, lv: number) {
-	if (lv < 0 || lv > MAX_LEVEL) return;
-	levels = { ...levels, [id]: lv };
+	const next = Math.max(0, Math.min(MAX_LEVEL, lv));
+	if (lvOf(id) === next) return;
+	levels = { ...levels, [id]: next };
 	dirty = true;
 	persist();
+}
+
+function addPoint(id: string) {
+	setLevel(id, lvOf(id) + 1);
+}
+
+function removePoint(id: string) {
+	setLevel(id, lvOf(id) - 1);
 }
 
 function resetToPreset() {
@@ -132,1185 +140,1356 @@ function resetToPreset() {
 
 function clearAll() {
 	const zeroed: Record<string, number> = {};
-	for (const n of ALL_NODES) zeroed[n.id] = 0;
+	for (const s of ALL_SKILLS) zeroed[s.id] = 0;
 	levels = zeroed;
 	dirty = true;
 	persist();
 }
 
-function matched(id: string): boolean {
-	if (filter === "todo") return lvOf(id) <= 1;
-	if (filter === "done") return lvOf(id) >= 3;
-	return true;
+function toggle(cat: SkillCategory) {
+	if (!unlocked(cat)) return;
+	expandedId = expandedId === cat.id ? null : cat.id;
 }
 
+/* ===================== 汇总统计 ===================== */
 const stats = $derived.by(() => {
-	let sum = 0;
-	let lit = 0;
-	let solid = 0;
-	for (const n of ALL_NODES) {
-		const lv = levels[n.id] ?? 0;
-		sum += lv;
-		if (lv > 0) lit += 1;
-		if (lv >= 3) solid += 1;
+	let totalPoints = 0;
+	let litSkills = 0;
+	let maxedSkills = 0;
+	for (const s of ALL_SKILLS) {
+		const lv = lvOf(s.id);
+		totalPoints += lv;
+		if (lv > 0) litSkills += 1;
+		if (lv >= MAX_LEVEL) maxedSkills += 1;
 	}
+	const maxTotal = TOTAL_SKILLS * MAX_LEVEL;
+	const pct = maxTotal === 0 ? 0 : Math.round((totalPoints / maxTotal) * 100);
+
+	let litCats = 0;
+	let maxedCats = 0;
+	for (const c of CATEGORIES) {
+		const pts = pointsOf(c);
+		if (pts > 0) litCats += 1;
+		if (pts >= maxPointsOf(c)) maxedCats += 1;
+	}
+
+	// 攻坚点数：服务端 / 架构 / 成长 这三个硬骨头方向的点数
+	const hardTracks = new Set(["服务端", "架构", "成长"]);
+	let hardPoints = 0;
+	for (const c of CATEGORIES)
+		if (hardTracks.has(c.short)) hardPoints += pointsOf(c);
+
+	let title = TITLES[0].name;
+	for (const t of TITLES) if (pct >= t.min) title = t.name;
+
 	return {
-		sum,
-		lit,
-		solid,
-		pct: Math.round((sum / (TOTAL_NODES * MAX_LEVEL)) * 100),
+		points: totalPoints,
+		max: maxTotal,
+		pct,
+		litSkills,
+		maxedSkills,
+		litCats,
+		maxedCats,
+		level: pct,
+		title,
+		charm: litCats * 2,
+		dex: TOTAL_SKILLS === 0 ? 0 : Math.round((totalPoints / TOTAL_SKILLS) * 6),
+		bald: Math.round(hardPoints / 10),
 	};
 });
 
-const RING = 2 * Math.PI * 52;
+/* ===================== 详情数据 ===================== */
+const activeCat = $derived(
+	hover?.kind === "cat" ? (CATEGORY_MAP[hover.id] ?? null) : null,
+);
 
-function tierStat(nodes: { id: string }[]) {
-	let sum = 0;
-	let lit = 0;
-	for (const n of nodes) {
-		const lv = levels[n.id] ?? 0;
-		sum += lv;
-		if (lv > 0) lit += 1;
+const activeSkill = $derived.by(() => {
+	if (hover?.kind !== "skill") return null;
+	const id = hover.id;
+	for (const c of CATEGORIES) {
+		const hit = c.skills.find((s) => s.id === id);
+		if (hit) return { skill: hit, cat: c };
 	}
+	return null;
+});
+
+const activeCatStats = $derived.by(() => {
+	if (!activeCat) return null;
 	return {
-		pct: nodes.length
-			? Math.round((sum / (nodes.length * MAX_LEVEL)) * 100)
-			: 0,
-		lit,
-		total: nodes.length,
+		points: pointsOf(activeCat),
+		max: maxPointsOf(activeCat),
+		level: catLevel(activeCat),
+		state: catState(activeCat),
+		locked: !unlocked(activeCat),
+		parents: activeCat.dependsOn
+			.map((d) => CATEGORY_MAP[d]?.name ?? d)
+			.join("、"),
 	};
+});
+
+const expandedCat = $derived(
+	expandedId ? (CATEGORY_MAP[expandedId] ?? null) : null,
+);
+
+/* ===================== 悬停气泡定位 ===================== */
+const tipPos = $derived.by(() => {
+	const W = 300;
+	const GAP = 14;
+	let box: Box | undefined;
+	if (hover?.kind === "cat") box = tileBoxes[hover.id];
+	else if (hover?.kind === "skill" && activeSkill) {
+		box = tileBoxes[activeSkill.cat.id];
+	}
+	if (!box) return { left: 0, top: 0, hidden: true };
+	const right = box.x + box.w + GAP;
+	const left =
+		right + W <= arenaSize.w ? right : Math.max(8, box.x - W / 2 - GAP);
+	return { left, top: Math.max(8, box.y - 10), hidden: false };
+});
+
+/* ===================== 连线（大类的 dependsOn） ===================== */
+type Edge = { key: string; d: string; arrow: string; active: boolean };
+
+function elbowPath(a: Box, b: Box): string {
+	const x1 = a.x + a.w / 2;
+	const y1 = a.y + a.h;
+	const x2 = b.x + b.w / 2;
+	const y2 = b.y;
+	const dy = y2 - y1;
+	const R = 12;
+	if (dy <= R * 2 || Math.abs(x2 - x1) < 1.5)
+		return `M ${x1} ${y1} L ${x2} ${y2}`;
+	const s = x2 >= x1 ? 1 : -1;
+	const my = y1 + dy / 2;
+	return `M ${x1} ${y1} V ${my - R} Q ${x1} ${my} ${x1 + s * R} ${my} H ${x2 - s * R} Q ${x2} ${my} ${x2} ${my + R} V ${y2}`;
 }
 
-/** 树形视图下过滤是「变暗」而不是「移除」，避免破坏树的轮廓 */
-const visibleTiers = $derived.by(() =>
-	TIERS.map((t) => ({
-		tier: t,
-		list: view === "tree" ? t.nodes : t.nodes.filter((n) => matched(n.id)),
-	})).filter((v) => v.list.length > 0),
-);
+function arrowPath(x: number, y: number): string {
+	return `M ${x} ${y + 1} L ${x - 5.2} ${y - 6.5} L ${x + 5.2} ${y - 6.5} Z`;
+}
 
-const activeNode = $derived(activeId ? NODE_MAP[activeId] : null);
-const activeLv = $derived(activeNode ? lvOf(activeNode.id) : 0);
-const activeTier = $derived(activeId ? TIERS[TIER_OF_NODE[activeId]] : null);
-const activeLevelDef = $derived(LEVELS[activeLv] ?? LEVELS[0]);
-/** 同层技术等权重：本层占比 ÷ 本层技能数 */
-const activeWeight = $derived(
-	activeTier
-		? ((tierRatio(activeTier) * 100) / activeTier.nodes.length).toFixed(2)
-		: "0",
-);
+const edges = $derived.by<Edge[]>(() => {
+	const out: Edge[] = [];
+	for (const child of CATEGORIES) {
+		const c = tileBoxes[child.id];
+		if (!c) continue;
+		for (const pid of child.dependsOn) {
+			const parent = CATEGORY_MAP[pid];
+			const p = tileBoxes[pid];
+			if (!parent || !p) continue;
 
-function pad(n: number): string {
-	return String(n).padStart(2, "0");
+			// 同一行的大类：横向连，避免折线从方块里穿过去
+			const sameRow = Math.abs(p.y - c.y) < 2;
+			let d = "";
+			let arrow = "";
+			if (sameRow) {
+				const y = p.y + p.h / 2;
+				const ax = p.x + p.w;
+				const bx = c.x;
+				d = `M ${ax} ${y} L ${bx} ${y}`;
+			} else {
+				// 起点：大类展开了就从小类清单底部出发，否则从方块底部
+				const src =
+					expandedId === pid && panelBox
+						? { x: p.x, y: panelBox.y, w: p.w, h: panelBox.h }
+						: p;
+				d = elbowPath(src, c);
+				arrow = arrowPath(c.x + c.w / 2, c.y);
+			}
+
+			out.push({
+				key: `${pid}->${child.id}`,
+				d,
+				arrow,
+				active: pointsOf(parent) > 0,
+			});
+		}
+	}
+	return out;
+});
+
+/* ===================== 量尺寸（连线靠它算坐标） ===================== */
+function measure() {
+	if (!arena) return;
+	const base = arena.getBoundingClientRect();
+	const boxes: Record<string, Box> = {};
+	for (const el of arena.querySelectorAll<HTMLElement>(".tt-cat[data-cid]")) {
+		const r = el.getBoundingClientRect();
+		boxes[el.dataset.cid ?? ""] = {
+			x: r.left - base.left,
+			y: r.top - base.top,
+			w: r.width,
+			h: r.height,
+		};
+	}
+	tileBoxes = boxes;
+
+	const p = arena.querySelector<HTMLElement>(".tt-panel");
+	if (p) {
+		const r = p.getBoundingClientRect();
+		panelBox = {
+			x: r.left - base.left,
+			y: r.top - base.top,
+			w: r.width,
+			h: r.height,
+		};
+	} else {
+		panelBox = null;
+	}
+
+	arenaSize = { w: base.width, h: base.height };
+}
+
+let resizeObserver: ResizeObserver | undefined;
+
+onMount(() => {
+	try {
+		const raw = localStorage.getItem(STORAGE_KEY);
+		if (raw) {
+			const parsed = JSON.parse(raw) as Record<string, unknown>;
+			const merged: Record<string, number> = { ...DEFAULT_LEVELS };
+			for (const s of ALL_SKILLS) {
+				const v = parsed[s.id];
+				if (typeof v === "number") {
+					merged[s.id] = Math.max(0, Math.min(MAX_LEVEL, Math.round(v)));
+				}
+			}
+			levels = merged;
+			dirty = JSON.stringify(merged) !== JSON.stringify(DEFAULT_LEVELS);
+		}
+	} catch {
+		/* 存储坏了就当没存过 */
+	}
+
+	measure();
+	if (arena && typeof ResizeObserver !== "undefined") {
+		resizeObserver = new ResizeObserver(() => measure());
+		resizeObserver.observe(arena);
+	}
+	return () => resizeObserver?.disconnect();
+});
+
+/** 展开 / 收起会改变盒子高度，等 DOM 更新完再重新量 */
+$effect(() => {
+	void expandedId;
+	void levels;
+	void tick().then(() => measure());
+});
+
+/** 展开的大类如果因为上游被清零而锁上，自动收起，别留着一段看不懂的清单 */
+$effect(() => {
+	if (!expandedId) return;
+	const cat = CATEGORY_MAP[expandedId];
+	if (!cat || !unlocked(cat)) expandedId = null;
+});
+
+/* ===================== 其它 ===================== */
+function mdnUrl(name: string): string {
+	return `https://developer.mozilla.org/zh-CN/search?q=${encodeURIComponent(name)}`;
+}
+
+function segs(n: number, total: number): number[] {
+	return Array.from({ length: total }, (_, i) => (i < n ? 1 : 0));
 }
 </script>
 
-<div class="sk-hero">
-	<div class="sk-hero-main">
-		<p class="sk-eyebrow">我的技能树</p>
-		<h2 class="sk-title">从前端小白，到能定方案的人</h2>
-		<p class="sk-sub">
-			{TIERS.length} 层技术，像圣诞树一样从上往下长。同一层的技术难度与占比相同，圆球越亮表示掌握得越扎实。
+<div class="tt-head">
+	<div class="tt-head-main">
+		<p class="tt-eyebrow">Talent Tree</p>
+		<h2 class="tt-title">我的技能天赋树</h2>
+		<p class="tt-sub">
+			{TIERS.length} 层、{TOTAL_CATEGORIES} 个方向、{TOTAL_SKILLS} 个技能点。<strong
+				>点方块展开它下面的小类</strong
+			>，点小类 +1、右键 -1；前置方向至少点亮 1 点才会解锁下一格。
 		</p>
 	</div>
-
-	<div class="sk-ring-wrap">
-		<svg class="sk-ring" viewBox="0 0 120 120" role="img" aria-label="总掌握度 {stats.pct}%">
-			<circle class="sk-ring-bg" cx="60" cy="60" r="52"></circle>
-			<circle
-				class="sk-ring-fg"
-				cx="60"
-				cy="60"
-				r="52"
-				stroke-dasharray="{RING}"
-				stroke-dashoffset="{RING * (1 - stats.pct / 100)}"
-			></circle>
-		</svg>
-		<div class="sk-ring-text">
-			<strong>{stats.pct}%</strong>
-			<span>总掌握度</span>
-		</div>
+	<div class="tt-head-actions">
+		<button type="button" class="tt-btn" onclick={resetToPreset} disabled={!dirty}>恢复预设</button>
+		<button type="button" class="tt-btn" onclick={clearAll}>全部清零</button>
 	</div>
 </div>
 
-<div class="sk-metrics">
-	<div class="sk-metric">
-		<span class="sk-metric-num">{stats.lit}<em>/{TOTAL_NODES}</em></span>
-		<span class="sk-metric-label">已点亮</span>
+<div class="tt-bar">
+	<div class="tt-bar-stat">
+		<span class="tt-bar-num">{stats.points}<em>/{stats.max}</em></span>
+		<span class="tt-bar-label">已投入技能点</span>
 	</div>
-	<div class="sk-metric">
-		<span class="sk-metric-num">{stats.solid}<em>/{TOTAL_NODES}</em></span>
-		<span class="sk-metric-label">熟练以上</span>
+	<div class="tt-bar-stat">
+		<span class="tt-bar-num">{stats.litCats}<em>/{TOTAL_CATEGORIES}</em></span>
+		<span class="tt-bar-label">已点亮方向</span>
 	</div>
-	<div class="sk-metric">
-		<span class="sk-metric-num">{TIERS.length}<em> 层</em></span>
-		<span class="sk-metric-label">技术梯度</span>
+	<div class="tt-bar-stat">
+		<span class="tt-bar-num">{stats.maxedCats}</span>
+		<span class="tt-bar-label">满级方向</span>
 	</div>
-	<div class="sk-legend" aria-label="亮度图例">
-		{#each LEVELS as def (def.level)}
-			<span class="sk-legend-item">
-				<i class="sk-legend-ball" data-lv="{def.level}"></i>
-				<span>Lv{def.level} {def.name}</span>
-			</span>
+	<div class="tt-progress" aria-label="总体进度 {stats.pct}%">
+		<i style="width:{stats.pct}%"></i>
+	</div>
+	<div class="tt-legend">
+		<span><i class="tt-dot is-locked"></i>未解锁</span>
+		<span><i class="tt-dot is-ready"></i>未开始</span>
+		<span><i class="tt-dot is-learned"></i>进行中</span>
+		<span><i class="tt-dot is-max"></i>已满级</span>
+	</div>
+</div>
+
+<div class="tt-arena" bind:this={arena}>
+	<svg
+		class="tt-links"
+		width={arenaSize.w}
+		height={arenaSize.h}
+		viewBox="0 0 {arenaSize.w} {arenaSize.h}"
+		aria-hidden="true"
+	>
+		{#each edges as e (e.key)}
+			<g class:active={e.active}>
+				<path class="tt-link-out" d={e.d}></path>
+				<path class="tt-link-in" d={e.d}></path>
+				{#if e.arrow}
+					<path class="tt-arrow" d={e.arrow}></path>
+				{/if}
+			</g>
 		{/each}
-	</div>
-</div>
+	</svg>
 
-<div class="sk-toolbar">
-	<div class="sk-seg" role="group" aria-label="筛选">
-		<button type="button" class:on={filter === "all"} onclick={() => (filter = "all")}>
-			全部
-		</button>
-		<button type="button" class:on={filter === "done"} onclick={() => (filter = "done")}>
-			已熟练
-		</button>
-		<button type="button" class:on={filter === "todo"} onclick={() => (filter = "todo")}>
-			待攻克
-		</button>
-	</div>
-
-	<div class="sk-toolbar-right">
-		<div class="sk-seg" role="group" aria-label="视图">
-			<button type="button" class:on={view === "tree"} onclick={() => (view = "tree")}>
-				树形
-			</button>
-			<button type="button" class:on={view === "compact"} onclick={() => (view = "compact")}>
-				清单
-			</button>
-		</div>
-		<button type="button" class="sk-act" onclick={resetToPreset} disabled={!dirty}>
-			恢复预设
-		</button>
-		<button type="button" class="sk-act" onclick={clearAll}>全部清零</button>
-	</div>
-</div>
-
-{#if view === "tree"}
-	<div class="sk-stage" bind:this={stageEl}>
-		<div class="sk-tree" class:revealed>
-			<div class="sk-apex">
-				<svg class="sk-star" viewBox="0 0 24 24" aria-hidden="true">
-					<path
-						d="M12 1.6l3.1 6.6 7 .9-5.1 4.9 1.3 7L12 17.7 5.7 21l1.3-7L1.9 9.1l7-.9z"
-					></path>
-				</svg>
-				<div class="sk-apex-text">
-					<strong>{ROOT.name}</strong>
-					<span>{ROOT.note}</span>
-				</div>
+	{#each TIERS as tier, ti (tier.tier)}
+		<section class="tt-band">
+			<div class="tt-band-head">
+				<span class="tt-band-idx">{String(ti + 1).padStart(2, "0")}</span>
+				<span class="tt-band-name">{tier.stage}</span>
+				<span class="tt-band-purpose">{tier.purpose}</span>
 			</div>
 
-			<div class="sk-rows">
-				<span class="sk-spine" aria-hidden="true"></span>
-
-				{#each visibleTiers as row, ti (row.tier.tier)}
-					{@const st = tierStat(row.tier.nodes)}
-					<div class="sk-tier" style="--ti:{ti}">
-						<div class="sk-tag">
-							<span class="sk-tag-idx">{pad(row.tier.tier + 1)}</span>
-							<span class="sk-tag-name">{row.tier.stage}</span>
-							<span class="sk-tag-pct">{st.pct}%</span>
-						</div>
-
-						<div class="sk-branch">
-							<div class="sk-row">
-								{#each row.list as node, ni (node.id)}
-									{@const lv = lvOf(node.id)}
-									<button
-										type="button"
-										class="sk-orn"
-										class:is-dim={filter !== "all" && !matched(node.id)}
-										style="--i:{ni}"
-										data-lv="{lv}"
-										title="{node.name} · Lv{lv} {LEVELS[lv].name}"
-										aria-label="{node.name}，Lv{lv} {LEVELS[lv].name}，点击查看详情"
-										onclick={() => (activeId = node.id)}
-									>
-										<span class="sk-ball" data-lv="{lv}"><span class="sk-core"></span></span>
-										<span class="sk-cap">{node.short}</span>
-									</button>
-								{/each}
-							</div>
-						</div>
-					</div>
-				{/each}
-			</div>
-
-			<span class="sk-ground" aria-hidden="true"></span>
-		</div>
-
-		<p class="sk-hint">点亮一颗球只需点开它——掌握度越高，球越亮。</p>
-	</div>
-{:else}
-	<div class="sk-list">
-		{#each visibleTiers as row (row.tier.tier)}
-			{@const st = tierStat(row.tier.nodes)}
-			<section class="sk-card">
-				<header class="sk-card-head">
-					<span class="sk-card-idx">{pad(row.tier.tier + 1)}</span>
-					<div class="sk-card-title">
-						<strong>{row.tier.stage}</strong>
-						<span>{row.tier.purpose}</span>
-					</div>
-					<div class="sk-card-stat">
-						<b>{st.pct}%</b>
-						<span>{st.lit}/{st.total}</span>
-					</div>
-				</header>
-				<div class="sk-bar"><i style="width:{st.pct}%"></i></div>
-				<div class="sk-chips">
-					{#each row.list as node (node.id)}
-						{@const lv = lvOf(node.id)}
-						<button
-							type="button"
-							class="sk-chip"
-							onclick={() => (activeId = node.id)}
-						>
-							<span class="sk-ball" data-lv="{lv}"><span class="sk-core"></span></span>
-							<span class="sk-chip-name">{node.name}</span>
-							<span class="sk-chip-lv">Lv{lv}</span>
-						</button>
-					{/each}
-				</div>
-			</section>
-		{/each}
-	</div>
-{/if}
-
-{#if activeNode && activeTier}
-	<button
-		type="button"
-		class="sk-scrim"
-		aria-label="关闭详情"
-		onclick={() => (activeId = null)}
-	></button>
-	<aside class="sk-drawer" aria-label="{activeNode.name} 详情">
-		<header class="sk-drawer-head">
-			<div>
-				<span class="sk-drawer-track">{activeNode.track}</span>
-				<h3 class="sk-drawer-title">{activeNode.name}</h3>
-			</div>
-			<button type="button" class="sk-close" aria-label="关闭" onclick={() => (activeId = null)}>
-				✕
-			</button>
-		</header>
-
-		<div class="sk-drawer-meta">
-			<span>第 {pad(activeTier.tier + 1)} 层 · {activeTier.stage}</span>
-			<span class="sk-dot">·</span>
-			<span>本层占比 {activeWeight}%</span>
-		</div>
-
-		<p class="sk-drawer-note">{activeNode.note}</p>
-
-		<div class="sk-drawer-level">
-			<div class="sk-drawer-level-top">
-				<span class="sk-drawer-badge">Lv{activeLv} {activeLevelDef.name}</span>
-				<span class="sk-drawer-level-pct">{Math.round((activeLv / MAX_LEVEL) * 100)}%</span>
-			</div>
-			<p class="sk-drawer-level-desc">{activeLevelDef.desc}</p>
-			<p class="sk-drawer-level-judge">判定：{activeLevelDef.judge}</p>
-			<div class="sk-steps" role="group" aria-label="设置掌握度">
-				{#each LEVELS as def (def.level)}
+			<div class="tt-row">
+				{#each tier.categories as cat (cat.id)}
 					<button
 						type="button"
-						class:on={activeLv === def.level}
-						title="Lv{def.level} {def.name}"
-						onclick={() => activeNode && setLevel(activeNode.id, def.level)}
+						class="tt-cat"
+						data-cid={cat.id}
+						data-state={catState(cat)}
+						data-open={expandedId === cat.id ? "true" : "false"}
+						aria-expanded={expandedId === cat.id}
+						aria-label="{cat.name}，{catState(cat) === 'locked'
+							? '未解锁'
+							: `已投入 ${pointsOf(cat)} / ${maxPointsOf(cat)} 点，综合 Lv${catLevel(cat)}`}，点击{expandedId ===
+						cat.id
+							? '收起'
+							: '展开'}小类"
+						onmouseenter={() => (hover = { kind: "cat", id: cat.id })}
+						onmouseleave={() => (hover = null)}
+						onfocus={() => (hover = { kind: "cat", id: cat.id })}
+						onblur={() => (hover = null)}
+						onclick={() => toggle(cat)}
+						oncontextmenu={(e) => {
+							e.preventDefault();
+							if (expandedId === cat.id) expandedId = null;
+						}}
 					>
-						{def.level}
+						<span class="tt-frame">
+							<span class="tt-socket">
+								<span class="tt-cat-name">{cat.short}</span>
+								<span class="tt-ranks" aria-hidden="true">
+									{#each segs(catLevel(cat), MAX_LEVEL) as on, i (i)}
+										<i class:on={on === 1}></i>
+									{/each}
+								</span>
+							</span>
+							<span class="tt-badge">{pointsOf(cat)}<em>/{maxPointsOf(cat)}</em></span>
+							{#if catState(cat) === "locked"}
+								<span class="tt-lock" aria-hidden="true">🔒</span>
+							{/if}
+						</span>
+						<span class="tt-cat-label">{cat.name}</span>
 					</button>
 				{/each}
 			</div>
-		</div>
 
-		{#if activeNode.tips?.length}
-			<div class="sk-drawer-tips">
-				<h4>学习要点</h4>
-				<ul>
-					{#each activeNode.tips as tip (tip)}
+			{#if expandedCat && tier.categories.some((c) => c.id === expandedCat.id)}
+				{@const cat = expandedCat}
+				<div class="tt-panel">
+					<div class="tt-panel-head">
+						<span class="tt-panel-title">
+							<b>{cat.name}</b>
+							<span class="tt-panel-meta">
+								{cat.skills.length} 个小类 · 已投入 {pointsOf(cat)}/{maxPointsOf(cat)} 点 · 综合 Lv{catLevel(
+									cat,
+								)}
+								{LEVELS[catLevel(cat)].name}
+							</span>
+						</span>
+						<span class="tt-panel-hint">点小类 +1 · 右键 -1</span>
+						<button
+							type="button"
+							class="tt-panel-close"
+							aria-label="收起 {cat.name}"
+							onclick={() => (expandedId = null)}>收起</button
+						>
+					</div>
+
+					<p class="tt-panel-note">{cat.note}</p>
+
+					<ul class="tt-skills">
+						{#each cat.skills as skill (skill.id)}
+							{@const lv = lvOf(skill.id)}
+							<li>
+								<button
+									type="button"
+									class="tt-skill-row"
+									data-sid={skill.id}
+									data-lv={lv}
+									aria-label="{skill.name}，当前 Lv{lv} {LEVELS[lv].name}，左键加点右键退点"
+									onmouseenter={() => (hover = { kind: "skill", id: skill.id })}
+									onmouseleave={() => (hover = null)}
+									onfocus={() => (hover = { kind: "skill", id: skill.id })}
+									onblur={() => (hover = null)}
+									onclick={() => addPoint(skill.id)}
+									oncontextmenu={(e) => {
+										e.preventDefault();
+										removePoint(skill.id);
+									}}
+									onkeydown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											addPoint(skill.id);
+										} else if (e.key === "Backspace" || e.key === "Delete") {
+											e.preventDefault();
+											removePoint(skill.id);
+										}
+									}}
+								>
+									<span class="tt-skill-main">
+										<span class="tt-skill-name">{skill.name}</span>
+										<span class="tt-skill-note">{skill.note}</span>
+									</span>
+									<span class="tt-skill-side">
+										<span class="tt-ranks" aria-hidden="true">
+											{#each segs(lv, MAX_LEVEL) as on, i (i)}
+												<i class:on={on === 1}></i>
+											{/each}
+										</span>
+										<span class="tt-skill-lv">Lv{lv}<em>{LEVELS[lv].name}</em></span>
+									</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+
+					{#if cat.tips?.length}
+						<ul class="tt-panel-tips">
+							{#each cat.tips as tip (tip)}
+								<li>{tip}</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			{/if}
+		</section>
+	{/each}
+
+	{#if activeCat && activeCatStats}
+		<div class="tt-tip" style="left:{tipPos.left}px; top:{tipPos.top}px">
+			<div class="tt-tip-head">
+				<h3>{activeCat.name}</h3>
+				<span class="tt-tip-track">{activeCat.short}</span>
+			</div>
+			<p class="tt-tip-desc">{activeCat.note}</p>
+			<div class="tt-tip-ranks">
+				{#if activeCatStats.locked}
+					<p class="tt-tip-locked">未解锁：需要先点亮 <strong>{activeCatStats.parents}</strong></p>
+				{:else}
+					<p>
+						已投入 <b>{activeCatStats.points}/{activeCatStats.max}</b> 点 · 综合 <b
+							>Lv{activeCatStats.level} {LEVELS[activeCatStats.level].name}</b
+						>
+					</p>
+					<p class="tt-tip-next">
+						{activeCat.skills.length} 个小类：{activeCat.skills
+							.map((s) => s.short)
+							.join("、")}
+					</p>
+				{/if}
+				<p class="tt-tip-judge">
+					{expandedId === activeCat.id ? "已经是展开状态，再点一次收起。" : "点击展开它下面的小类。"}
+				</p>
+			</div>
+			{#if activeCat.tips?.length}
+				<ul class="tt-tip-tips">
+					{#each activeCat.tips as tip (tip)}
 						<li>{tip}</li>
 					{/each}
 				</ul>
+			{/if}
+		</div>
+	{/if}
+
+	{#if activeSkill}
+		{@const s = activeSkill.skill}
+		{@const lv = lvOf(s.id)}
+		<div class="tt-tip" style="left:{tipPos.left}px; top:{tipPos.top}px">
+			<div class="tt-tip-head">
+				<h3>{s.name}</h3>
+				<span class="tt-tip-track">{activeSkill.cat.short}</span>
 			</div>
-		{/if}
-	</aside>
-{/if}
+			<p class="tt-tip-desc">{s.note}</p>
+			<div class="tt-tip-ranks">
+				<p>
+					现有等级：<b>Lv{lv} {LEVELS[lv].name}</b>
+				</p>
+				{#if lv < MAX_LEVEL}
+					<p class="tt-tip-next">
+						下一等级：Lv{lv + 1} {LEVELS[lv + 1].name} —— {LEVELS[lv + 1].desc}
+					</p>
+				{:else}
+					<p class="tt-tip-next">已满级：{LEVELS[lv].desc}</p>
+				{/if}
+				<p class="tt-tip-judge">
+					{LEVELS[lv].judge === "——" ? LEVELS[lv].desc : `判定：${LEVELS[lv].judge}`}
+				</p>
+			</div>
+			{#if s.tips?.length}
+				<ul class="tt-tip-tips">
+					{#each s.tips as tip (tip)}
+						<li>{tip}</li>
+					{/each}
+				</ul>
+			{/if}
+			<div class="tt-tip-foot">
+				<span>所属方向 · {activeSkill.cat.name}</span>
+				<a href={mdnUrl(s.name)} target="_blank" rel="noreferrer">查资料 →</a>
+			</div>
+		</div>
+	{/if}
+</div>
+
+<div class="tt-avatar">
+	<div class="tt-portrait">
+		<img src={avatarUrl} alt={profileConfig.name} />
+		<span class="tt-portrait-lv">{stats.level}</span>
+	</div>
+	<div class="tt-details">
+		<div class="tt-details-title">
+			等级 <b>{stats.level}</b> <span>{stats.title}</span>
+		</div>
+		<ul class="tt-attrs">
+			<li><span>魅力值</span><b>{stats.charm}</b></li>
+			<li><span>灵巧值</span><b>{stats.dex}</b></li>
+			<li><span>秃头值</span><b>{stats.bald}</b></li>
+		</ul>
+		<p class="tt-details-note">
+			学完是不可能学完的，这辈子都不可能的。既然学不完，那就好好享受学习的过程吧~
+		</p>
+	</div>
+</div>
 
 <style>
-	/* ===================== 概览区 ===================== */
-	.sk-hero {
+	/* ===================== 头部 ===================== */
+	.tt-head {
 		display: flex;
-		gap: 1.4rem;
-		align-items: center;
+		gap: 1.2rem;
+		align-items: flex-end;
 		justify-content: space-between;
 		flex-wrap: wrap;
 	}
-	.sk-hero-main {
+	.tt-head-main {
 		min-width: 0;
-		flex: 1 1 16rem;
+		flex: 1 1 18rem;
 	}
-	.sk-eyebrow {
-		margin: 0 0 0.25rem;
-		font-size: 0.74rem;
-		letter-spacing: 0.16em;
+	.tt-eyebrow {
+		margin: 0 0 0.2rem;
+		font-size: 0.72rem;
+		letter-spacing: 0.18em;
 		text-transform: uppercase;
-		color: color-mix(in srgb, var(--primary) 80%, transparent);
+		color: color-mix(in srgb, var(--primary) 78%, transparent);
 	}
-	.sk-title {
+	.tt-title {
 		margin: 0;
 		font-size: 1.5rem;
-		line-height: 1.35;
 		font-weight: 700;
+		line-height: 1.35;
 		color: var(--text-color);
 	}
-	.sk-sub {
-		margin: 0.5rem 0 0;
-		font-size: 0.83rem;
+	.tt-sub {
+		margin: 0.45rem 0 0;
+		font-size: 0.82rem;
 		line-height: 1.75;
 		color: color-mix(in srgb, var(--deep-text) 62%, transparent);
 	}
-
-	.sk-ring-wrap {
-		position: relative;
-		width: 7.4rem;
-		height: 7.4rem;
+	.tt-sub strong {
+		color: color-mix(in srgb, var(--primary) 85%, transparent);
+	}
+	.tt-head-actions {
+		display: flex;
+		gap: 0.5rem;
 		flex: none;
 	}
-	.sk-ring {
-		width: 100%;
+	.tt-btn {
+		border: 1px solid var(--line-divider);
+		border-radius: 0.6rem;
+		background: transparent;
+		padding: 0.36rem 0.85rem;
+		font-size: 0.8rem;
+		color: color-mix(in srgb, var(--deep-text) 78%, transparent);
+		cursor: pointer;
+		transition: all 180ms ease;
+	}
+	.tt-btn:hover:not(:disabled) {
+		border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+		color: var(--primary);
+	}
+	.tt-btn:disabled {
+		opacity: 0.42;
+		cursor: default;
+	}
+
+	/* ===================== 统计条 ===================== */
+	.tt-bar {
+		display: flex;
+		align-items: center;
+		gap: 1.3rem;
+		flex-wrap: wrap;
+		margin: 1.1rem 0 0.2rem;
+		padding: 0.7rem 0.9rem;
+		border-radius: 0.75rem;
+		border: 1px solid color-mix(in srgb, var(--tt-gold, #d9a441) 22%, transparent);
+		background: color-mix(in srgb, var(--deep-text) 3.5%, transparent);
+	}
+	.tt-bar-stat {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+	}
+	.tt-bar-num {
+		font-size: 1.05rem;
+		font-weight: 800;
+		color: color-mix(in srgb, var(--deep-text) 88%, transparent);
+		font-variant-numeric: tabular-nums;
+	}
+	.tt-bar-num em {
+		font-size: 0.72rem;
+		font-style: normal;
+		font-weight: 600;
+		color: color-mix(in srgb, var(--deep-text) 45%, transparent);
+	}
+	.tt-bar-label {
+		font-size: 0.7rem;
+		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+	}
+	.tt-progress {
+		flex: 1 1 10rem;
+		min-width: 6rem;
+		height: 7px;
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--deep-text) 10%, transparent);
+		overflow: hidden;
+	}
+	.tt-progress i {
+		display: block;
 		height: 100%;
-		transform: rotate(-90deg);
+		border-radius: 99px;
+		background: linear-gradient(90deg, #8a6220, #d9a441 55%, #f4dda6);
+		transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
 	}
-	.sk-ring-bg {
-		fill: none;
-		stroke: color-mix(in srgb, var(--deep-text) 10%, transparent);
-		stroke-width: 8;
+	.tt-legend {
+		display: flex;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+		margin-left: auto;
+		font-size: 0.7rem;
+		color: color-mix(in srgb, var(--deep-text) 58%, transparent);
 	}
-	.sk-ring-fg {
-		fill: none;
-		stroke: var(--primary);
-		stroke-width: 8;
-		stroke-linecap: round;
-		transition: stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1);
+	.tt-legend span {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.28rem;
 	}
-	.sk-ring-text {
+	.tt-dot {
+		width: 9px;
+		height: 9px;
+		border-radius: 3px;
+		flex: none;
+	}
+	.tt-dot.is-locked {
+		background: color-mix(in srgb, var(--deep-text) 12%, transparent);
+		border: 1px dashed color-mix(in srgb, var(--deep-text) 35%, transparent);
+	}
+	.tt-dot.is-ready {
+		background: var(--tt-socket, #16171b);
+		border: 1px solid color-mix(in srgb, #d9a441 45%, transparent);
+	}
+	.tt-dot.is-learned {
+		background: linear-gradient(160deg, #d9a441, #8a6220);
+	}
+	.tt-dot.is-max {
+		background: linear-gradient(160deg, #f4dda6, #d9a441);
+		box-shadow: 0 0 6px color-mix(in srgb, #d9a441 70%, transparent);
+	}
+
+	/* ===================== 树 ===================== */
+	.tt-arena {
+		--tt-gold: #d9a441;
+		--tt-gold-deep: #8a6220;
+		--tt-gold-light: #f4dda6;
+		--tt-socket: #16171b;
+		--gap: clamp(10px, 1.7cqw, 22px);
+		/* 用 100% 而不是 100cqw：变量定义在容器自身上，cqw 查不了自己，只能按祖先宽度算。
+		   末尾减 1px 是留给亚像素取整的余量，否则 4 个一排会差 1px 折行。 */
+		--cat-w: min(196px, calc((100% - 3 * var(--gap)) / 4 - 1px));
+		position: relative;
+		container-type: inline-size;
+		margin-top: 0.7rem;
+		padding: 0.9rem 0 0.4rem;
+		background-image: radial-gradient(
+			color-mix(in srgb, var(--deep-text) 9%, transparent) 1px,
+			transparent 1px
+		);
+		background-size: 22px 22px;
+		border-radius: 0.9rem;
+	}
+	.tt-links {
 		position: absolute;
-		inset: 0;
+		left: 0;
+		top: 0;
+		z-index: 0;
+		overflow: visible;
+		pointer-events: none;
+	}
+	.tt-link-out,
+	.tt-link-in {
+		fill: none;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.tt-link-out {
+		stroke: color-mix(in srgb, var(--tt-gold-deep) 45%, transparent);
+		stroke-width: 6;
+	}
+	.tt-link-in {
+		stroke: color-mix(in srgb, var(--tt-gold) 32%, transparent);
+		stroke-width: 3;
+	}
+	.tt-arrow {
+		fill: color-mix(in srgb, var(--tt-gold) 32%, transparent);
+	}
+	.tt-links g {
+		opacity: 0.4;
+		transition: opacity 220ms ease;
+	}
+	.tt-links g.active {
+		opacity: 1;
+	}
+	.tt-links g.active .tt-link-out {
+		stroke: var(--tt-gold-deep);
+	}
+	.tt-links g.active .tt-link-in {
+		stroke: var(--tt-gold-light);
+	}
+	.tt-links g.active .tt-arrow {
+		fill: var(--tt-gold-light);
+	}
+
+	.tt-band {
+		position: relative;
+		z-index: 1;
+		padding: 0 0 0.5rem;
+	}
+	.tt-band-head {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.45rem;
+		width: fit-content;
+		margin: 0 auto 0.85rem;
+		padding: 0.16rem 0.75rem;
+		border-radius: 99px;
+		border: 1px solid color-mix(in srgb, var(--tt-gold) 30%, transparent);
+		/* 实心底衬：挡住从字底下穿过的连线 */
+		background: var(--card-bg);
+		font-size: 0.74rem;
+		color: color-mix(in srgb, var(--deep-text) 72%, transparent);
+	}
+	.tt-band-idx {
+		font-weight: 800;
+		color: color-mix(in srgb, var(--tt-gold-deep) 88%, transparent);
+		letter-spacing: 0.06em;
+	}
+	.tt-band-name {
+		font-weight: 800;
+		color: color-mix(in srgb, var(--deep-text) 85%, transparent);
+	}
+	.tt-band-purpose {
+		opacity: 0.7;
+	}
+	.tt-band-purpose::before {
+		content: "·";
+		margin-right: 0.35rem;
+	}
+	.tt-row {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		align-items: flex-start;
+		gap: var(--gap);
+	}
+
+	/* ===================== 大类方块 ===================== */
+	.tt-cat {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.4rem;
+		width: var(--cat-w);
+		flex: none;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		cursor: pointer;
+		outline: none;
+	}
+	.tt-frame {
+		position: relative;
+		display: block;
+		width: 100%;
+		aspect-ratio: 1 / 0.92;
+		padding: 5px;
+		border-radius: 15px;
+		background: linear-gradient(
+			160deg,
+			var(--tt-gold-light) 0%,
+			var(--tt-gold) 38%,
+			var(--tt-gold-deep) 100%
+		);
+		box-shadow:
+			0 2px 6px color-mix(in srgb, #000 26%, transparent),
+			inset 0 0 0 1px color-mix(in srgb, var(--tt-gold-light) 55%, transparent);
+		transition:
+			transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+			box-shadow 200ms ease,
+			filter 200ms ease;
+	}
+	.tt-socket {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 0.1rem;
+		gap: 0.35rem;
+		width: 100%;
+		height: 100%;
+		border-radius: 11px;
+		background: radial-gradient(
+			120% 100% at 50% 0%,
+			color-mix(in srgb, #2a2c33 100%, transparent),
+			var(--tt-socket) 70%
+		);
+		box-shadow:
+			inset 0 3px 9px color-mix(in srgb, #000 72%, transparent),
+			inset 0 -1px 0 color-mix(in srgb, #fff 6%, transparent);
+		overflow: hidden;
 	}
-	.sk-ring-text strong {
-		font-size: 1.28rem;
+	.tt-cat-name {
+		font-size: 1.34rem;
 		font-weight: 800;
-		color: var(--primary);
-		line-height: 1;
+		letter-spacing: 0.03em;
+		color: #f4dda6;
+		text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
 	}
-	.sk-ring-text span {
-		font-size: 0.62rem;
-		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+	.tt-ranks {
+		display: inline-flex;
+		gap: 4px;
 	}
-
-	.sk-metrics {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.6rem 1.6rem;
-		margin-top: 1.15rem;
-		padding: 0.85rem 0.95rem;
-		border-radius: 0.85rem;
-		background: color-mix(in srgb, var(--deep-text) 4%, transparent);
+	.tt-ranks i {
+		display: block;
+		width: 18px;
+		height: 7px;
+		border-radius: 3px;
+		background: color-mix(in srgb, #f4dda6 16%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, #f4dda6 14%, transparent);
+		transition: all 240ms ease;
 	}
-	.sk-metric {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
+	.tt-ranks i.on {
+		background: linear-gradient(180deg, var(--tt-gold-light), var(--tt-gold));
+		box-shadow: 0 0 6px color-mix(in srgb, var(--tt-gold) 75%, transparent);
 	}
-	.sk-metric-num {
-		font-size: 1rem;
+	.tt-badge {
+		position: absolute;
+		right: -5px;
+		bottom: -5px;
+		min-width: 46px;
+		padding: 0.14rem 0.4rem;
+		border-radius: 9px;
+		border: 1px solid var(--tt-gold-deep);
+		background: linear-gradient(180deg, #3a2f16, #221b0c);
+		font-size: 0.74rem;
 		font-weight: 800;
-		color: var(--text-color);
-		line-height: 1.2;
+		color: var(--tt-gold-light);
+		text-align: center;
+		font-variant-numeric: tabular-nums;
+		box-shadow: 0 2px 5px color-mix(in srgb, #000 45%, transparent);
 	}
-	.sk-metric-num em {
+	.tt-badge em {
 		font-style: normal;
-		font-size: 0.7rem;
 		font-weight: 600;
-		color: color-mix(in srgb, var(--deep-text) 50%, transparent);
+		opacity: 0.62;
 	}
-	.sk-metric-label {
-		font-size: 0.66rem;
-		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+	.tt-lock {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		font-size: 1.7rem;
+		filter: grayscale(1) drop-shadow(0 2px 4px rgb(0 0 0 / 0.5));
 	}
-	.sk-legend {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.3rem 0.75rem;
-		margin-left: auto;
+	.tt-cat-label {
+		font-size: 0.74rem;
+		font-weight: 600;
+		color: color-mix(in srgb, var(--deep-text) 72%, transparent);
 	}
-	.sk-legend-item {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
-		font-size: 0.64rem;
-		color: color-mix(in srgb, var(--deep-text) 60%, transparent);
+	.tt-cat:hover .tt-frame,
+	.tt-cat:focus-visible .tt-frame {
+		transform: translateY(-3px);
+		box-shadow:
+			0 10px 22px color-mix(in srgb, #000 32%, transparent),
+			0 0 0 1px var(--tt-gold-light) inset;
 	}
-	.sk-legend-ball {
-		width: 0.72rem;
-		height: 0.72rem;
-		border-radius: 50%;
-		display: inline-block;
+	.tt-cat[data-state="locked"] .tt-frame {
+		filter: grayscale(0.85) brightness(0.62);
+	}
+	.tt-cat[data-state="ready"] .tt-frame {
+		animation: tt-ready 2.4s ease-in-out infinite;
+	}
+	.tt-cat[data-state="max"] .tt-frame {
+		box-shadow:
+			0 0 0 2px color-mix(in srgb, var(--tt-gold-light) 55%, transparent),
+			0 6px 20px color-mix(in srgb, var(--tt-gold) 55%, transparent);
+	}
+	.tt-cat[data-open="true"] .tt-frame {
+		transform: translateY(-3px);
+		box-shadow:
+			0 0 0 2px var(--tt-gold-light),
+			0 8px 24px color-mix(in srgb, var(--tt-gold) 60%, transparent);
+	}
+	@keyframes tt-ready {
+		50% {
+			box-shadow:
+				0 0 0 2px color-mix(in srgb, var(--tt-gold) 55%, transparent),
+				0 4px 14px color-mix(in srgb, var(--tt-gold) 45%, transparent);
+		}
 	}
 
-	/* ===================== 工具条 ===================== */
-	.sk-toolbar {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.6rem;
-		align-items: center;
-		justify-content: space-between;
-		margin: 1.15rem 0 1.5rem;
-	}
-	.sk-toolbar-right {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.6rem;
-		align-items: center;
-	}
-	.sk-seg {
-		display: inline-flex;
-		padding: 0.16rem;
-		border-radius: 0.65rem;
-		background: color-mix(in srgb, var(--deep-text) 6%, transparent);
-		gap: 0.16rem;
-	}
-	.sk-seg button {
-		border: 0;
-		background: transparent;
-		border-radius: 0.5rem;
-		padding: 0.3rem 0.7rem;
-		font-size: 0.75rem;
-		color: color-mix(in srgb, var(--deep-text) 62%, transparent);
-		cursor: pointer;
-		transition: all 180ms ease;
-	}
-	.sk-seg button:hover {
-		color: var(--text-color);
-	}
-	.sk-seg button.on {
+	/* ===================== 展开的小类清单 ===================== */
+	.tt-panel {
+		margin: 1.15rem auto 0.4rem;
+		max-width: 62rem;
+		padding: 1rem 1.15rem 1.1rem;
+		border-radius: 1rem;
+		border: 1px solid color-mix(in srgb, var(--tt-gold) 38%, transparent);
 		background: var(--card-bg);
-		color: var(--primary);
-		font-weight: 700;
-		box-shadow: 0 1px 6px color-mix(in srgb, var(--primary) 22%, transparent);
+		box-shadow:
+			0 14px 34px color-mix(in srgb, #000 14%, transparent),
+			inset 0 0 0 1px color-mix(in srgb, var(--tt-gold-light) 22%, transparent);
+		animation: tt-pop 220ms cubic-bezier(0.22, 1, 0.36, 1);
 	}
-	.sk-act {
-		border: 1px solid color-mix(in srgb, var(--deep-text) 14%, transparent);
+	@keyframes tt-pop {
+		from {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+	}
+	.tt-panel-head {
+		display: flex;
+		align-items: baseline;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+	}
+	.tt-panel-title {
+		display: flex;
+		align-items: baseline;
+		gap: 0.55rem;
+		flex-wrap: wrap;
+	}
+	.tt-panel-title b {
+		font-size: 1.06rem;
+		font-weight: 800;
+		color: color-mix(in srgb, var(--deep-text) 92%, transparent);
+	}
+	.tt-panel-meta {
+		font-size: 0.74rem;
+		color: color-mix(in srgb, var(--tt-gold-deep) 85%, transparent);
+		font-weight: 700;
+	}
+	.tt-panel-hint {
+		margin-left: auto;
+		font-size: 0.72rem;
+		color: color-mix(in srgb, var(--deep-text) 52%, transparent);
+	}
+	.tt-panel-close {
+		flex: none;
+		border: 1px solid var(--line-divider);
+		border-radius: 0.5rem;
 		background: transparent;
-		border-radius: 0.6rem;
-		padding: 0.34rem 0.8rem;
+		padding: 0.14rem 0.6rem;
 		font-size: 0.74rem;
 		color: color-mix(in srgb, var(--deep-text) 68%, transparent);
 		cursor: pointer;
-		transition: all 180ms ease;
 	}
-	.sk-act:hover:not(:disabled) {
-		border-color: var(--primary);
+	.tt-panel-close:hover {
+		border-color: color-mix(in srgb, var(--primary) 50%, transparent);
 		color: var(--primary);
 	}
-	.sk-act:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
+	.tt-panel-note {
+		margin: 0.5rem 0 0.85rem;
+		font-size: 0.82rem;
+		line-height: 1.7;
+		color: color-mix(in srgb, var(--deep-text) 62%, transparent);
 	}
-
-	/* ===================== 树形视图 ===================== */
-	.sk-stage {
-		position: relative;
-		container-type: inline-size;
-	}
-	/* 适当吃掉卡片内边距，让最宽的枝条舒展一点 */
-	@media (min-width: 768px) {
-		.sk-stage {
-			margin-inline: -1.5rem;
-		}
-	}
-
-	.sk-tree {
-		--col: clamp(30px, 4.3vw, 56px);
-		--d: max(16px, calc(var(--col) - 7px));
-		position: relative;
-		width: 100%;
-	}
-	/* 容器查询可用时，列宽按实际可用宽度均分给最宽的 14 个节点
-	   （层标签已挪到每行上方，不再占用横向空间，所以只留 16px 余量） */
-	@supports (width: 1cqw) {
-		.sk-tree {
-			--col: clamp(20px, calc((100cqw - 16px) / 14), 56px);
-		}
-	}
-
-	/* 树尖的星 */
-	.sk-apex {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.4rem;
-		margin-bottom: 1.1rem;
-	}
-	.sk-star {
-		width: 2.1rem;
-		height: 2.1rem;
-		fill: var(--primary);
-		filter: drop-shadow(0 0 10px color-mix(in srgb, var(--primary) 60%, transparent));
-		opacity: 0;
-		transform: scale(0.5) rotate(-40deg);
-	}
-	.sk-tree.revealed .sk-star {
-		opacity: 1;
-		transform: none;
-		transition:
-			opacity 520ms ease,
-			transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
-		animation: sk-twinkle 3.6s ease-in-out 900ms infinite;
-	}
-	.sk-apex-text {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.1rem;
-		text-align: center;
-	}
-	.sk-apex-text strong {
-		font-size: 0.95rem;
-		font-weight: 800;
-		color: var(--primary);
-		letter-spacing: 0.02em;
-	}
-	.sk-apex-text span {
-		font-size: 0.68rem;
-		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
-	}
-
-	/* 各层所在的区域：中央主干就撑在这个容器里 */
-	.sk-rows {
-		position: relative;
-	}
-	.sk-spine {
-		position: absolute;
-		left: 50%;
-		top: 0;
-		bottom: 0;
-		width: 2px;
-		transform: translateX(-50%) scaleY(0);
-		transform-origin: top;
-		background: linear-gradient(
-			to bottom,
-			color-mix(in srgb, var(--primary) 55%, transparent),
-			color-mix(in srgb, var(--primary) 22%, transparent)
-		);
-	}
-	.sk-tree.revealed .sk-spine {
-		transform: translateX(-50%) scaleY(1);
-		transition: transform 1400ms cubic-bezier(0.3, 0.9, 0.3, 1) 120ms;
-	}
-
-	/* 一层 = 一条横枝 */
-	.sk-tier {
-		position: relative;
-		padding-bottom: 0.6rem;
-	}
-
-	/* 层标签：居中压在主干上，用卡片底色遮住背后的线，像串在枝上的标签 */
-	.sk-tag {
-		position: relative;
-		z-index: 2;
-		display: flex;
-		width: fit-content;
-		margin: 0 auto 0.4rem;
-		align-items: center;
-		gap: 0.34rem;
-		padding: 0.14rem 0.6rem 0.14rem 0.18rem;
-		border-radius: 99px;
-		background: var(--card-bg);
-		border: 1px solid color-mix(in srgb, var(--deep-text) 11%, transparent);
-		opacity: 0;
-		transform: translateY(-6px);
-	}
-	.sk-tag-idx {
+	.tt-skills {
 		display: grid;
-		place-items: center;
-		width: 1.25rem;
-		height: 1.25rem;
-		border-radius: 50%;
-		background: color-mix(in srgb, var(--primary) 16%, transparent);
-		color: var(--primary);
-		font-size: 0.6rem;
-		font-weight: 800;
-	}
-	.sk-tag-name {
-		font-size: 0.72rem;
-		font-weight: 700;
-		color: color-mix(in srgb, var(--deep-text) 78%, transparent);
-	}
-	.sk-tag-pct {
-		font-size: 0.64rem;
-		font-weight: 700;
-		color: color-mix(in srgb, var(--primary) 75%, transparent);
-	}
-
-	/* 枝条与圆球排布 */
-	.sk-branch {
-		display: flex;
-		justify-content: center;
-	}
-	.sk-row {
-		position: relative;
-		display: flex;
-		flex: none;
-		justify-content: center;
-		align-items: flex-start;
-	}
-	/* 横枝：穿过球心的一条线，末端渐隐 */
-	.sk-row::before {
-		content: "";
-		position: absolute;
-		left: -2%;
-		right: -2%;
-		top: calc(var(--d) / 2);
-		height: 2px;
-		border-radius: 2px;
-		background: linear-gradient(
-			90deg,
-			transparent,
-			color-mix(in srgb, var(--primary) 48%, transparent) 11%,
-			color-mix(in srgb, var(--primary) 48%, transparent) 89%,
-			transparent
-		);
-		opacity: 0;
-		transform: scaleX(0.15);
-	}
-
-	/* 圆球挂件 */
-	.sk-orn {
-		position: relative;
-		z-index: 1;
-		flex: none;
-		width: var(--col);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.3rem;
+		grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+		gap: 0.5rem;
+		margin: 0;
 		padding: 0;
-		border: 0;
-		background: transparent;
-		cursor: pointer;
-		opacity: 0;
-		transform: translateY(-7px) scale(0.6);
-		transition:
-			opacity 380ms ease,
-			transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+		list-style: none;
 	}
-	.sk-orn:hover .sk-ball {
-		transform: scale(1.14);
-	}
-	.sk-orn:focus-visible .sk-ball {
-		outline: 2px solid var(--primary);
-		outline-offset: 3px;
-	}
-	.sk-orn.is-dim {
-		filter: grayscale(0.85) opacity(0.28);
-	}
-
-	.sk-ball {
-		position: relative;
-		display: grid;
-		place-items: center;
-		width: var(--d);
-		height: var(--d);
-		border-radius: 50%;
-		background-color: var(--sk-bg);
-		border: 1.5px solid var(--sk-border);
-		box-shadow: var(--sk-glow, none);
-		transition:
-			transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-			box-shadow 240ms ease,
-			background-color 240ms ease,
-			border-color 240ms ease;
-	}
-	/* 玻璃球高光 */
-	.sk-ball .sk-core {
-		position: absolute;
-		left: 22%;
-		top: 17%;
-		width: 27%;
-		height: 27%;
-		border-radius: 50%;
-		background: color-mix(in srgb, #fff 82%, transparent);
-		opacity: var(--sk-core, 0);
-	}
-
-	/* 树里只显示短名：列宽只有 40 多像素，全名会断得很难看 */
-	.sk-cap {
-		max-width: calc(var(--col) + 9px);
-		font-size: 0.58rem;
-		line-height: 1.25;
-		text-align: center;
-		color: color-mix(in srgb, var(--deep-text) 66%, transparent);
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-		overflow-wrap: break-word;
-	}
-
-	.sk-ground {
-		display: block;
-		height: 2px;
-		margin: 0.35rem 12% 0;
-		border-radius: 2px;
-		background: linear-gradient(
-			90deg,
-			transparent,
-			color-mix(in srgb, var(--primary) 26%, transparent) 50%,
-			transparent
-		);
-	}
-
-	.sk-hint {
-		margin: 0.9rem 0 0;
-		text-align: center;
-		font-size: 0.72rem;
-		color: color-mix(in srgb, var(--deep-text) 48%, transparent);
-	}
-
-	/* ===================== 六档亮度 ===================== */
-	.sk-ball,
-	.sk-legend-ball {
-		--sk-bg: color-mix(in oklab, var(--deep-text) 8%, var(--card-bg));
-		--sk-border: color-mix(in srgb, var(--deep-text) 24%, transparent);
-		--sk-core: 0;
-		--sk-glow: none;
-	}
-	[data-lv="0"] {
-		--sk-bg: color-mix(in oklab, var(--deep-text) 8%, var(--card-bg));
-		--sk-border: color-mix(in srgb, var(--deep-text) 30%, transparent);
-		--sk-core: 0;
-	}
-	[data-lv="1"] {
-		--sk-bg: color-mix(in oklab, var(--primary) 20%, var(--card-bg));
-		--sk-border: color-mix(in srgb, var(--primary) 38%, transparent);
-		--sk-core: 0.16;
-	}
-	[data-lv="2"] {
-		--sk-bg: color-mix(in oklab, var(--primary) 38%, var(--card-bg));
-		--sk-border: color-mix(in srgb, var(--primary) 56%, transparent);
-		--sk-core: 0.3;
-	}
-	[data-lv="3"] {
-		--sk-bg: color-mix(in oklab, var(--primary) 58%, var(--card-bg));
-		--sk-border: color-mix(in srgb, var(--primary) 76%, transparent);
-		--sk-core: 0.46;
-		--sk-glow: 0 2px 10px color-mix(in srgb, var(--primary) 18%, transparent);
-	}
-	[data-lv="4"] {
-		--sk-bg: color-mix(in oklab, var(--primary) 82%, var(--card-bg));
-		--sk-border: var(--primary);
-		--sk-core: 0.66;
-		--sk-glow: 0 4px 16px color-mix(in srgb, var(--primary) 36%, transparent);
-	}
-	[data-lv="5"] {
-		--sk-bg: var(--primary);
-		--sk-border: oklch(0.45 0.13 var(--hue));
-		--sk-core: 0.88;
-		--sk-glow:
-			0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent),
-			0 6px 22px color-mix(in srgb, var(--primary) 50%, transparent);
-	}
-	.sk-orn[data-lv="5"] .sk-ball {
-		animation: sk-breathe 2.8s ease-in-out infinite;
-	}
-
-	@keyframes sk-breathe {
-		0%,
-		100% {
-			box-shadow:
-				0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent),
-				0 6px 22px color-mix(in srgb, var(--primary) 46%, transparent);
-		}
-		50% {
-			box-shadow:
-				0 0 0 6px color-mix(in srgb, var(--primary) 12%, transparent),
-				0 6px 30px color-mix(in srgb, var(--primary) 62%, transparent);
-		}
-	}
-	@keyframes sk-twinkle {
-		0%,
-		100% {
-			opacity: 1;
-			transform: scale(1);
-		}
-		50% {
-			opacity: 0.82;
-			transform: scale(1.07);
-		}
-	}
-
-	/* ===================== 从高到低逐层点亮 ===================== */
-	.sk-tree.revealed .sk-tag {
-		opacity: 1;
-		transform: none;
-		transition:
-			opacity 360ms ease,
-			transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
-		transition-delay: calc(var(--ti) * 150ms);
-	}
-	.sk-tree.revealed .sk-row::before {
-		opacity: 1;
-		transform: scaleX(1);
-		transition:
-			opacity 420ms ease,
-			transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
-		transition-delay: calc(var(--ti) * 150ms + 40ms);
-	}
-	.sk-tree.revealed .sk-orn {
-		opacity: 1;
-		transform: none;
-		transition-delay: calc(var(--ti) * 150ms + var(--i) * 46ms + 90ms);
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.sk-orn,
-		.sk-star,
-		.sk-tag,
-		.sk-row::before,
-		.sk-spine {
-			opacity: 1 !important;
-			animation: none !important;
-			transition: none !important;
-		}
-		.sk-orn,
-		.sk-star,
-		.sk-tag {
-			transform: none !important;
-		}
-		.sk-row::before {
-			transform: scaleX(1) !important;
-		}
-		.sk-spine {
-			transform: translateX(-50%) !important;
-		}
-	}
-
-	/* ===================== 清单视图 ===================== */
-	.sk-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.9rem;
-	}
-	.sk-card {
-		border: 1px solid color-mix(in srgb, var(--deep-text) 10%, transparent);
-		border-radius: 0.9rem;
-		padding: 0.85rem 0.95rem 1rem;
-		background: color-mix(in srgb, var(--deep-text) 3%, transparent);
-	}
-	.sk-card-head {
+	.tt-skill-row {
 		display: flex;
 		align-items: center;
 		gap: 0.7rem;
+		width: 100%;
+		padding: 0.5rem 0.7rem;
+		border-radius: 0.7rem;
+		border: 1px solid color-mix(in srgb, var(--deep-text) 10%, transparent);
+		background: color-mix(in srgb, var(--deep-text) 2.5%, transparent);
+		text-align: left;
+		cursor: pointer;
+		outline: none;
+		transition: all 170ms ease;
 	}
-	.sk-card-idx {
-		display: grid;
-		place-items: center;
-		width: 1.6rem;
-		height: 1.6rem;
-		border-radius: 50%;
-		background: color-mix(in srgb, var(--primary) 16%, transparent);
-		color: var(--primary);
-		font-size: 0.68rem;
-		font-weight: 800;
-		flex: none;
+	.tt-skill-row:hover,
+	.tt-skill-row:focus-visible {
+		border-color: color-mix(in srgb, var(--tt-gold) 55%, transparent);
+		background: color-mix(in srgb, var(--tt-gold) 8%, transparent);
+		transform: translateX(2px);
 	}
-	.sk-card-title {
+	.tt-skill-main {
 		display: flex;
 		flex-direction: column;
 		gap: 0.1rem;
 		min-width: 0;
+		flex: 1 1 auto;
 	}
-	.sk-card-title strong {
-		font-size: 0.9rem;
-		color: var(--text-color);
+	.tt-skill-name {
+		font-size: 0.85rem;
+		font-weight: 700;
+		color: color-mix(in srgb, var(--deep-text) 88%, transparent);
 	}
-	.sk-card-title span {
+	.tt-skill-note {
 		font-size: 0.72rem;
-		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
-	}
-	.sk-card-stat {
-		margin-left: auto;
-		text-align: right;
-		flex: none;
-	}
-	.sk-card-stat b {
-		display: block;
-		font-size: 0.95rem;
-		color: var(--primary);
-	}
-	.sk-card-stat span {
-		font-size: 0.68rem;
+		line-height: 1.5;
 		color: color-mix(in srgb, var(--deep-text) 52%, transparent);
-	}
-	.sk-bar {
-		height: 4px;
-		margin: 0.6rem 0 0.8rem;
-		border-radius: 4px;
-		background: color-mix(in srgb, var(--deep-text) 9%, transparent);
 		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
-	.sk-bar i {
-		display: block;
-		height: 100%;
-		border-radius: 4px;
-		background: var(--primary);
-		transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
-	}
-	.sk-chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-	}
-	.sk-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		padding: 0.26rem 0.6rem 0.26rem 0.3rem;
-		border-radius: 99px;
-		border: 1px solid color-mix(in srgb, var(--deep-text) 12%, transparent);
-		background: var(--card-bg);
-		cursor: pointer;
-		transition: all 180ms ease;
-	}
-	.sk-chip:hover {
-		border-color: var(--primary);
-		transform: translateY(-1px);
-	}
-	.sk-chip .sk-ball {
-		width: 1rem;
-		height: 1rem;
-		flex: none;
-	}
-	.sk-chip-name {
-		font-size: 0.76rem;
-		color: var(--text-color);
-	}
-	.sk-chip-lv {
-		font-size: 0.62rem;
-		font-weight: 700;
-		color: color-mix(in srgb, var(--primary) 78%, transparent);
-	}
-
-	/* ===================== 详情抽屉 ===================== */
-	.sk-scrim {
-		position: fixed;
-		inset: 0;
-		z-index: 60;
-		border: 0;
-		padding: 0;
-		background: color-mix(in srgb, #000 32%, transparent);
-		cursor: pointer;
-		animation: sk-fade 220ms ease;
-	}
-	.sk-drawer {
-		position: fixed;
-		top: 0;
-		right: 0;
-		z-index: 61;
-		width: min(23rem, 92vw);
-		height: 100%;
-		overflow-y: auto;
-		padding: 1.25rem 1.35rem 2rem;
-		background: var(--card-bg);
-		border-left: 1px solid color-mix(in srgb, var(--deep-text) 12%, transparent);
-		box-shadow: -12px 0 40px color-mix(in srgb, #000 18%, transparent);
-		animation: sk-slide 280ms cubic-bezier(0.22, 1, 0.36, 1);
-	}
-	@keyframes sk-fade {
-		from {
-			opacity: 0;
-		}
-	}
-	@keyframes sk-slide {
-		from {
-			transform: translateX(24px);
-			opacity: 0;
-		}
-	}
-	.sk-drawer-head {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 0.8rem;
-	}
-	.sk-drawer-track {
-		display: inline-block;
-		font-size: 0.64rem;
-		font-weight: 700;
-		padding: 0.1rem 0.42rem;
-		border-radius: 0.4rem;
-		background: color-mix(in srgb, var(--primary) 14%, transparent);
-		color: var(--primary);
-	}
-	.sk-drawer-title {
-		margin: 0.45rem 0 0;
-		font-size: 1.15rem;
-		color: var(--text-color);
-	}
-	.sk-close {
-		border: 1px solid color-mix(in srgb, var(--deep-text) 14%, transparent);
-		background: transparent;
-		width: 1.9rem;
-		height: 1.9rem;
-		border-radius: 50%;
-		color: color-mix(in srgb, var(--deep-text) 60%, transparent);
-		cursor: pointer;
-		flex: none;
-	}
-	.sk-close:hover {
-		border-color: var(--primary);
-		color: var(--primary);
-	}
-	.sk-drawer-meta {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.35rem;
-		margin-top: 0.6rem;
-		font-size: 0.7rem;
-		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
-	}
-	.sk-dot {
-		opacity: 0.6;
-	}
-	.sk-drawer-note {
-		margin: 0.85rem 0 0;
-		padding: 0.7rem 0.8rem;
-		border-radius: 0.7rem;
-		background: color-mix(in srgb, var(--primary) 7%, transparent);
-		font-size: 0.8rem;
-		line-height: 1.75;
-		color: color-mix(in srgb, var(--deep-text) 78%, transparent);
-	}
-	.sk-drawer-level {
-		margin-top: 1.1rem;
-	}
-	.sk-drawer-level-top {
+	.tt-skill-side {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		gap: 0.5rem;
+		flex: none;
 	}
-	.sk-drawer-badge {
-		font-size: 0.74rem;
-		font-weight: 800;
-		padding: 0.18rem 0.5rem;
-		border-radius: 0.5rem;
-		background: color-mix(in srgb, var(--primary) 14%, transparent);
-		color: var(--primary);
-	}
-	.sk-drawer-level-pct {
-		font-size: 0.8rem;
-		font-weight: 800;
-		color: var(--primary);
-	}
-	.sk-drawer-level-desc {
-		margin: 0.6rem 0 0.25rem;
-		font-size: 0.8rem;
-		line-height: 1.7;
-		color: var(--text-color);
-	}
-	.sk-drawer-level-judge {
-		margin: 0;
+	.tt-skill-lv {
+		min-width: 4.6rem;
 		font-size: 0.72rem;
-		line-height: 1.65;
+		font-weight: 800;
+		color: var(--tt-gold-deep);
+		font-variant-numeric: tabular-nums;
+	}
+	.tt-skill-lv em {
+		font-style: normal;
+		font-weight: 600;
+		margin-left: 0.25rem;
 		color: color-mix(in srgb, var(--deep-text) 55%, transparent);
 	}
-	.sk-steps {
-		display: flex;
-		gap: 0.3rem;
-		margin-top: 0.85rem;
-	}
-	.sk-steps button {
-		flex: 1;
-		height: 2rem;
-		border-radius: 0.55rem;
-		border: 1px solid color-mix(in srgb, var(--deep-text) 14%, transparent);
-		background: transparent;
-		font-size: 0.78rem;
-		font-weight: 700;
-		color: color-mix(in srgb, var(--deep-text) 62%, transparent);
-		cursor: pointer;
-		transition: all 180ms ease;
-	}
-	.sk-steps button:hover {
-		border-color: var(--primary);
-		color: var(--primary);
-	}
-	.sk-steps button.on {
-		background: var(--primary);
-		border-color: var(--primary);
-		color: var(--card-bg);
-	}
-	.sk-drawer-tips {
-		margin-top: 1.3rem;
-	}
-	.sk-drawer-tips h4 {
-		margin: 0 0 0.5rem;
-		font-size: 0.78rem;
-		color: color-mix(in srgb, var(--deep-text) 70%, transparent);
-	}
-	.sk-drawer-tips ul {
-		margin: 0;
-		padding-left: 1.05rem;
+	.tt-panel-tips {
+		margin: 0.9rem 0 0;
+		padding: 0.6rem 0 0 0;
+		list-style: none;
+		border-top: 1px dashed color-mix(in srgb, var(--tt-gold) 30%, transparent);
 		display: flex;
 		flex-direction: column;
-		gap: 0.32rem;
+		gap: 0.3rem;
 	}
-	.sk-drawer-tips li {
-		font-size: 0.78rem;
+	.tt-panel-tips li {
+		position: relative;
+		padding-left: 0.95rem;
+		font-size: 0.76rem;
+		line-height: 1.65;
+		color: color-mix(in srgb, var(--deep-text) 58%, transparent);
+	}
+	.tt-panel-tips li::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		top: 0.52em;
+		width: 5px;
+		height: 5px;
+		border-radius: 2px;
+		background: var(--tt-gold);
+	}
+
+	/* ===================== 悬停气泡 ===================== */
+	.tt-tip {
+		position: absolute;
+		z-index: 6;
+		width: 300px;
+		padding: 0.8rem 0.9rem 0.85rem;
+		border-radius: 0.85rem;
+		background: color-mix(in srgb, var(--tt-socket) 96%, transparent);
+		border: 1px solid color-mix(in srgb, var(--tt-gold) 48%, transparent);
+		box-shadow: 0 16px 42px color-mix(in srgb, #000 46%, transparent);
+		color: #f2ecdf;
+		pointer-events: none;
+		animation: tt-fade 180ms ease;
+	}
+	@keyframes tt-fade {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
+	}
+	.tt-tip-head {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		margin-bottom: 0.4rem;
+	}
+	.tt-tip-head h3 {
+		margin: 0;
+		font-size: 1rem;
+		font-weight: 800;
+		color: var(--tt-gold-light);
+	}
+	.tt-tip-track {
+		font-size: 0.68rem;
+		padding: 0.06rem 0.42rem;
+		border-radius: 99px;
+		border: 1px solid color-mix(in srgb, var(--tt-gold) 45%, transparent);
+		color: color-mix(in srgb, var(--tt-gold-light) 85%, transparent);
+	}
+	.tt-tip-desc {
+		margin: 0 0 0.6rem;
+		font-size: 0.76rem;
 		line-height: 1.7;
-		color: color-mix(in srgb, var(--deep-text) 72%, transparent);
+		color: color-mix(in srgb, #f2ecdf 78%, transparent);
+	}
+	.tt-tip-ranks {
+		display: flex;
+		flex-direction: column;
+		gap: 0.28rem;
+	}
+	.tt-tip-ranks p {
+		margin: 0;
+		font-size: 0.73rem;
+		line-height: 1.65;
+		color: color-mix(in srgb, #f2ecdf 72%, transparent);
+	}
+	.tt-tip-ranks b {
+		color: var(--tt-gold-light);
+	}
+	.tt-tip-next {
+		color: color-mix(in srgb, #f2ecdf 62%, transparent);
+	}
+	.tt-tip-judge {
+		margin-top: 0.15rem;
+		font-size: 0.7rem;
+		color: color-mix(in srgb, var(--tt-gold) 85%, transparent);
+	}
+	.tt-tip-locked {
+		color: #f0a6a6;
+	}
+	.tt-tip-tips {
+		margin: 0.6rem 0 0;
+		padding: 0.55rem 0 0 0;
+		list-style: none;
+		border-top: 1px dashed color-mix(in srgb, var(--tt-gold) 32%, transparent);
+		display: flex;
+		flex-direction: column;
+		gap: 0.24rem;
+	}
+	.tt-tip-tips li {
+		position: relative;
+		padding-left: 0.85rem;
+		font-size: 0.72rem;
+		line-height: 1.6;
+		color: color-mix(in srgb, #f2ecdf 68%, transparent);
+	}
+	.tt-tip-tips li::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		top: 0.55em;
+		width: 4px;
+		height: 4px;
+		border-radius: 2px;
+		background: var(--tt-gold);
+	}
+	.tt-tip-foot {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin-top: 0.6rem;
+		font-size: 0.68rem;
+		color: color-mix(in srgb, #f2ecdf 55%, transparent);
+	}
+	.tt-tip-foot a {
+		color: var(--tt-gold-light);
+		text-decoration: none;
+		pointer-events: auto;
+	}
+	.tt-tip-foot a:hover {
+		text-decoration: underline;
+	}
+
+	/* ===================== 角色面板 ===================== */
+	/* 这一块在 .tt-arena 外面，拿不到里面的 --tt-* 变量，所以都带兜底色 */
+	.tt-avatar {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-top: 1.1rem;
+		padding-top: 1rem;
+		border-top: 1px dashed
+			color-mix(in srgb, var(--tt-gold, #d9a441) 30%, transparent);
+	}
+	.tt-portrait {
+		position: relative;
+		flex: none;
+		width: 64px;
+		height: 64px;
+	}
+	.tt-portrait img {
+		width: 100%;
+		height: 100%;
+		border-radius: 14px;
+		object-fit: cover;
+		border: 2px solid var(--tt-gold, #d9a441);
+		box-shadow: 0 4px 14px color-mix(in srgb, #000 24%, transparent);
+	}
+	.tt-portrait-lv {
+		position: absolute;
+		right: -6px;
+		bottom: -6px;
+		min-width: 26px;
+		padding: 0.06rem 0.28rem;
+		border-radius: 7px;
+		border: 1px solid var(--tt-gold-deep, #8a6220);
+		background: linear-gradient(180deg, #3a2f16, #221b0c);
+		font-size: 0.66rem;
+		font-weight: 800;
+		color: var(--tt-gold-light, #f4dda6);
+		text-align: center;
+	}
+	.tt-details {
+		min-width: 0;
+	}
+	.tt-details-title {
+		font-size: 0.9rem;
+		color: color-mix(in srgb, var(--deep-text) 78%, transparent);
+	}
+	.tt-details-title b {
+		color: var(--tt-gold-deep, #8a6220);
+		font-size: 1.05rem;
+	}
+	.tt-details-title span {
+		margin-left: 0.3rem;
+		font-weight: 800;
+		color: color-mix(in srgb, var(--primary) 85%, transparent);
+	}
+	.tt-attrs {
+		display: flex;
+		gap: 1rem;
+		flex-wrap: wrap;
+		margin: 0.4rem 0 0;
+		padding: 0;
+		list-style: none;
+	}
+	.tt-attrs li {
+		display: flex;
+		align-items: baseline;
+		gap: 0.3rem;
+		font-size: 0.74rem;
+		color: color-mix(in srgb, var(--deep-text) 58%, transparent);
+	}
+	.tt-attrs b {
+		font-size: 0.95rem;
+		color: color-mix(in srgb, var(--deep-text) 88%, transparent);
+		font-variant-numeric: tabular-nums;
+	}
+	.tt-details-note {
+		margin: 0.45rem 0 0;
+		font-size: 0.74rem;
+		line-height: 1.65;
+		color: color-mix(in srgb, var(--deep-text) 48%, transparent);
 	}
 
 	/* ===================== 响应式 ===================== */
 	@media (max-width: 760px) {
-		.sk-title {
-			font-size: 1.24rem;
+		.tt-title {
+			font-size: 1.26rem;
 		}
-		.sk-ring-wrap {
-			width: 6rem;
-			height: 6rem;
-		}
-		.sk-legend {
+		.tt-legend {
 			margin-left: 0;
-			width: 100%;
 		}
-		.sk-tag {
-			gap: 0.25rem;
-			padding: 0.1rem 0.45rem 0.1rem 0.14rem;
-			margin-bottom: 0.3rem;
+		.tt-arena {
+			--gap: 9px;
+			--cat-w: calc((100% - 3 * var(--gap)) / 4 - 1px);
 		}
-		.sk-tier {
-			padding-bottom: 0.7rem;
+		.tt-cat-name {
+			font-size: 0.86rem;
 		}
-		.sk-tree {
-			--col: clamp(20px, 5.4vw, 40px);
+		.tt-ranks i {
+			width: 9px;
+			height: 4px;
 		}
-		@supports (width: 1cqw) {
-			.sk-tree {
-				--col: clamp(17px, calc((100cqw - 10px) / 14), 40px);
-			}
+		.tt-panel {
+			padding: 0.85rem 0.85rem 0.95rem;
 		}
-		/* 窄屏列太窄，名称放不下，靠点开详情看 */
-		.sk-cap {
+		.tt-skills {
+			grid-template-columns: 1fr;
+		}
+		.tt-skill-lv {
+			min-width: 3.6rem;
+		}
+		.tt-panel-hint {
 			display: none;
+		}
+	}
+	@media (max-width: 460px) {
+		.tt-avatar {
+			align-items: flex-start;
+		}
+		.tt-badge {
+			min-width: 32px;
+			font-size: 0.56rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tt-cat[data-state="ready"] .tt-frame {
+			animation: none;
+		}
+		.tt-tip,
+		.tt-panel {
+			animation: none;
+		}
+		.tt-cat:hover .tt-frame,
+		.tt-cat:focus-visible .tt-frame,
+		.tt-skill-row:hover,
+		.tt-skill-row:focus-visible {
+			transform: none;
 		}
 	}
 </style>
