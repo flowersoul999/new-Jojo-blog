@@ -757,8 +757,11 @@ const widgetId =
     }
 
     /** 核心绘制入口：真实时间 → 行 → 逐字状态 */
-    function paintKaraoke(t) {
-        local.lastTime = t;
+    function paintKaraoke(rawT) {
+        local.lastTime = rawT;
+        // 叠加全局歌词偏移：主面板此前漏加该偏移，导致逐字染色比声音慢约 1 秒。
+        // 现在与行级高亮、浮动歌词（均已用 ct + lyricsOffset）保持一致。
+        var t = rawT + LRC_OFFSET;
         var lyr = local.lyrics;
         if (!lyr || !lyr.length) return;
         // 行索引由真实时间直接计算：快进/快退/拖动后立即正确，不依赖事件顺序
@@ -827,8 +830,8 @@ const widgetId =
     function updateLrcHighlight(index) {
         if (index === local.currentLrcIndex) return;
         activateLine(index);
-        // 立即按真实时间重绘一次，不等待下一帧 RAF
-        if (index >= 0) paintLineChars(index, mgr.getState().currentTime);
+        // 立即按真实时间重绘一次，不等待下一帧 RAF（同样叠加偏移，与 paintKaraoke 一致）
+        if (index >= 0) paintLineChars(index, mgr.getState().currentTime + LRC_OFFSET);
     }
 
     // ── Full sync from manager state (for late-mount) ────────

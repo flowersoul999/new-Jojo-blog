@@ -7,6 +7,7 @@ import {
 	type StoredEvent,
 } from "@/utils/analytics-store";
 import { isLocalDev } from "@/utils/editor-auth";
+import { resolveGeo } from "@/utils/geoip";
 
 export const prerender = false;
 
@@ -101,14 +102,6 @@ function getClientIp(request: Request): string {
 	const forwarded = request.headers.get("x-forwarded-for");
 	if (forwarded) return forwarded.split(",")[0].trim() || "unknown";
 	return request.headers.get("x-real-ip") || "unknown";
-}
-
-function getCountry(request: Request): string {
-	return (
-		request.headers.get("cf-ipcountry") ||
-		request.headers.get("x-vercel-ip-country") ||
-		""
-	);
 }
 
 /** 解析 UA，产出设备/系统/浏览器三字段（弃原始 UA 以减小文件体积） */
@@ -217,7 +210,8 @@ export const POST: APIRoute = async ({ request }) => {
 	}
 
 	const { dev, os, br } = parseUa(ua);
-	const cc = getCountry(request);
+	// IP 归属地：解析到省/市/区（geoip.ts 内置腾讯/太平洋/请求头三层降级）
+	const { cc, rg } = await resolveGeo(ip, request);
 	const serverNow = Date.now();
 
 	const events: StoredEvent[] = [];
@@ -277,6 +271,7 @@ export const POST: APIRoute = async ({ request }) => {
 			t: ts,
 			ip: settings.recordIp ? ip.slice(0, 64) : "",
 			cc,
+			rg,
 			os,
 			br,
 			dev,

@@ -29,6 +29,12 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 		past: "#3b82f6", // 已演唱文本颜色（blue-500）
 	},
 
+	// 歌词时间整体偏移（秒）：绘制歌词时按 currentTime + lyricsOffset 计算。
+	// 音频输出存在硬件/系统延迟（蓝牙音箱可达 1s 左右），导致听到的声音
+	// 落后于 audio.currentTime，表现为"歌词变色比人声慢"。
+	// 正值 = 变色提前（抵消听觉延迟）；负值 = 变色延后。可按听感微调。
+	lyricsOffset: 1,
+
 	// Meting API 配置
 	meting: {
 		// Meting API 地址

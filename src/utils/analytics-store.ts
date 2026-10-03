@@ -17,6 +17,7 @@ import {
 	readLocalFile,
 	writeLocalFile,
 } from "./editor-auth";
+import { type GeoDiag, getGeoDiag } from "./geoip";
 import {
 	type ContentsItem,
 	deleteFile,
@@ -54,7 +55,7 @@ export interface AnalyticsSettings {
 
 export const DEFAULT_SETTINGS: AnalyticsSettings = {
 	enabled: true,
-	recordIp: true,
+	recordIp: false,
 	maskIp: false,
 	recordActions: true,
 	adminLogins: [GITHUB_REPO.owner],
@@ -74,6 +75,7 @@ export interface StoredEvent {
 	t: number; // 服务端落盘时间戳（毫秒）
 	ip?: string; // 访客 IP（recordIp=false 时为空）
 	cc?: string; // 国家代码
+	rg?: string; // 国家以下地区（省/市/区拼接，如「广东省广州市黄埔区」）
 	os?: string;
 	br?: string;
 	dev?: string;
@@ -114,6 +116,8 @@ export interface IpRow {
 	uv: number;
 	lastSeen: number;
 	country: string;
+	/** 省/市/区拼接串（如「广东省广州市黄埔区」），无数据为空 */
+	region?: string;
 }
 
 export interface BehaviorRow {
@@ -208,6 +212,8 @@ export interface AnalyticsDiagnostics {
 	eventsToday: number;
 	serverTime: number;
 	storeError: string;
+	/** 最近一次 IP→地域定位的诊断快照（来源/层级/原因），用于排查“只到国家”的问题 */
+	geoDiag: GeoDiag;
 }
 
 export interface StatsResult {
@@ -992,18 +998,26 @@ export async function aggregateStats(days = 30): Promise<StatsResult> {
 	// IP 明细
 	const ipMap = new Map<
 		string,
-		{ pv: number; uv: Set<string>; lastSeen: number; cc: string }
+		{ pv: number; uv: Set<string>; lastSeen: number; cc: string; rg: string }
 	>();
 	for (const e of pageEvents) {
 		if (!e.ip) continue;
 		let entry = ipMap.get(e.ip);
 		if (!entry) {
-			entry = { pv: 0, uv: new Set(), lastSeen: 0, cc: e.cc || "" };
+			entry = {
+				pv: 0,
+				uv: new Set(),
+				lastSeen: 0,
+				cc: e.cc || "",
+				rg: e.rg || "",
+			};
 			ipMap.set(e.ip, entry);
 		}
 		entry.pv += 1;
 		entry.uv.add(e.v);
 		if (e.t > entry.lastSeen) entry.lastSeen = e.t;
+		// 归属地优先取更精准的 rg；同 IP 多次上报以非空者覆盖
+		if (e.rg && !entry.rg) entry.rg = e.rg;
 	}
 	const ipList: IpRow[] = [...ipMap.entries()]
 		.map(([ip, v]) => ({
@@ -1012,6 +1026,7 @@ export async function aggregateStats(days = 30): Promise<StatsResult> {
 			uv: v.uv.size,
 			lastSeen: v.lastSeen,
 			country: countryName(v.cc),
+			region: v.rg || "",
 		}))
 		.sort((a, b) => b.lastSeen - a.lastSeen);
 
@@ -1161,6 +1176,7 @@ export async function getDiagnostics(
 		eventsToday,
 		serverTime: Date.now(),
 		storeError,
+		geoDiag: getGeoDiag(),
 	};
 }
 

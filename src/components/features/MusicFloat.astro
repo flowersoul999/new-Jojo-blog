@@ -197,6 +197,8 @@ import { Icon } from "astro-icon/components";
         function paintFloat(t) {
             var line = currentLyrics[currentLrcIndex];
             if (!line || !line.chars) return;
+            // 应用全局歌词偏移（与 MusicPlayer.paintKaraoke 保持一致）
+            t = t + ((mgr && mgr.getState().config || {}).lyricsOffset || 0);
             var chars = line.chars;
             var spans = els.lrcText.children;
 

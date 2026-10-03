@@ -120,6 +120,14 @@ interface Diagnostics {
 	eventsToday: number;
 	serverTime: number;
 	storeError: string;
+	geoDiag: {
+		at: number;
+		source: string;
+		level: string;
+		cc: string;
+		rg: string;
+		note: string;
+	};
 }
 interface Settings {
 	enabled: boolean;
@@ -306,6 +314,19 @@ function diagItems(d: Diagnostics | undefined) {
 			type: "warn",
 			title: "访客 IP 正明文写入公开仓库，任何人都能看到",
 			desc: `当前数据仓库 ${d.repo.owner}/${d.repo.name} 是公开仓库。建议新建一个私有仓库并配置 ANALYTICS_REPO_OWNER / ANALYTICS_REPO_NAME 环境变量，或在设置中开启 IP 脱敏。`,
+		});
+	}
+	// IP→地域定位诊断：直接暴露“为什么只到国家/省/市”，避免一直猜
+	{
+		const g = d.geoDiag;
+		const reached = g.rg || (g.cc ? `国家级（${g.cc}）` : "无");
+		const ok =
+			g.source === "tencent" &&
+			(g.level === "district" || g.level === "city" || g.level === "province");
+		items.push({
+			type: ok ? "ok" : "warn",
+			title: `访客地域定位：${reached}${ok ? " ✅" : " ⚠️"}`,
+			desc: `来源=${g.source || "none"} · 层级=${g.level || "none"} · 最近触发=${g.at ? new Date(g.at).toLocaleString("zh-CN") : "无"} · ${g.note || "尚未有上报触发定位"}`,
 		});
 	}
 	if (d.tokenConfigured && d.enabled && !d.storeError) {
@@ -1152,8 +1173,8 @@ function maxModuleOf(data: StatsData | null): number {
 							<tbody>
 								{#each ipRows as row}
 									<tr class="border-b border-(--line-divider)/40 transition hover:bg-(--muted)/20">
-										<td class="py-2.5 pr-4 font-mono text-xs text-(--deep-text)">{row.ip}</td>
-										<td class="py-2.5 pr-4 text-xs text-(--content-meta)">{row.country}</td>
+									<td class="py-2.5 pr-4 font-mono text-xs text-(--deep-text)">{row.ip}</td>
+									<td class="py-2.5 pr-4 text-xs text-(--content-meta)">{row.region || row.country}</td>
 										<td class="py-2.5 pr-4 text-right tabular-nums">{fmt(row.pv)}</td>
 										<td class="py-2.5 pr-4 text-right tabular-nums">{fmt(row.uv)}</td>
 										<td class="py-2.5 text-xs tabular-nums text-(--content-meta)">{fmtDateTime(row.lastSeen)}</td>

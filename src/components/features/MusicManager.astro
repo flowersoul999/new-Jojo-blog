@@ -35,6 +35,8 @@ const managerConfigStr = JSON.stringify({
 	volume: config.volume ?? 0.7,
 	playMode: config.playMode ?? "list",
 	showLyrics: config.showLyrics ?? true,
+	// 歌词时间整体偏移（秒），用于抵消音频输出延迟导致的"变色比人声慢"
+	lyricsOffset: config.lyricsOffset ?? 0,
 	i18n: {
 		noPlaying: i18n(I18nKey.musicNoPlaying),
 		lyrics: i18n(I18nKey.musicLyrics),
@@ -465,11 +467,12 @@ const managerConfigStr = JSON.stringify({
             durationStr: formatTime(dur)
         });
 
-        // Lyrics sync
+        // Lyrics sync（用偏移后时间计算，抵消音频输出硬件延迟）
         if (state.lyrics.length > 0) {
+            var lrcT = ct + (config.lyricsOffset || 0);
             var idx = -1;
             for (var i = 0; i < state.lyrics.length; i++) {
-                if (ct >= state.lyrics[i].time) idx = i;
+                if (lrcT >= state.lyrics[i].time) idx = i;
                 else break;
             }
             if (idx !== state.currentLrcIndex) {

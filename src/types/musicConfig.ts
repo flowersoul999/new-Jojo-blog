@@ -16,6 +16,10 @@ export type MusicPlayerConfig = {
 	// past=已演唱文本颜色, current=当前演唱高亮色, future=未演唱文本颜色
 	lyricsColors?: { past?: string; current?: string; future?: string };
 
+	// 歌词时间整体偏移（秒）：绘制时按 currentTime + lyricsOffset 计算。
+	// 正值=变色提前（抵消音频输出硬件延迟），负值=变色延后。默认 0。
+	lyricsOffset?: number;
+
 	// 是否在导航栏显示音乐播放器
 	showInNavbar?: boolean;
 
