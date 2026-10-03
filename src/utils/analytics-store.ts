@@ -636,6 +636,7 @@ interface SessionData {
 	pv: number;
 	ips: string[];
 	cc: string;
+	rg: string;
 	os: string;
 	br: string;
 	dev: string;
@@ -805,6 +806,7 @@ function aggregateVisitors(
 		if (s.start < row.firstTs) row.firstTs = s.start;
 		if (s.end > row.lastTs) row.lastTs = s.end;
 		row.cc = s.cc || row.cc;
+		row.rg = s.rg || row.rg;
 		row.os = s.os || row.os;
 		row.br = s.br || row.br;
 		row.dev = s.dev || row.dev;
@@ -1085,6 +1087,7 @@ export async function getVisitorDetail(
 		ip: maskIpAddress(allIps[0] || "", settings.maskIp),
 		ips: allIps.slice(0, 5).map((ip) => maskIpAddress(ip, settings.maskIp)),
 		country: countryName(latest?.cc || ""),
+		region: latest?.rg || "",
 		dev: latest?.dev || "未知",
 		os: latest?.os || "未知",
 		br: latest?.br || "未知",

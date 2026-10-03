@@ -65,6 +65,7 @@ interface VisitorRow {
 	ip: string;
 	ips: string[];
 	country: string;
+	region?: string;
 	dev: string;
 	os: string;
 	br: string;
@@ -99,6 +100,7 @@ interface VisitorDetail {
 	ip: string;
 	ips: string[];
 	country: string;
+	region?: string;
 	dev: string;
 	os: string;
 	br: string;
@@ -720,6 +722,7 @@ function maxModuleOf(data: StatsData | null): number {
 		<!-- 页签 -->
 		<nav class="mb-6 flex flex-wrap gap-2" aria-label="后台管理模块">
 			{#each [
+				{ key: "analytics", label: "站点统计" },
 				{ key: "overview", label: "访问统计" },
 				{ key: "behavior", label: "用户行为" },
 				{ key: "visitors", label: "访客明细" },
