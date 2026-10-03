@@ -1081,26 +1081,27 @@ const year = new Date().getFullYear();
 				color: var(--text-color);
 			}
 
-			/* 24 小时活跃：把原本 7×24 的热力图压成单行 24 格 */
-			.analytics-embed__hours-heatmap {
+			/* 24 小时活跃：把原本 7×24 的热力图压成单行 24 格。
+			   统一加 .analytics-page 前缀提高优先级，避免样式注入顺序影响覆盖。 */
+			.analytics-page .analytics-embed__hours-heatmap {
 				grid-template-columns: minmax(0, 1fr);
 			}
-			.analytics-embed__hours-labels {
+			.analytics-page .analytics-embed__hours-labels {
 				grid-column: 1;
 			}
-			.analytics-embed__hours-grid {
+			.analytics-page .analytics-embed__hours-grid {
 				grid-column: 1;
 				grid-row: 2;
 				grid-template-rows: minmax(0, 1fr);
 			}
 
 			/* 最近动态列表贴紧表头 */
-			.analytics-embed__recent {
-				margin-top: 0.58rem;
+			.analytics-page .analytics-embed__recent {
+				margin: 0.58rem 0 0;
 			}
 
 			/* 设备与浏览器：.analytics-panel 本身没有内边距，这里补上 */
-			.analytics-devices {
+			.analytics-page .analytics-devices {
 				padding: 1.2rem 1.1rem 0.95rem;
 			}
 		</style>
