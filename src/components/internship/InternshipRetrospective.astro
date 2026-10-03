@@ -1,0 +1,153 @@
+---
+// Golden Experience · 复盘：一段话总结 + 下一步想补什么
+import { Icon } from "astro-icon/components";
+import type { InternshipRetro } from "@/data/internship";
+
+interface Props {
+	retro: InternshipRetro;
+}
+
+const { retro } = Astro.props;
+---
+
+<section id="retro" class="gi-section" data-gi-anchor>
+	<header class="gi-section__head">
+		<span class="gi-section__icon" aria-hidden="true">
+			<Icon is:inline name="material-symbols:signpost" class="text-[1.35rem]" />
+		</span>
+		<div>
+			<h2 class="gi-section__title">复盘与下一步</h2>
+			<p class="gi-section__desc">写下来才想得清楚，所以顺手记一笔。</p>
+		</div>
+	</header>
+
+	<div class="gi-retro" data-gi-reveal>
+		<div class="gi-retro__quote">
+			<Icon is:inline name="material-symbols:format-list-bulleted" class="gi-retro__mark" />
+			<p class="gi-retro__summary">{retro.summary}</p>
+		</div>
+
+		<div class="gi-retro__next">
+			<h3 class="gi-retro__label">
+				<Icon is:inline name="material-symbols:rocket-launch-rounded" class="text-base" />
+				接下来想做
+			</h3>
+			<ul class="gi-retro__list">
+				{
+					retro.next.map((item, index) => (
+						<li>
+							<span class="gi-retro__index">{String(index + 1).padStart(2, "0")}</span>
+							<span>{item}</span>
+						</li>
+					))
+				}
+			</ul>
+		</div>
+	</div>
+</section>
+
+<style>
+	.gi-section {
+		margin-top: 2.6rem;
+		margin-bottom: 0.5rem;
+		scroll-margin-top: 10rem;
+	}
+	.gi-section__head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.8rem;
+		margin-bottom: 1.3rem;
+	}
+	.gi-section__icon {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.3rem;
+		height: 2.3rem;
+		border-radius: 13px;
+		background: var(--gi-soft);
+		color: var(--gi-accent);
+	}
+	.gi-section__title {
+		margin: 0;
+		font-size: 1.22rem;
+		font-weight: 800;
+		color: var(--gi-title);
+	}
+	.gi-section__desc {
+		margin: 0.3rem 0 0;
+		font-size: 0.82rem;
+		line-height: 1.7;
+		color: var(--gi-muted);
+	}
+
+	.gi-retro {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1rem;
+		padding: 1.15rem 1.2rem 1.25rem;
+		border-radius: 18px;
+		border: 1px solid var(--gi-line);
+		background: color-mix(in srgb, var(--gi-accent) 5%, var(--gi-surface));
+	}
+	.gi-retro__quote {
+		position: relative;
+		min-width: 0;
+		padding-left: 1rem;
+		border-left: 3px solid color-mix(in srgb, var(--gi-accent) 45%, transparent);
+	}
+	.gi-retro__mark {
+		display: none;
+	}
+	.gi-retro__summary {
+		margin: 0;
+		font-size: 0.9rem;
+		line-height: 1.9;
+		color: var(--gi-body);
+	}
+	.gi-retro__next {
+		min-width: 0;
+	}
+	.gi-retro__label {
+		display: flex;
+		align-items: center;
+		gap: 0.32rem;
+		margin: 0 0 0.7rem;
+		font-size: 0.82rem;
+		font-weight: 700;
+		color: var(--gi-accent);
+	}
+	.gi-retro__list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.gi-retro__list li {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6rem;
+		font-size: 0.83rem;
+		line-height: 1.75;
+		color: var(--gi-body);
+		word-break: break-word;
+	}
+	.gi-retro__index {
+		flex: none;
+		font-size: 0.72rem;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		color: color-mix(in srgb, var(--gi-accent) 70%, transparent);
+	}
+
+	@media (min-width: 860px) {
+		.gi-retro {
+			grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+			gap: 1.6rem;
+			padding: 1.35rem 1.5rem;
+		}
+	}
+</style>

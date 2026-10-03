@@ -1,0 +1,163 @@
+---
+// 八股文：按领域分组的知识点，答案默认收起（自测模式）
+import { getCollection, render } from "astro:content";
+import FoldCard from "@/components/interview/FoldCard.astro";
+import InterviewShell from "@/components/interview/InterviewShell.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+const entries = await getCollection("questions", ({ data }) => !data.draft);
+
+const withContent = await Promise.all(
+	entries.map(async (entry) => ({
+		entry,
+		Content: (await render(entry)).Content,
+	})),
+);
+
+/** 领域顺序按学习路径排，比字母序有意义；没列到的领域会自动排在最后 */
+const CATEGORY_ORDER = [
+	"HTML",
+	"CSS",
+	"JavaScript",
+	"浏览器",
+	"网络",
+	"工程化",
+	"Vue",
+	"React",
+	"手写题",
+];
+
+const buckets = new Map<string, typeof withContent>();
+for (const item of withContent) {
+	const key = item.entry.data.category;
+	const bucket = buckets.get(key);
+	if (bucket) {
+		bucket.push(item);
+	} else {
+		buckets.set(key, [item]);
+	}
+}
+
+const orderOf = (category: string) => {
+	const index = CATEGORY_ORDER.indexOf(category);
+	return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+};
+
+const groups = [...buckets]
+	.sort((a, b) => orderOf(a[0]) - orderOf(b[0]))
+	.map(([category, list], index) => ({
+		category,
+		anchor: `cat-${index}`,
+		list: [...list].sort(
+			(a, b) => b.entry.data.frequency - a.entry.data.frequency,
+		),
+	}));
+
+const countLevel = (level: string) =>
+	entries.filter((entry) => entry.data.level === level).length;
+
+const stats = [
+	{ label: "总条数", value: entries.length },
+	{ label: "领域", value: groups.length },
+	{ label: "高频", value: countLevel("高频") },
+	{ label: "进阶", value: countLevel("进阶") },
+];
+
+const title = "八股文";
+const description = "按领域归档的前端知识点，答案默认收起，先自测再对照。";
+---
+
+<MainGridLayout title={title} description={description} hideSidebars>
+	<InterviewShell
+		kicker="KNOWLEDGE BASE"
+		title="八股文"
+		desc="每张卡的问题都来自真实面试，答案是自己整理的那一版。默认收起来是有意的——先自己讲一遍，讲不下去的地方才是要补的地方。"
+		current="questions"
+		stats={stats}
+	>
+		{
+			groups.length === 0 && (
+				<div class="iv-empty">
+					还没有条目。去 <code>src/content/questions/</code> 加一条试试。
+				</div>
+			)
+		}
+
+		{
+			groups.length > 0 && (
+				<nav class="iv-catbar" aria-label="领域跳转">
+					{groups.map((group) => (
+						<a class="iv-catbar__item" href={`#${group.anchor}`}>
+							{group.category}
+							<span class="iv-catbar__num">{group.list.length}</span>
+						</a>
+					))}
+				</nav>
+			)
+		}
+
+		{groups.map((group) => (
+			<section class="iv-block" id={group.anchor}>
+				<div class="iv-block__head">
+					<h2 class="iv-block__title">{group.category}</h2>
+					<span class="iv-block__count">{group.list.length} 条</span>
+				</div>
+
+				<div class="iv-qa-list">
+					{group.list.map(({ entry, Content }) => (
+						<FoldCard id={entry.id} title={entry.data.question}>
+							<Fragment slot="meta">
+								<span class="iv-tag">{entry.data.level}</span>
+								<span class="iv-tag">被问 {entry.data.frequency} 次</span>
+							</Fragment>
+							<Content />
+						</FoldCard>
+					))}
+				</div>
+			</section>
+		))}
+	</InterviewShell>
+</MainGridLayout>
+
+<style>
+	.iv-catbar {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin-bottom: 1.4rem;
+	}
+	.iv-catbar__item {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.32rem;
+		padding: 0.34rem 0.7rem;
+		border-radius: 999px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		font-size: 0.76rem;
+		font-weight: 600;
+		color: var(--iv-body);
+		text-decoration: none;
+		transition:
+			border-color 180ms ease,
+			color 180ms ease,
+			background-color 180ms ease;
+	}
+	.iv-catbar__item:hover {
+		border-color: color-mix(in srgb, var(--iv-accent) 45%, transparent);
+		background: var(--iv-soft);
+		color: var(--iv-accent);
+	}
+	.iv-catbar__num {
+		font-size: 0.68rem;
+		color: var(--iv-faint);
+	}
+
+	.iv-qa-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+</style>

@@ -1,0 +1,157 @@
+---
+// Golden Experience · 收获卡片：从「做了什么」抽象到「会了什么」
+import { Icon } from "astro-icon/components";
+import type { InternshipTakeaway } from "@/data/internship";
+
+interface Props {
+	takeaways: InternshipTakeaway[];
+}
+
+const { takeaways } = Astro.props;
+---
+
+<section id="takeaways" class="gi-section" data-gi-anchor>
+	<header class="gi-section__head">
+		<span class="gi-section__icon" aria-hidden="true">
+			<Icon is:inline name="material-symbols:lightbulb-rounded" class="text-[1.35rem]" />
+		</span>
+		<div>
+			<h2 class="gi-section__title">带走的收获</h2>
+			<p class="gi-section__desc">
+				把做过的事往下抽一层，大概是这三类东西留了下来。
+			</p>
+		</div>
+	</header>
+
+	<ul class="gi-takeaways">
+		{
+			takeaways.map((item) => (
+				<li class="gi-takeaway" data-gi-reveal>
+					<div class="gi-takeaway__head">
+						<span class="gi-takeaway__icon" aria-hidden="true">
+							<Icon is:inline name={`material-symbols:${item.icon}`} class="text-[1.2rem]" />
+						</span>
+						<h3 class="gi-takeaway__title">{item.title}</h3>
+					</div>
+					<ul class="gi-takeaway__points">
+						{item.points.map((point) => (
+							<li>{point}</li>
+						))}
+					</ul>
+				</li>
+			))
+		}
+	</ul>
+</section>
+
+<style>
+	.gi-section {
+		margin-top: 2.6rem;
+		scroll-margin-top: 10rem;
+	}
+	.gi-section__head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.8rem;
+		margin-bottom: 1.3rem;
+	}
+	.gi-section__icon {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.3rem;
+		height: 2.3rem;
+		border-radius: 13px;
+		background: var(--gi-soft);
+		color: var(--gi-accent);
+	}
+	.gi-section__title {
+		margin: 0;
+		font-size: 1.22rem;
+		font-weight: 800;
+		color: var(--gi-title);
+	}
+	.gi-section__desc {
+		margin: 0.3rem 0 0;
+		font-size: 0.82rem;
+		line-height: 1.7;
+		color: var(--gi-muted);
+	}
+
+	.gi-takeaways {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+		gap: 0.9rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.gi-takeaway {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		padding: 1.1rem 1.15rem 1.2rem;
+		border-radius: 18px;
+		border: 1px solid var(--gi-line);
+		background: var(--gi-surface);
+		transition:
+			border-color 220ms ease,
+			box-shadow 220ms ease,
+			transform 220ms ease;
+	}
+	.gi-takeaway:hover {
+		border-color: color-mix(in srgb, var(--gi-accent) 40%, transparent);
+		box-shadow: 0 14px 34px rgb(0 0 0 / 0.08);
+		transform: translateY(-2px);
+	}
+	.gi-takeaway__head {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		margin-bottom: 0.8rem;
+	}
+	.gi-takeaway__icon {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2rem;
+		height: 2rem;
+		border-radius: 11px;
+		background: var(--gi-soft);
+		color: var(--gi-accent);
+	}
+	.gi-takeaway__title {
+		margin: 0;
+		font-size: 0.98rem;
+		font-weight: 800;
+		color: var(--gi-title);
+	}
+	.gi-takeaway__points {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.gi-takeaway__points li {
+		position: relative;
+		padding-left: 0.95rem;
+		font-size: 0.82rem;
+		line-height: 1.72;
+		color: var(--gi-body);
+		word-break: break-word;
+	}
+	.gi-takeaway__points li::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		top: 0.58rem;
+		width: 0.36rem;
+		height: 0.36rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--gi-accent) 55%, transparent);
+	}
+</style>

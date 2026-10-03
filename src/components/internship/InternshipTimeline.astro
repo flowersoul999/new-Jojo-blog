@@ -1,0 +1,372 @@
+---
+// Golden Experience · 阶段时间线：一张卡 = 一段成长弧
+// 数据来自 src/content/internship/*.md，正文收在 <details> 里按需展开
+import { type CollectionEntry, render } from "astro:content";
+import { Icon } from "astro-icon/components";
+
+interface Props {
+	items: CollectionEntry<"internship">[];
+}
+
+const { items } = Astro.props;
+
+const phases = await Promise.all(
+	items.map(async (entry) => ({
+		entry,
+		// glob loader 会把 Markdown 正文挂在 entry.body 上；没有正文就不渲染展开区
+		hasBody: ((entry as { body?: string }).body ?? "").trim().length > 0,
+		Content: (await render(entry)).Content,
+	})),
+);
+---
+
+<section id="timeline" class="gi-section" data-gi-anchor>
+	<header class="gi-section__head">
+		<span class="gi-section__icon" aria-hidden="true">
+			<Icon is:inline name="material-symbols:timeline" class="text-[1.35rem]" />
+		</span>
+		<div>
+			<h2 class="gi-section__title">阶段时间线</h2>
+			<p class="gi-section__desc">
+				不按月份记流水账，按「想明白了什么」分成几段。展开卡片可以看每个阶段的完整记录。
+			</p>
+		</div>
+	</header>
+
+	<div class="gi-timeline">
+		{
+			phases.map(({ entry, hasBody, Content }, index) => (
+				<article class="gi-phase" data-gi-reveal>
+					<div class="gi-phase__node" aria-hidden="true">
+						{index + 1}
+					</div>
+
+					<div class="gi-phase__card">
+						<div class="gi-phase__top">
+							<span class="gi-period">{entry.data.period}</span>
+							<h3 class="gi-phase__title">{entry.data.title}</h3>
+						</div>
+
+						{entry.data.summary && <p class="gi-phase__summary">{entry.data.summary}</p>}
+
+						<div class="gi-phase__grid">
+							{entry.data.did.length > 0 && (
+								<div class="gi-block">
+									<h4 class="gi-block__title">
+										<Icon is:inline name="material-symbols:build-outline" class="text-base" />
+										做了什么
+									</h4>
+									<ul class="gi-list">
+										{entry.data.did.map((row) => (
+											<li>{row}</li>
+										))}
+									</ul>
+								</div>
+							)}
+
+							{entry.data.learned.length > 0 && (
+								<div class="gi-block">
+									<h4 class="gi-block__title">
+										<Icon is:inline name="material-symbols:lightbulb-rounded" class="text-base" />
+										学到了什么
+									</h4>
+									<ul class="gi-list gi-list--learned">
+										{entry.data.learned.map((row) => (
+											<li>{row}</li>
+										))}
+									</ul>
+								</div>
+							)}
+						</div>
+
+						{entry.data.stack.length > 0 && (
+							<ul class="gi-tags">
+								{entry.data.stack.map((tag) => (
+									<li class="gi-tag">{tag}</li>
+								))}
+							</ul>
+						)}
+
+						{hasBody && (
+							<details class="gi-more">
+								<summary class="gi-more__toggle">
+									<span>展开完整记录</span>
+									<Icon
+										is:inline
+										name="material-symbols:expand-more-rounded"
+										class="text-[1.15rem] gi-more__chevron"
+									/>
+								</summary>
+								<div class="gi-more__body custom-md">
+									<Content />
+								</div>
+							</details>
+						)}
+					</div>
+				</article>
+			))
+		}
+	</div>
+</section>
+
+<style>
+	.gi-section {
+		margin-top: 2.6rem;
+		scroll-margin-top: 10rem;
+	}
+	.gi-section__head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.8rem;
+		margin-bottom: 1.3rem;
+	}
+	.gi-section__icon {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.3rem;
+		height: 2.3rem;
+		border-radius: 13px;
+		background: var(--gi-soft);
+		color: var(--gi-accent);
+	}
+	.gi-section__title {
+		margin: 0;
+		font-size: 1.22rem;
+		font-weight: 800;
+		letter-spacing: 0.01em;
+		color: var(--gi-title);
+	}
+	.gi-section__desc {
+		margin: 0.3rem 0 0;
+		font-size: 0.82rem;
+		line-height: 1.7;
+		color: var(--gi-muted);
+	}
+
+	/* ===================== 时间线骨架 ===================== */
+	.gi-timeline {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 1.1rem;
+	}
+	.gi-timeline::before {
+		content: "";
+		position: absolute;
+		left: calc(1.3rem - 1px);
+		top: 1.6rem;
+		bottom: 1.6rem;
+		width: 2px;
+		border-radius: 2px;
+		background: linear-gradient(
+			to bottom,
+			color-mix(in srgb, var(--gi-accent) 50%, transparent),
+			color-mix(in srgb, var(--gi-accent) 10%, transparent)
+		);
+	}
+	.gi-phase {
+		position: relative;
+		display: grid;
+		grid-template-columns: 2.6rem minmax(0, 1fr);
+		align-items: start;
+	}
+	.gi-phase__node {
+		grid-column: 1;
+		justify-self: center;
+		margin-top: 1.2rem;
+		width: 1.9rem;
+		height: 1.9rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 999px;
+		font-size: 0.78rem;
+		font-weight: 800;
+		color: var(--gi-on-accent);
+		background: var(--gi-accent);
+		border: 3px solid var(--gi-surface);
+		box-shadow: 0 0 0 1px color-mix(in srgb, var(--gi-accent) 32%, transparent);
+	}
+
+	/* ===================== 阶段卡片 ===================== */
+	.gi-phase__card {
+		grid-column: 2;
+		min-width: 0;
+		padding: 1.05rem 1.15rem 1.15rem;
+		border-radius: 18px;
+		border: 1px solid var(--gi-line);
+		background: var(--gi-surface);
+		transition:
+			border-color 220ms ease,
+			box-shadow 220ms ease,
+			transform 220ms ease;
+	}
+	.gi-phase__card:hover {
+		border-color: color-mix(in srgb, var(--gi-accent) 40%, transparent);
+		box-shadow: 0 14px 34px rgb(0 0 0 / 0.09);
+		transform: translateY(-2px);
+	}
+	.gi-phase__top {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 0.65rem;
+	}
+	.gi-period {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+		padding: 0.2rem 0.65rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		color: var(--gi-accent);
+		background: var(--gi-soft);
+		border: 1px solid color-mix(in srgb, var(--gi-accent) 28%, transparent);
+	}
+	.gi-phase__title {
+		margin: 0;
+		font-size: 1.08rem;
+		font-weight: 800;
+		color: var(--gi-title);
+	}
+	.gi-phase__summary {
+		margin: 0.6rem 0 0;
+		font-size: 0.87rem;
+		line-height: 1.75;
+		color: var(--gi-body);
+	}
+
+	.gi-phase__grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+		gap: 0.4rem 1.2rem;
+		margin-top: 0.95rem;
+	}
+	.gi-block {
+		min-width: 0;
+	}
+	.gi-block__title {
+		display: flex;
+		align-items: center;
+		gap: 0.32rem;
+		margin: 0 0 0.45rem;
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: var(--gi-accent);
+	}
+	.gi-list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.38rem;
+	}
+	.gi-list li {
+		position: relative;
+		padding-left: 0.95rem;
+		font-size: 0.83rem;
+		line-height: 1.75;
+		color: var(--gi-body);
+		word-break: break-word;
+	}
+	.gi-list li::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		top: 0.62rem;
+		width: 0.38rem;
+		height: 0.38rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--gi-accent) 55%, transparent);
+	}
+	.gi-list--learned li::before {
+		top: 0.58rem;
+		width: 0.44rem;
+		height: 0.44rem;
+		background: transparent;
+		border: 1.5px solid color-mix(in srgb, var(--gi-accent) 60%, transparent);
+	}
+
+	.gi-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin: 0.9rem 0 0;
+		padding: 0;
+		list-style: none;
+	}
+	.gi-tag {
+		padding: 0.16rem 0.6rem;
+		border-radius: 999px;
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: var(--gi-muted);
+		background: var(--gi-sunken);
+		border: 1px solid var(--gi-line);
+	}
+
+	/* ===================== 展开正文 ===================== */
+	.gi-more {
+		margin-top: 0.95rem;
+		border-top: 1px dashed var(--gi-line);
+		padding-top: 0.7rem;
+	}
+	.gi-more__toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--gi-accent);
+		cursor: pointer;
+		list-style: none;
+		user-select: none;
+	}
+	.gi-more__toggle::-webkit-details-marker {
+		display: none;
+	}
+	.gi-more__chevron {
+		transition: transform 220ms ease;
+	}
+	.gi-more[open] .gi-more__chevron {
+		transform: rotate(180deg);
+	}
+	.gi-more__body {
+		margin-top: 0.6rem;
+		padding: 0.1rem 0 0.2rem;
+		font-size: 0.88rem;
+	}
+	.gi-more__body :global(p) {
+		line-height: 1.9;
+	}
+	.gi-more__body :global(p:first-child) {
+		margin-top: 0;
+	}
+	.gi-more__body :global(p:last-child) {
+		margin-bottom: 0;
+	}
+
+	@media (max-width: 639px) {
+		.gi-phase {
+			grid-template-columns: 2.1rem minmax(0, 1fr);
+		}
+		.gi-timeline::before {
+			left: calc(1.05rem - 1px);
+		}
+		.gi-phase__node {
+			width: 1.6rem;
+			height: 1.6rem;
+			font-size: 0.7rem;
+			border-width: 2px;
+		}
+		.gi-phase__card {
+			padding: 0.95rem 0.95rem 1rem;
+			border-radius: 16px;
+		}
+	}
+</style>

@@ -1,0 +1,211 @@
+---
+// 算法 Hot100：按官方分类分组铺开，点进去看题解
+import { getCollection } from "astro:content";
+import { Icon } from "astro-icon/components";
+import InterviewShell from "@/components/interview/InterviewShell.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+const entries = (await getCollection("hot100", ({ data }) => !data.draft)).sort(
+	(a, b) => a.data.no - b.data.no,
+);
+
+/** 力扣官方 100 题的 17 个分类，按题单顺序 */
+const CATEGORY_ORDER = [
+	"哈希",
+	"双指针",
+	"滑动窗口",
+	"子串",
+	"普通数组",
+	"矩阵",
+	"链表",
+	"二叉树",
+	"图论",
+	"回溯",
+	"二分查找",
+	"栈",
+	"堆",
+	"贪心算法",
+	"动态规划",
+	"多维动态规划",
+	"技巧",
+];
+
+const buckets = new Map<string, typeof entries>();
+for (const entry of entries) {
+	const key = entry.data.category;
+	const bucket = buckets.get(key);
+	if (bucket) {
+		bucket.push(entry);
+	} else {
+		buckets.set(key, [entry]);
+	}
+}
+
+const orderOf = (category: string) => {
+	const index = CATEGORY_ORDER.indexOf(category);
+	return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+};
+
+const groups = [...buckets]
+	.sort((a, b) => orderOf(a[0]) - orderOf(b[0]))
+	.map(([category, list]) => ({ category, list }));
+
+const TONE: Record<string, string> = {
+	简单: "easy",
+	中等: "medium",
+	困难: "hard",
+};
+
+const countDiff = (difficulty: string) =>
+	entries.filter((entry) => entry.data.difficulty === difficulty).length;
+
+const stats = [
+	{ label: "已收录", value: `${entries.length}/100` },
+	{ label: "简单", value: countDiff("简单") },
+	{ label: "中等", value: countDiff("中等") },
+	{ label: "困难", value: countDiff("困难") },
+];
+
+const title = "算法 Hot100";
+const description =
+	"力扣官方 100 题清单，按分类铺开，每题记核心思路而不是抄题解。";
+---
+
+<MainGridLayout title={title} description={description} hideSidebars>
+	<InterviewShell
+		kicker="ALGORITHM"
+		title="算法 Hot100"
+		desc="力扣官方题单，按分类铺开。每一题记两件事：这题的关键在哪，以及我第一次写错在哪。刷题进度还在做，先把清单和题解补起来。"
+		current="hot100"
+		stats={stats}
+	>
+		{
+			entries.length === 0 && (
+				<div class="iv-empty">
+					还没有题。去 <code>src/content/hot100/</code> 加一道试试。
+				</div>
+			)
+		}
+
+		{groups.map((group) => (
+			<section class="iv-block">
+				<div class="iv-block__head">
+					<h2 class="iv-block__title">{group.category}</h2>
+					<span class="iv-block__count">{group.list.length} 题</span>
+				</div>
+
+				<div class="iv-prob-list">
+					{group.list.map((entry) => (
+						<a class="iv-prob" href={`/interview/hot100/${entry.id}/`}>
+							<span class="iv-prob__no">{String(entry.data.no).padStart(3, "0")}</span>
+							<span class="iv-prob__main">
+								<span class="iv-prob__title">{entry.data.title}</span>
+								{entry.data.keyIdea && (
+									<span class="iv-prob__idea">{entry.data.keyIdea}</span>
+								)}
+							</span>
+							<span class="iv-prob__diff">
+								<i class:list={["iv-dot", `iv-dot--${TONE[entry.data.difficulty] ?? "medium"}`]} />
+								{entry.data.difficulty}
+							</span>
+							<Icon
+								is:inline
+								name="material-symbols:arrow-forward-rounded"
+								class="iv-prob__arrow"
+							/>
+						</a>
+					))}
+				</div>
+			</section>
+		))}
+	</InterviewShell>
+</MainGridLayout>
+
+<style>
+	.iv-prob-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+
+	.iv-prob {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.7rem 0.9rem;
+		border-radius: 14px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		text-decoration: none;
+		transition:
+			border-color 180ms ease,
+			transform 180ms ease,
+			background-color 180ms ease;
+	}
+	.iv-prob:hover {
+		border-color: color-mix(in srgb, var(--iv-accent) 45%, transparent);
+		transform: translateX(3px);
+	}
+
+	.iv-prob__no {
+		flex: none;
+		width: 2.4rem;
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.76rem;
+		font-weight: 700;
+		color: var(--iv-faint);
+	}
+
+	.iv-prob__main {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		min-width: 0;
+	}
+
+	.iv-prob__title {
+		font-size: 0.9rem;
+		font-weight: 700;
+		color: var(--iv-title);
+	}
+
+	.iv-prob__idea {
+		font-size: 0.75rem;
+		line-height: 1.6;
+		color: var(--iv-muted);
+		overflow: hidden;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 1;
+		line-clamp: 1;
+	}
+
+	.iv-prob__diff {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.28rem;
+		margin-left: auto;
+		font-size: 0.72rem;
+		color: var(--iv-muted);
+	}
+
+	.iv-prob__arrow {
+		flex: none;
+		font-size: 1rem;
+		color: var(--iv-faint);
+		transition: transform 180ms ease;
+	}
+	.iv-prob:hover .iv-prob__arrow {
+		transform: translateX(3px);
+		color: var(--iv-accent);
+	}
+
+	@media (max-width: 639px) {
+		.iv-prob__idea {
+			display: none;
+		}
+	}
+</style>

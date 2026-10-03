@@ -1,0 +1,200 @@
+---
+// 面经卡片：一场面试一张卡，点进详情看问题和复盘
+import type { CollectionEntry } from "astro:content";
+import { Icon } from "astro-icon/components";
+
+interface Props {
+	entry: CollectionEntry<"interviews">;
+}
+
+const { entry } = Astro.props;
+const { company, position, date, stage, result, difficulty, tags, summary } =
+	entry.data;
+
+/** 结果 → 语义色，加新结果时在这里补一个映射就行 */
+const RESULT_TONE: Record<string, string> = {
+	offer: "easy",
+	挂: "hard",
+	待定: "medium",
+	已约: "medium",
+};
+const tone = RESULT_TONE[result] ?? "medium";
+
+const LEVELS = [1, 2, 3, 4, 5];
+
+function formatDate(value: Date) {
+	const y = value.getFullYear();
+	const m = String(value.getMonth() + 1).padStart(2, "0");
+	const d = String(value.getDate()).padStart(2, "0");
+	return `${y}.${m}.${d}`;
+}
+
+const href = `/interview/experience/${entry.id}/`;
+---
+
+<a class="iv-exp" href={href}>
+	<div class="iv-exp__top">
+		<span class="iv-exp__stage">{stage}</span>
+		<h3 class="iv-exp__company">{company}</h3>
+		<span class:list={["iv-exp__result", `iv-exp__result--${tone}`]}>{result}</span>
+	</div>
+
+	<p class="iv-exp__meta">
+		<span>{position}</span>
+		<span class="iv-exp__sep" aria-hidden="true">·</span>
+		<time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time>
+	</p>
+
+	{summary && <p class="iv-exp__summary">{summary}</p>}
+
+	<div class="iv-exp__bottom">
+		<span class="iv-exp__diff" title={`主观难度 ${difficulty}/5`}>
+			{LEVELS.map((level) => (
+				<span class:list={["iv-exp__pip", { "is-on": level <= difficulty }]} />
+			))}
+			<span class="iv-exp__diff-text">难度 {difficulty}/5</span>
+		</span>
+
+		{tags.length > 0 && (
+			<ul class="iv-tags iv-exp__tags">
+				{tags.slice(0, 4).map((tag) => (
+					<li class="iv-tag">{tag}</li>
+				))}
+			</ul>
+		)}
+
+		<Icon is:inline name="material-symbols:arrow-forward-rounded" class="iv-exp__arrow" />
+	</div>
+</a>
+
+<style>
+	.iv-exp {
+		display: block;
+		padding: 1.05rem 1.15rem 0.95rem;
+		border-radius: 16px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		text-decoration: none;
+		transition:
+			border-color 200ms ease,
+			transform 200ms ease,
+			box-shadow 200ms ease;
+	}
+
+	.iv-exp:hover {
+		border-color: color-mix(in srgb, var(--iv-accent) 45%, transparent);
+		transform: translateY(-2px);
+		box-shadow: 0 14px 30px rgb(0 0 0 / 0.08);
+	}
+
+	.iv-exp__top {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.iv-exp__stage {
+		flex: none;
+		padding: 0.18rem 0.6rem;
+		border-radius: 999px;
+		font-size: 0.68rem;
+		font-weight: 700;
+		color: var(--iv-accent);
+		background: var(--iv-soft);
+		border: 1px solid color-mix(in srgb, var(--iv-accent) 26%, transparent);
+	}
+
+	.iv-exp__company {
+		margin: 0;
+		font-size: 1.02rem;
+		font-weight: 800;
+		color: var(--iv-title);
+	}
+
+	.iv-exp__result {
+		margin-left: auto;
+		padding: 0.16rem 0.6rem;
+		border-radius: 999px;
+		font-size: 0.68rem;
+		font-weight: 700;
+		border: 1px solid currentcolor;
+	}
+	.iv-exp__result--easy {
+		color: var(--iv-easy);
+		background: color-mix(in srgb, var(--iv-easy) 12%, transparent);
+	}
+	.iv-exp__result--medium {
+		color: var(--iv-medium);
+		background: color-mix(in srgb, var(--iv-medium) 12%, transparent);
+	}
+	.iv-exp__result--hard {
+		color: var(--iv-hard);
+		background: color-mix(in srgb, var(--iv-hard) 12%, transparent);
+	}
+
+	.iv-exp__meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.3rem;
+		margin: 0.35rem 0 0;
+		font-size: 0.74rem;
+		color: var(--iv-faint);
+	}
+	.iv-exp__sep {
+		opacity: 0.6;
+	}
+
+	.iv-exp__summary {
+		margin: 0.6rem 0 0;
+		font-size: 0.83rem;
+		line-height: 1.8;
+		color: var(--iv-body);
+	}
+
+	.iv-exp__bottom {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 0.7rem;
+		margin-top: 0.8rem;
+		padding-top: 0.65rem;
+		border-top: 1px dashed var(--iv-line);
+	}
+
+	.iv-exp__diff {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.22rem;
+	}
+	.iv-exp__pip {
+		width: 0.42rem;
+		height: 0.42rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--text-color) 16%, transparent);
+	}
+	.iv-exp__pip.is-on {
+		background: var(--iv-accent);
+	}
+	.iv-exp__diff-text {
+		margin-left: 0.2rem;
+		font-size: 0.7rem;
+		color: var(--iv-faint);
+	}
+
+	.iv-exp__tags {
+		min-width: 0;
+	}
+
+	.iv-exp__arrow {
+		margin-left: auto;
+		font-size: 1.05rem;
+		color: var(--iv-faint);
+		transition: transform 200ms ease;
+	}
+	.iv-exp:hover .iv-exp__arrow {
+		transform: translateX(3px);
+		color: var(--iv-accent);
+	}
+</style>

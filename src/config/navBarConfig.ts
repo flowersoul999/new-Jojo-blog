@@ -36,6 +36,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 	// 技能树
 	links.push(LinkPresets.Skills);
 
+	// 面试（求职准备：面经 / 八股 / Hot100 / 手撕题）
+	links.push(LinkPresets.Interview);
+
 	// 站点统计（暂时隐藏，页面仍可通过 /analytics/ 访问）
 	// links.push(LinkPresets.Analytics);
 
@@ -54,6 +57,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		url: "#",
 		icon: "material-symbols:person",
 		children: [
+			// 实习经历（Golden Experience）
+			LinkPresets.Internship,
+
 			// 相册
 			LinkPresets.Gallery,
 
@@ -154,6 +160,12 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		url: "/skills/",
 		icon: "material-symbols:account-tree-rounded",
 	},
+	Interview: {
+		name: "面试",
+		url: "/interview/",
+		icon: "material-symbols:work",
+		pageKey: "interview",
+	},
 	Friends: {
 		name: "友链",
 		url: "/friends/",
@@ -185,6 +197,12 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		name: "站点统计",
 		url: "/analytics/",
 		icon: "material-symbols:monitoring-rounded",
+	},
+	Internship: {
+		name: "Golden Experience",
+		url: "/internship/",
+		icon: "material-symbols:auto-awesome-rounded",
+		pageKey: "internship",
 	},
 	BlogChangelog: {
 		name: "博客日志",

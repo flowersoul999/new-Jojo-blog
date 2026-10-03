@@ -1,0 +1,158 @@
+---
+// 面试板块首页：四个模块的入口卡（带条数 + 一句话说明）
+import { Icon } from "astro-icon/components";
+import { INTERVIEW_MODULES } from "@/data/interview";
+
+interface Props {
+	/** key → 条数 */
+	counts: Record<string, number>;
+}
+
+const { counts } = Astro.props;
+
+/** 各模块的计量单位，跟中文习惯走 */
+const UNIT: Record<string, string> = {
+	experience: "场",
+	questions: "条",
+	hot100: "题",
+	handcraft: "道",
+};
+---
+
+<div class="iv-modules">
+	{
+		INTERVIEW_MODULES.map((mod) => (
+			<a class="iv-module" href={mod.href}>
+				<span class="iv-module__icon" aria-hidden="true">
+					<Icon is:inline name={mod.icon} />
+				</span>
+
+				<span class="iv-module__head">
+					<span class="iv-module__name">{mod.name}</span>
+					<span class="iv-module__hint">{mod.hint}</span>
+				</span>
+
+				<span class="iv-module__desc">{mod.desc}</span>
+
+				<span class="iv-module__foot">
+					<span class="iv-module__count">{counts[mod.key] ?? 0}</span>
+					<span class="iv-module__unit">{UNIT[mod.key] ?? "条"}</span>
+					<Icon
+						is:inline
+						name="material-symbols:arrow-forward-rounded"
+						class="iv-module__arrow"
+					/>
+				</span>
+			</a>
+		))
+	}
+</div>
+
+<style>
+	.iv-modules {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+	}
+
+	.iv-module {
+		display: grid;
+		grid-template-rows: auto auto 1fr auto;
+		gap: 0.5rem;
+		padding: 1.05rem 1.1rem 0.95rem;
+		border-radius: 16px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		text-decoration: none;
+		transition:
+			border-color 200ms ease,
+			transform 200ms ease,
+			box-shadow 200ms ease;
+	}
+
+	.iv-module:hover {
+		border-color: color-mix(in srgb, var(--iv-accent) 45%, transparent);
+		transform: translateY(-3px);
+		box-shadow: 0 14px 30px rgb(0 0 0 / 0.08);
+	}
+
+	.iv-module__icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.35rem;
+		height: 2.35rem;
+		border-radius: 12px;
+		font-size: 1.35rem;
+		background: var(--iv-soft);
+		color: var(--iv-accent);
+	}
+
+	.iv-module__head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.4rem;
+	}
+
+	.iv-module__name {
+		font-size: 1.02rem;
+		font-weight: 800;
+		color: var(--iv-title);
+	}
+
+	.iv-module__hint {
+		padding: 0.1rem 0.5rem;
+		border-radius: 999px;
+		font-size: 0.64rem;
+		font-weight: 700;
+		color: var(--iv-accent);
+		background: var(--iv-soft);
+		border: 1px solid color-mix(in srgb, var(--iv-accent) 26%, transparent);
+	}
+
+	.iv-module__desc {
+		font-size: 0.79rem;
+		line-height: 1.75;
+		color: var(--iv-muted);
+	}
+
+	.iv-module__foot {
+		display: flex;
+		align-items: baseline;
+		gap: 0.2rem;
+		margin-top: 0.35rem;
+		padding-top: 0.6rem;
+		border-top: 1px dashed var(--iv-line);
+	}
+
+	.iv-module__count {
+		font-size: 1.28rem;
+		font-weight: 800;
+		line-height: 1;
+		color: var(--iv-accent);
+	}
+
+	.iv-module__unit {
+		font-size: 0.72rem;
+		color: var(--iv-faint);
+	}
+
+	.iv-module__arrow {
+		margin-left: auto;
+		font-size: 1.05rem;
+		color: var(--iv-faint);
+		transition: transform 200ms ease;
+	}
+
+	.iv-module:hover .iv-module__arrow {
+		transform: translateX(3px);
+		color: var(--iv-accent);
+	}
+
+	@media (max-width: 639px) {
+		.iv-modules {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

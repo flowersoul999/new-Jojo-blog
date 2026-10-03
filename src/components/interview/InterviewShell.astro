@@ -1,0 +1,337 @@
+---
+// 面试板块外壳：页头 + 模块切换条 + 设计令牌
+// 令牌集中在 .iv-shell 上，所有子页面与子组件都从这里继承，浅色/深色自动跟随主题
+import { Icon } from "astro-icon/components";
+import { INTERVIEW_MODULES } from "@/data/interview";
+
+interface Stat {
+	label: string;
+	value: string | number;
+}
+
+interface Props {
+	kicker?: string;
+	title: string;
+	desc?: string;
+	/** 当前模块 key；传 "home"（默认）时不渲染模块切换条 */
+	current?: string;
+	stats?: Stat[];
+}
+
+const {
+	kicker = "INTERVIEW PREP",
+	title,
+	desc = "",
+	current = "home",
+	stats = [],
+} = Astro.props;
+
+const showTabs = current !== "home";
+---
+
+<div class="iv-shell">
+	<header class="iv-hero">
+		<p class="iv-hero__kicker">{kicker}</p>
+		<h1 class="iv-hero__title">{title}</h1>
+		{desc && <p class="iv-hero__desc">{desc}</p>}
+
+		{
+			stats.length > 0 && (
+				<ul class="iv-stats">
+					{stats.map((stat) => (
+						<li class="iv-stat">
+							<span class="iv-stat__value">{stat.value}</span>
+							<span class="iv-stat__label">{stat.label}</span>
+						</li>
+					))}
+				</ul>
+			)
+		}
+	</header>
+
+	{
+		showTabs && (
+			<nav class="iv-tabs" aria-label="面试板块导航">
+				{INTERVIEW_MODULES.map((mod) => (
+					<a
+						class:list={["iv-tab", { "is-active": mod.key === current }]}
+						href={mod.href}
+						aria-current={mod.key === current ? "page" : undefined}
+					>
+						<span class="iv-tab__icon" aria-hidden="true">
+							<Icon is:inline name={mod.icon} />
+						</span>
+						<span class="iv-tab__text">
+							<span class="iv-tab__name">{mod.name}</span>
+							<span class="iv-tab__hint">{mod.hint}</span>
+						</span>
+					</a>
+				))}
+			</nav>
+		)
+	}
+
+	<div class="iv-body">
+		<slot />
+	</div>
+</div>
+
+<style is:global>
+	/* ============================================================================
+	   设计令牌 —— 全部基于主题变量推导，浅色 / 深色模式自动跟着走。
+	   --text-color 是主题感知的文字色，不要换成 --deep-text。
+	   ============================================================================ */
+	.iv-shell {
+		--iv-accent: var(--primary);
+		--iv-on-accent: #ffffff;
+		--iv-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+		--iv-title: var(--text-color);
+		--iv-body: color-mix(in srgb, var(--text-color) 76%, transparent);
+		--iv-muted: color-mix(in srgb, var(--text-color) 58%, transparent);
+		--iv-faint: color-mix(in srgb, var(--text-color) 44%, transparent);
+		--iv-line: var(--line-divider);
+		--iv-surface: var(--card-bg);
+		--iv-sunken: color-mix(in srgb, var(--text-color) 6%, transparent);
+		/* 难度 / 结果三档语义色 */
+		--iv-easy: #1f9d6b;
+		--iv-medium: #c98400;
+		--iv-hard: #d64545;
+		min-width: 0;
+	}
+	html.dark .iv-shell {
+		--iv-on-accent: rgb(0 0 0 / 0.8);
+		--iv-easy: #3ec98f;
+		--iv-medium: #e0a83a;
+		--iv-hard: #f0736f;
+	}
+
+	/* ===================== 页头 ===================== */
+	.iv-hero {
+		position: relative;
+		padding: 1.5rem 1.4rem 1.35rem;
+		border-radius: 18px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		overflow: hidden;
+	}
+	.iv-hero::before {
+		content: "";
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: 3px;
+		background: linear-gradient(
+			to bottom,
+			color-mix(in srgb, var(--iv-accent) 80%, transparent),
+			color-mix(in srgb, var(--iv-accent) 10%, transparent)
+		);
+	}
+	.iv-hero__kicker {
+		margin: 0;
+		font-size: 0.62rem;
+		font-weight: 700;
+		letter-spacing: 0.26em;
+		color: var(--iv-accent);
+	}
+	.iv-hero__title {
+		margin: 0.45rem 0 0;
+		font-size: clamp(1.5rem, 5vw, 2rem);
+		font-weight: 800;
+		line-height: 1.15;
+		color: var(--iv-title);
+	}
+	.iv-hero__desc {
+		margin: 0.65rem 0 0;
+		max-width: 44rem;
+		font-size: 0.86rem;
+		line-height: 1.85;
+		color: var(--iv-muted);
+	}
+
+	/* ===================== 统计条 ===================== */
+	.iv-stats {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+		gap: 0.5rem;
+		margin: 1.15rem 0 0;
+		padding: 0;
+		list-style: none;
+	}
+	.iv-stat {
+		padding: 0.6rem 0.75rem;
+		border-radius: 12px;
+		background: var(--iv-sunken);
+		border: 1px solid var(--iv-line);
+	}
+	.iv-stat__value {
+		display: block;
+		font-size: 1.3rem;
+		font-weight: 800;
+		line-height: 1.1;
+		color: var(--iv-accent);
+	}
+	.iv-stat__label {
+		display: block;
+		margin-top: 0.15rem;
+		font-size: 0.7rem;
+		color: var(--iv-muted);
+	}
+
+	/* ===================== 模块切换条 ===================== */
+	.iv-tabs {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.5rem;
+		margin-top: 1rem;
+	}
+	.iv-tab {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.65rem 0.75rem;
+		border-radius: 14px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		text-decoration: none;
+		transition:
+			border-color 200ms ease,
+			background-color 200ms ease,
+			transform 200ms ease;
+	}
+	.iv-tab:hover {
+		border-color: color-mix(in srgb, var(--iv-accent) 42%, transparent);
+		transform: translateY(-2px);
+	}
+	.iv-tab.is-active {
+		border-color: color-mix(in srgb, var(--iv-accent) 55%, transparent);
+		background: var(--iv-soft);
+	}
+	.iv-tab__icon {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.9rem;
+		height: 1.9rem;
+		border-radius: 10px;
+		font-size: 1.15rem;
+		background: var(--iv-sunken);
+		color: var(--iv-muted);
+	}
+	.iv-tab.is-active .iv-tab__icon {
+		background: var(--iv-soft);
+		color: var(--iv-accent);
+	}
+	.iv-tab__text {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.iv-tab__name {
+		font-size: 0.86rem;
+		font-weight: 700;
+		color: var(--iv-title);
+		white-space: nowrap;
+	}
+	.iv-tab__hint {
+		font-size: 0.66rem;
+		color: var(--iv-faint);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.iv-body {
+		margin-top: 1.4rem;
+	}
+
+	/* ===================== 子页面通用区块 ===================== */
+	.iv-block + .iv-block {
+		margin-top: 1.7rem;
+	}
+	.iv-block[id] {
+		scroll-margin-top: 7rem;
+	}
+	.iv-block__head {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+	}
+	.iv-block__title {
+		margin: 0;
+		font-size: 1.02rem;
+		font-weight: 800;
+		color: var(--iv-title);
+	}
+	.iv-block__count {
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--iv-faint);
+	}
+	.iv-block__note {
+		margin: 0.25rem 0 0;
+		font-size: 0.78rem;
+		line-height: 1.7;
+		color: var(--iv-muted);
+	}
+
+	/* ===================== 通用件 ===================== */
+	.iv-panel {
+		border-radius: 16px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		padding: 1rem 1.1rem;
+	}
+	.iv-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.iv-tag {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.14rem 0.55rem;
+		border-radius: 999px;
+		font-size: 0.68rem;
+		font-weight: 600;
+		color: var(--iv-muted);
+		background: var(--iv-sunken);
+		border: 1px solid var(--iv-line);
+	}
+	.iv-dot {
+		display: inline-block;
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 999px;
+		flex: none;
+	}
+	.iv-dot--easy {
+		background: var(--iv-easy);
+	}
+	.iv-dot--medium {
+		background: var(--iv-medium);
+	}
+	.iv-dot--hard {
+		background: var(--iv-hard);
+	}
+	.iv-empty {
+		padding: 1.4rem;
+		border-radius: 16px;
+		border: 1px dashed var(--iv-line);
+		text-align: center;
+		font-size: 0.82rem;
+		color: var(--iv-faint);
+	}
+
+	@media (max-width: 767px) {
+		.iv-tabs {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.iv-hero {
+			padding: 1.2rem 1.1rem 1.15rem;
+			border-radius: 16px;
+		}
+	}
+</style>

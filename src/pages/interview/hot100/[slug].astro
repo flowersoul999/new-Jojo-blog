@@ -1,0 +1,265 @@
+---
+// Hot100 题解详情：关键思路 + 代码 + 易错点
+import { type CollectionEntry, getCollection, render } from "astro:content";
+import { Icon } from "astro-icon/components";
+import InterviewShell from "@/components/interview/InterviewShell.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+	const entries = await getCollection("hot100", ({ data }) => !data.draft);
+	return entries.map((entry) => ({
+		params: { slug: entry.id },
+		props: { entry },
+	}));
+}
+
+interface Props {
+	entry: CollectionEntry<"hot100">;
+}
+
+const { entry } = Astro.props;
+const {
+	no,
+	title,
+	difficulty,
+	category,
+	leetcode,
+	keyIdea,
+	complexity,
+	related,
+} = entry.data;
+
+const { Content } = await render(entry);
+
+const TONE: Record<string, string> = {
+	简单: "easy",
+	中等: "medium",
+	困难: "hard",
+};
+
+/** 相似题：按题号在同一个集合里捞，顺带拿到标题 */
+const all = await getCollection("hot100");
+const relatedItems = related
+	.map((num) => all.find((item) => item.data.no === num))
+	.filter((item): item is CollectionEntry<"hot100"> => item !== undefined);
+
+const stats = [
+	{ label: "难度", value: difficulty },
+	{ label: "分类", value: category },
+	{ label: "复杂度", value: complexity || "—" },
+];
+---
+
+<MainGridLayout title={`${no}. ${title}`} description={keyIdea} hideSidebars>
+	<InterviewShell
+		kicker={`LEETCODE #${no}`}
+		title={title}
+		desc=""
+		current="hot100"
+		stats={stats}
+	>
+		<article class="iv-sol">
+			<div class="iv-sol__top">
+				<span class:list={["iv-sol__diff", `iv-sol__diff--${TONE[difficulty] ?? "medium"}`]}>
+					<i class:list={["iv-dot", `iv-dot--${TONE[difficulty] ?? "medium"}`]} />
+					{difficulty}
+				</span>
+
+				{leetcode && (
+					<a class="iv-sol__link" href={leetcode} target="_blank" rel="noopener noreferrer">
+						<Icon is:inline name="material-symbols:open-in-new-rounded" />
+						去力扣做题
+					</a>
+				)}
+			</div>
+
+			{keyIdea && (
+				<div class="iv-sol__idea">
+					<span class="iv-sol__idea-label">关键</span>
+					<p>{keyIdea}</p>
+				</div>
+			)}
+
+			<div class="iv-sol__body custom-md">
+				<Content />
+			</div>
+		</article>
+
+		{
+			relatedItems.length > 0 && (
+				<section class="iv-block">
+					<div class="iv-block__head">
+						<h2 class="iv-block__title">相似题</h2>
+					</div>
+					<div class="iv-sol__related">
+						{relatedItems.map((item) => (
+							<a class="iv-related__item" href={`/interview/hot100/${item.id}/`}>
+								<span class="iv-related__no">#{item.data.no}</span>
+								<span>{item.data.title}</span>
+								<span class="iv-related__cat">{item.data.difficulty}</span>
+							</a>
+						))}
+					</div>
+				</section>
+			)
+		}
+
+		<div class="iv-sol__back">
+			<a class="iv-back-link" href="/interview/hot100/">
+				<Icon is:inline name="material-symbols:arrow-back-rounded" />
+				返回题单
+			</a>
+		</div>
+	</InterviewShell>
+</MainGridLayout>
+
+<style>
+	.iv-sol {
+		padding: 1.2rem 1.25rem 1.3rem;
+		border-radius: 18px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+	}
+
+	.iv-sol__top {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem;
+	}
+
+	.iv-sol__diff {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		padding: 0.2rem 0.65rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		border: 1px solid currentcolor;
+	}
+	.iv-sol__diff--easy {
+		color: var(--iv-easy);
+		background: color-mix(in srgb, var(--iv-easy) 12%, transparent);
+	}
+	.iv-sol__diff--medium {
+		color: var(--iv-medium);
+		background: color-mix(in srgb, var(--iv-medium) 12%, transparent);
+	}
+	.iv-sol__diff--hard {
+		color: var(--iv-hard);
+		background: color-mix(in srgb, var(--iv-hard) 12%, transparent);
+	}
+
+	.iv-sol__link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.28rem;
+		margin-left: auto;
+		padding: 0.26rem 0.7rem;
+		border-radius: 999px;
+		border: 1px solid color-mix(in srgb, var(--iv-accent) 40%, transparent);
+		background: var(--iv-soft);
+		font-size: 0.74rem;
+		font-weight: 600;
+		color: var(--iv-accent);
+		text-decoration: none;
+		transition: border-color 180ms ease;
+	}
+	.iv-sol__link:hover {
+		border-color: var(--iv-accent);
+	}
+
+	.iv-sol__idea {
+		display: flex;
+		gap: 0.6rem;
+		margin-top: 1rem;
+		padding: 0.8rem 0.9rem;
+		border-radius: 14px;
+		background: var(--iv-sunken);
+		border-left: 3px solid var(--iv-accent);
+	}
+	.iv-sol__idea-label {
+		flex: none;
+		font-size: 0.7rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		color: var(--iv-accent);
+	}
+	.iv-sol__idea p {
+		margin: 0;
+		font-size: 0.84rem;
+		line-height: 1.8;
+		color: var(--iv-body);
+	}
+
+	.iv-sol__body {
+		margin-top: 1.2rem;
+		font-size: 0.88rem;
+	}
+	.iv-sol__body :global(h2) {
+		margin-top: 1.6rem;
+		font-size: 1rem;
+		font-weight: 800;
+		color: var(--iv-title);
+	}
+	.iv-sol__body :global(h2:first-child) {
+		margin-top: 0;
+	}
+
+	.iv-sol__related {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.iv-related__item {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.6rem 0.8rem;
+		border-radius: 12px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		font-size: 0.82rem;
+		color: var(--iv-body);
+		text-decoration: none;
+		transition:
+			border-color 180ms ease,
+			background-color 180ms ease;
+	}
+	.iv-related__item:hover {
+		border-color: color-mix(in srgb, var(--iv-accent) 45%, transparent);
+		background: var(--iv-soft);
+	}
+	.iv-related__no {
+		flex: none;
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.74rem;
+		font-weight: 700;
+		color: var(--iv-accent);
+	}
+	.iv-related__cat {
+		margin-left: auto;
+		flex: none;
+		font-size: 0.68rem;
+		color: var(--iv-faint);
+	}
+
+	.iv-sol__back {
+		margin-top: 1.5rem;
+	}
+	.iv-back-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--iv-accent);
+		text-decoration: none;
+	}
+	.iv-back-link:hover {
+		text-decoration: underline;
+	}
+</style>

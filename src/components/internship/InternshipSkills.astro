@@ -1,0 +1,230 @@
+---
+// Golden Experience · 技能成长：左边熟练度，右边技术标签
+import { Icon } from "astro-icon/components";
+import type { InternshipSkill, InternshipStackGroup } from "@/data/internship";
+
+interface Props {
+	skills: InternshipSkill[];
+	stackGroups: InternshipStackGroup[];
+}
+
+const { skills, stackGroups } = Astro.props;
+---
+
+<section id="skills" class="gi-section" data-gi-anchor>
+	<header class="gi-section__head">
+		<span class="gi-section__icon" aria-hidden="true">
+			<Icon is:inline name="material-symbols:trending-up-rounded" class="text-[1.35rem]" />
+		</span>
+		<div>
+			<h2 class="gi-section__title">技能成长</h2>
+			<p class="gi-section__desc">
+				数字只是个大概的手感，不用太当真——重点是这几个方向确实比刚入职时清楚多了。
+			</p>
+		</div>
+	</header>
+
+	<div class="gi-skills">
+		<div class="gi-skills__panel" data-gi-reveal>
+			<h3 class="gi-panel__title">上手程度</h3>
+			<ul class="gi-skill-list">
+				{
+					skills.map((skill) => (
+						<li class="gi-skill">
+							<div class="gi-skill__row">
+								<span class="gi-skill__name">{skill.name}</span>
+								<span class="gi-skill__level">{skill.level}%</span>
+							</div>
+							<div class="gi-skill__track">
+								<span
+									class="gi-skill__bar"
+									data-gi-bar
+									data-gi-w={`${skill.level}%`}
+									style={`--gi-w: ${skill.level}%`}
+								/>
+							</div>
+							{skill.note && <p class="gi-skill__note">{skill.note}</p>}
+						</li>
+					))
+				}
+			</ul>
+		</div>
+
+		<div class="gi-skills__panel" data-gi-reveal>
+			<h3 class="gi-panel__title">技术标签</h3>
+			<div class="gi-stack">
+				{
+					stackGroups.map((group) => (
+						<div class="gi-stack__group">
+							<h4 class="gi-stack__label">
+								<Icon is:inline name="material-symbols:tag-rounded" class="text-sm" />
+								{group.title}
+							</h4>
+							<ul class="gi-stack__items">
+								{group.items.map((item) => (
+									<li class="gi-stack__item">{item}</li>
+								))}
+							</ul>
+						</div>
+					))
+				}
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.gi-section {
+		margin-top: 2.6rem;
+		scroll-margin-top: 10rem;
+	}
+	.gi-section__head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.8rem;
+		margin-bottom: 1.3rem;
+	}
+	.gi-section__icon {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.3rem;
+		height: 2.3rem;
+		border-radius: 13px;
+		background: var(--gi-soft);
+		color: var(--gi-accent);
+	}
+	.gi-section__title {
+		margin: 0;
+		font-size: 1.22rem;
+		font-weight: 800;
+		color: var(--gi-title);
+	}
+	.gi-section__desc {
+		margin: 0.3rem 0 0;
+		font-size: 0.82rem;
+		line-height: 1.7;
+		color: var(--gi-muted);
+	}
+
+	.gi-skills {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1rem;
+	}
+	.gi-skills__panel {
+		min-width: 0;
+		padding: 1.05rem 1.15rem 1.2rem;
+		border-radius: 18px;
+		border: 1px solid var(--gi-line);
+		background: var(--gi-surface);
+	}
+	.gi-panel__title {
+		margin: 0 0 1rem;
+		font-size: 0.9rem;
+		font-weight: 800;
+		color: var(--gi-title);
+	}
+
+	/* ===================== 熟练度 ===================== */
+	.gi-skill-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.gi-skill {
+		min-width: 0;
+	}
+	.gi-skill__row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.6rem;
+		margin-bottom: 0.42rem;
+	}
+	.gi-skill__name {
+		font-size: 0.84rem;
+		font-weight: 600;
+		color: var(--gi-body);
+	}
+	.gi-skill__level {
+		flex: none;
+		font-size: 0.76rem;
+		font-weight: 700;
+		color: var(--gi-accent);
+		font-variant-numeric: tabular-nums;
+	}
+	.gi-skill__track {
+		height: 0.48rem;
+		border-radius: 999px;
+		background: var(--gi-sunken);
+		overflow: hidden;
+	}
+	.gi-skill__bar {
+		display: block;
+		width: var(--gi-w, 0%);
+		height: 100%;
+		border-radius: 999px;
+		background: linear-gradient(
+			to right,
+			color-mix(in srgb, var(--gi-accent) 62%, transparent),
+			var(--gi-accent)
+		);
+		transition: width 900ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	}
+	.gi-skill__note {
+		margin: 0.32rem 0 0;
+		font-size: 0.74rem;
+		color: var(--gi-faint);
+	}
+
+	/* ===================== 技术标签 ===================== */
+	.gi-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 1.05rem;
+	}
+	.gi-stack__label {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		margin: 0 0 0.6rem;
+		font-size: 0.78rem;
+		font-weight: 700;
+		color: var(--gi-accent);
+	}
+	.gi-stack__items {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.gi-stack__item {
+		padding: 0.32rem 0.7rem;
+		border-radius: 999px;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--gi-body);
+		background: color-mix(in srgb, var(--gi-accent) 9%, transparent);
+		border: 1px solid color-mix(in srgb, var(--gi-accent) 22%, transparent);
+		transition:
+			background 180ms ease,
+			transform 180ms ease;
+	}
+	.gi-stack__item:hover {
+		background: color-mix(in srgb, var(--gi-accent) 18%, transparent);
+		transform: translateY(-1px);
+	}
+
+	@media (min-width: 860px) {
+		.gi-skills {
+			grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+		}
+	}
+</style>

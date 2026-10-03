@@ -1,0 +1,104 @@
+---
+// 面试板块首页：只做入口和概览，不放具体内容
+import { getCollection } from "astro:content";
+import InterviewShell from "@/components/interview/InterviewShell.astro";
+import ModuleGrid from "@/components/interview/ModuleGrid.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+const keep = ({ data }: { data: { draft?: boolean } }) => !data.draft;
+
+const [experiences, questions, problems, handcrafts] = await Promise.all([
+	getCollection("interviews", keep),
+	getCollection("questions", keep),
+	getCollection("hot100", keep),
+	getCollection("handcraft", keep),
+]);
+
+const counts: Record<string, number> = {
+	experience: experiences.length,
+	questions: questions.length,
+	hot100: problems.length,
+	handcraft: handcrafts.length,
+};
+
+const offers = experiences.filter(
+	(item) => item.data.result === "offer",
+).length;
+
+const stats = [
+	{ label: "场面试", value: experiences.length },
+	{ label: "条八股", value: questions.length },
+	{ label: "道刷题", value: problems.length },
+	{ label: "道手撕", value: handcrafts.length },
+];
+
+const title = "面试";
+const description =
+	"面完不写下来就等于白面了一场。这里存着每一次的真题、按领域归档的八股、力扣 Hot100 的刷题进度，以及白板上手写过的那些题。";
+---
+
+<MainGridLayout title={title} description={description} hideSidebars>
+	<InterviewShell
+		kicker="INTERVIEW PREP"
+		title="面试"
+		desc="面完不写下来，就等于白面了一场。这里存着每一次的真题目、按领域归档的八股、Hot100 的刷题进度，还有白板上手写过的那些题。"
+		stats={stats}
+	>
+		<ModuleGrid counts={counts} />
+
+		{
+			offers > 0 && (
+				<section class="iv-block">
+					<div class="iv-block__head">
+						<h2 class="iv-block__title">结果</h2>
+					</div>
+					<div class="iv-panel">
+						<p class="iv-block__note">
+							已经记录 {experiences.length} 场面试，其中 {offers} 场拿到了 offer。
+						</p>
+					</div>
+				</section>
+			)
+		}
+
+		<section class="iv-block">
+			<div class="iv-block__head">
+				<h2 class="iv-block__title">怎么用这个板块</h2>
+			</div>
+			<div class="iv-panel iv-howto">
+				<ol class="iv-howto__list">
+					<li>
+						<strong>面完当天就写。</strong>趁记忆还热，把被问到的每个问题原样记下来，包括答砸的那几个——答砸的才值钱。
+					</li>
+					<li>
+						<strong>八股先自测再展开。</strong>每张卡的答案默认是收起来的，先自己讲一遍，再点开对照，缺的部分补进去。
+					</li>
+					<li>
+						<strong>刷题只记关键。</strong>Hot100 记的是「这题的关键在哪、错在哪」，不是抄一遍题解。
+					</li>
+				</ol>
+			</div>
+		</section>
+	</InterviewShell>
+</MainGridLayout>
+
+<style>
+	.iv-howto__list {
+		margin: 0;
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+	.iv-howto__list li {
+		font-size: 0.84rem;
+		line-height: 1.85;
+		color: var(--iv-body);
+	}
+	.iv-howto__list strong {
+		color: var(--iv-title);
+		font-weight: 700;
+	}
+</style>

@@ -1,0 +1,306 @@
+---
+// Golden Experience · 页头：替身名牌 + 身份卡 + 关键指标
+import { Icon } from "astro-icon/components";
+import type { InternshipProfile } from "@/data/internship";
+
+interface Props {
+	profile: InternshipProfile;
+	title: string;
+	tagline: string;
+}
+
+const { profile, title, tagline } = Astro.props;
+const initial = profile.name.slice(0, 1);
+---
+
+<header class="gi-head" data-gi-reveal>
+	<div class="gi-head__badge">
+		<Icon is:inline name="material-symbols:auto-awesome-rounded" class="text-[1.5rem]" />
+	</div>
+	<div class="gi-head__text">
+		<div class="gi-head__kicker">STAND NAME · 实习经历</div>
+		<div class="gi-head__title">{title}</div>
+		<p class="gi-head__tagline">{tagline}</p>
+	</div>
+</header>
+
+<section class="gi-hero" data-gi-reveal>
+	<div class="gi-hero__identity">
+		{profile.avatar ? (
+			<img
+				class="gi-avatar"
+				src={profile.avatar}
+				alt=""
+				width="88"
+				height="88"
+				decoding="async"
+			/>
+		) : (
+			<div class="gi-avatar gi-avatar--text" aria-hidden="true">{initial}</div>
+		)}
+		<div class="gi-hero__id">
+			<div class="gi-hero__nameline">
+				<span class="gi-hero__name">{profile.name}</span>
+				<span class="gi-status">
+					<span class="gi-status__dot" aria-hidden="true"></span>
+					{profile.status}
+				</span>
+			</div>
+			<div class="gi-hero__role">{profile.role}</div>
+			<ul class="gi-hero__meta">
+				<li>
+					<Icon is:inline name="material-symbols:workspace-premium-rounded" class="text-sm" />
+					<span>{profile.team}</span>
+				</li>
+				<li>
+					<Icon is:inline name="material-symbols:calendar-today-rounded" class="text-sm" />
+					<span>{profile.period}</span>
+				</li>
+			</ul>
+		</div>
+	</div>
+
+	<ul class="gi-metrics">
+		{
+			profile.metrics.map((metric) => (
+				<li class="gi-metric" title={metric.hint}>
+					<span class="gi-metric__icon" aria-hidden="true">
+						<Icon is:inline name={`material-symbols:${metric.icon}`} class="text-[1.2rem]" />
+					</span>
+					<span class="gi-metric__value">{metric.value}</span>
+					<span class="gi-metric__label">{metric.label}</span>
+				</li>
+			))
+		}
+	</ul>
+</section>
+
+<p class="gi-intro" data-gi-reveal>{profile.intro}</p>
+
+{
+	profile.links.length > 0 && (
+		<div class="gi-links" data-gi-reveal>
+			{profile.links.map((link) => (
+				<a
+					class="gi-link"
+					href={link.href}
+					target={link.external ? "_blank" : undefined}
+					rel={link.external ? "noreferrer noopener" : undefined}
+				>
+					<span>{link.label}</span>
+					<Icon is:inline name={`material-symbols:${link.icon}`} class="text-base" />
+				</a>
+			))}
+		</div>
+	)
+}
+
+<style>
+	.gi-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.9rem;
+		padding-bottom: 1.15rem;
+		margin-bottom: 1.6rem;
+		border-bottom: 1px dashed var(--gi-line);
+	}
+	.gi-head__badge {
+		flex: none;
+		width: 2.6rem;
+		height: 2.6rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 14px;
+		background: var(--gi-soft);
+		color: var(--gi-accent);
+	}
+	.gi-head__kicker {
+		font-size: 0.66rem;
+		font-weight: 700;
+		letter-spacing: 0.22em;
+		color: var(--gi-accent);
+	}
+	.gi-head__title {
+		margin-top: 0.1rem;
+		font-size: clamp(1.6rem, 4vw, 2.15rem);
+		font-weight: 800;
+		line-height: 1.12;
+		letter-spacing: -0.01em;
+		color: var(--gi-title);
+	}
+	.gi-head__tagline {
+		margin: 0.4rem 0 0;
+		font-size: 0.86rem;
+		line-height: 1.6;
+		color: var(--gi-muted);
+	}
+
+	/* ===================== 身份卡 ===================== */
+	.gi-hero {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1.05rem;
+		padding: 1.15rem 1.2rem;
+		border-radius: 20px;
+		border: 1px solid var(--gi-line);
+		background: color-mix(in srgb, var(--gi-accent) 5%, var(--gi-surface));
+	}
+	.gi-hero__identity {
+		display: flex;
+		align-items: center;
+		gap: 0.95rem;
+		min-width: 0;
+	}
+	.gi-avatar {
+		flex: none;
+		width: 4.4rem;
+		height: 4.4rem;
+		border-radius: 22px;
+		object-fit: cover;
+		background: var(--gi-soft);
+		border: 1px solid color-mix(in srgb, var(--gi-accent) 30%, transparent);
+	}
+	.gi-avatar--text {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.7rem;
+		font-weight: 800;
+		color: var(--gi-accent);
+	}
+	.gi-hero__id {
+		min-width: 0;
+	}
+	.gi-hero__nameline {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.gi-hero__name {
+		font-size: 1.3rem;
+		font-weight: 800;
+		color: var(--gi-title);
+	}
+	.gi-status {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.32rem;
+		padding: 0.14rem 0.6rem 0.14rem 0.5rem;
+		border-radius: 999px;
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: var(--gi-accent);
+		background: var(--gi-soft);
+		border: 1px solid color-mix(in srgb, var(--gi-accent) 30%, transparent);
+	}
+	.gi-status__dot {
+		width: 0.4rem;
+		height: 0.4rem;
+		border-radius: 999px;
+		background: var(--gi-accent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--gi-accent) 22%, transparent);
+	}
+	.gi-hero__role {
+		margin-top: 0.28rem;
+		font-size: 0.88rem;
+		font-weight: 600;
+		color: var(--gi-body);
+	}
+	.gi-hero__meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem 1rem;
+		margin: 0.5rem 0 0;
+		padding: 0;
+		list-style: none;
+		font-size: 0.76rem;
+		color: var(--gi-muted);
+	}
+	.gi-hero__meta li {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+	.gi-hero__meta li span {
+		word-break: break-word;
+	}
+
+	/* ===================== 指标 ===================== */
+	.gi-metrics {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+		gap: 0.6rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.gi-metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		padding: 0.7rem 0.8rem;
+		border-radius: 14px;
+		background: var(--gi-surface);
+		border: 1px solid var(--gi-line);
+	}
+	.gi-metric__icon {
+		color: var(--gi-accent);
+		line-height: 1;
+		margin-bottom: 0.15rem;
+	}
+	.gi-metric__value {
+		font-size: 1.15rem;
+		font-weight: 800;
+		line-height: 1.2;
+		color: var(--gi-title);
+	}
+	.gi-metric__label {
+		font-size: 0.7rem;
+		color: var(--gi-muted);
+	}
+
+	/* ===================== 自我介绍与链接 ===================== */
+	.gi-intro {
+		margin: 1.15rem 0 0;
+		font-size: 0.92rem;
+		line-height: 1.85;
+		color: var(--gi-body);
+	}
+	.gi-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 0.9rem;
+	}
+	.gi-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.85rem;
+		border-radius: 999px;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--gi-accent);
+		background: var(--gi-soft);
+		border: 1px solid color-mix(in srgb, var(--gi-accent) 26%, transparent);
+		text-decoration: none;
+		transition:
+			background 200ms ease,
+			transform 200ms ease;
+	}
+	.gi-link:hover {
+		background: color-mix(in srgb, var(--gi-accent) 20%, transparent);
+		transform: translateY(-1px);
+	}
+
+	@media (min-width: 900px) {
+		.gi-hero {
+			grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+			align-items: center;
+			padding: 1.3rem 1.35rem;
+		}
+	}
+</style>

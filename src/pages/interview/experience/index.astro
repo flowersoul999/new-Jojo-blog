@@ -1,0 +1,79 @@
+---
+// 面经列表：一场面试一张卡，按时间倒序，按年份分组
+import { getCollection } from "astro:content";
+import ExperienceCard from "@/components/interview/ExperienceCard.astro";
+import InterviewShell from "@/components/interview/InterviewShell.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+const entries = (
+	await getCollection("interviews", ({ data }) => !data.draft)
+).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const countBy = (result: string) =>
+	entries.filter((entry) => entry.data.result === result).length;
+
+const stats = [
+	{ label: "场次", value: entries.length },
+	{ label: "offer", value: countBy("offer") },
+	{ label: "待定", value: countBy("待定") },
+	{ label: "未过", value: countBy("挂") },
+];
+
+/** 按年份分组（entries 已倒序，Map 会保持这个顺序） */
+const byYear = new Map<number, typeof entries>();
+for (const entry of entries) {
+	const year = entry.data.date.getFullYear();
+	const bucket = byYear.get(year);
+	if (bucket) {
+		bucket.push(entry);
+	} else {
+		byYear.set(year, [entry]);
+	}
+}
+
+const title = "面经";
+const description =
+	"每一次面试的真题记录：被问了什么、我是怎么答的、事后怎么想的。";
+---
+
+<MainGridLayout title={title} description={description} hideSidebars>
+	<InterviewShell
+		kicker="INTERVIEW LOG"
+		title="面经"
+		desc="一场面试一篇。重点不在「题目汇总」，而在最后那段复盘——把当场卡住的地方写清楚，下次才不会再卡。"
+		current="experience"
+		stats={stats}
+	>
+		{
+			entries.length === 0 && (
+				<div class="iv-empty">
+					还没有记录。去 <code>src/content/interviews/</code> 加一篇，或复制现成的改。
+				</div>
+			)
+		}
+
+		{[...byYear].map(([year, list]) => (
+			<section class="iv-block">
+				<div class="iv-block__head">
+					<h2 class="iv-block__title">{year} 年</h2>
+					<span class="iv-block__count">{list.length} 场</span>
+				</div>
+				<div class="iv-exp-list">
+					{list.map((entry) => (
+						<ExperienceCard entry={entry} />
+					))}
+				</div>
+			</section>
+		))}
+	</InterviewShell>
+</MainGridLayout>
+
+<style>
+	.iv-exp-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+	}
+</style>

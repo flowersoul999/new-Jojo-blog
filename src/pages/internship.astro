@@ -1,0 +1,372 @@
+---
+// Golden Experience · 实习经历页
+// ----------------------------------------------------------------------------
+// 页面只负责「怎么摆」，内容全在别处：
+//   阶段时间线 → src/content/internship/*.md
+//   其余板块   → src/data/internship.ts
+// 所以以后更新实习经历，不需要动这个文件。
+import { getCollection } from "astro:content";
+import { Icon } from "astro-icon/components";
+import InternshipHero from "@/components/internship/InternshipHero.astro";
+import InternshipHighlights from "@/components/internship/InternshipHighlights.astro";
+import InternshipRetrospective from "@/components/internship/InternshipRetrospective.astro";
+import InternshipSkills from "@/components/internship/InternshipSkills.astro";
+import InternshipTakeaways from "@/components/internship/InternshipTakeaways.astro";
+import InternshipTimeline from "@/components/internship/InternshipTimeline.astro";
+import { siteConfig } from "@/config";
+import {
+	internshipHighlights,
+	internshipMeta,
+	internshipProfile,
+	internshipRetro,
+	internshipSkills,
+	internshipStackGroups,
+	internshipTakeaways,
+} from "@/data/internship";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+if (!siteConfig.pages.internship) {
+	return Astro.redirect("/404/");
+}
+
+const phases = (await getCollection("internship"))
+	.filter((entry) => !entry.data.draft)
+	.sort((a, b) => a.data.order - b.data.order);
+
+/** 吸顶锚点导航的条目，id 要和各组件里的 section id 对上 */
+const anchors = [
+	{ id: "timeline", label: "阶段时间线", icon: "material-symbols:timeline" },
+	{
+		id: "skills",
+		label: "技能成长",
+		icon: "material-symbols:trending-up-rounded",
+	},
+	{
+		id: "takeaways",
+		label: "收获",
+		icon: "material-symbols:lightbulb-rounded",
+	},
+	{
+		id: "highlights",
+		label: "高光时刻",
+		icon: "material-symbols:local-fire-department-rounded",
+	},
+	{ id: "retro", label: "复盘", icon: "material-symbols:signpost" },
+];
+---
+
+<MainGridLayout
+	title={internshipMeta.title}
+	description={internshipMeta.description}
+	hideSidebars
+	fullWidth
+>
+	<div class="gi card-base relative z-10 w-full" data-gi-root>
+		<div class="gi-shell mx-auto w-full max-w-[78rem] px-4 sm:px-6 md:px-8 py-6 sm:py-8">
+			<!-- 移动端没有全屏壁纸上的大字标题，这里补一个 -->
+			<div class="gi-mobile-title lg:hidden">
+				<span class="gi-mobile-title__kicker">STAND NAME</span>
+				<span class="gi-mobile-title__text">{internshipMeta.title}</span>
+			</div>
+
+			<InternshipHero
+				profile={internshipProfile}
+				title={internshipProfile.title}
+				tagline={internshipProfile.tagline}
+			/>
+
+			<nav class="gi-anchors" aria-label="页面内导航">
+				<ul class="gi-anchors__list">
+					{
+						anchors.map((anchor) => (
+							<li>
+								<a
+									class="gi-anchor"
+									href={`#${anchor.id}`}
+									data-gi-anchor-link={anchor.id}
+								>
+									<Icon is:inline name={anchor.icon} class="text-base" />
+									<span>{anchor.label}</span>
+								</a>
+							</li>
+						))
+					}
+				</ul>
+			</nav>
+
+			{phases.length > 0 ? (
+				<InternshipTimeline items={phases} />
+			) : (
+				<div class="gi-empty">
+					<p>还没有记录任何阶段，去 src/content/internship/ 加一条吧。</p>
+				</div>
+			)}
+
+			<InternshipSkills skills={internshipSkills} stackGroups={internshipStackGroups} />
+			<InternshipTakeaways takeaways={internshipTakeaways} />
+			<InternshipHighlights highlights={internshipHighlights} />
+			<InternshipRetrospective retro={internshipRetro} />
+		</div>
+	</div>
+
+	<style is:global>
+		/* ============================================================================
+		   Golden Experience 设计令牌
+		   全部基于主题变量推导，所以浅色 / 深色模式自动跟着走。
+		   --text-color 是主题感知的文字色（浅色下深、深色下浅），
+		   不要换成 --deep-text，那个在深色模式下不会变浅。
+		   ============================================================================ */
+		.gi {
+			--gi-accent: var(--primary);
+			--gi-on-accent: #ffffff;
+			--gi-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+			--gi-title: var(--text-color);
+			--gi-body: color-mix(in srgb, var(--text-color) 76%, transparent);
+			--gi-muted: color-mix(in srgb, var(--text-color) 58%, transparent);
+			--gi-faint: color-mix(in srgb, var(--text-color) 44%, transparent);
+			--gi-line: var(--line-divider);
+			--gi-surface: var(--card-bg);
+			--gi-sunken: color-mix(in srgb, var(--text-color) 6%, transparent);
+		}
+		html.dark .gi {
+			--gi-on-accent: rgb(0 0 0 / 0.8);
+		}
+
+		.gi-shell {
+			min-width: 0;
+		}
+
+		/* ===================== 移动端补的标题 ===================== */
+		.gi-mobile-title {
+			display: flex;
+			flex-direction: column;
+			gap: 0.1rem;
+			margin-bottom: 1.3rem;
+		}
+		.gi-mobile-title__kicker {
+			font-size: 0.62rem;
+			font-weight: 700;
+			letter-spacing: 0.24em;
+			color: var(--gi-accent);
+		}
+		.gi-mobile-title__text {
+			font-size: clamp(1.6rem, 8vw, 2.1rem);
+			font-weight: 800;
+			line-height: 1.12;
+			color: var(--gi-title);
+		}
+
+		/* ===================== 吸顶锚点导航 ===================== */
+		.gi-anchors {
+			position: sticky;
+			top: 4.5rem;
+			z-index: 30;
+			margin: 1.4rem 0 0;
+			padding: 0.4rem 0.5rem;
+			border: 1px solid var(--gi-line);
+			border-radius: 999px;
+			background: color-mix(in srgb, var(--gi-surface) 88%, transparent);
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+		}
+		.gi-anchors__list {
+			display: flex;
+			gap: 0.25rem;
+			margin: 0;
+			padding: 0;
+			list-style: none;
+			overflow-x: auto;
+			scrollbar-width: none;
+			-ms-overflow-style: none;
+		}
+		.gi-anchors__list::-webkit-scrollbar {
+			display: none;
+		}
+		.gi-anchor {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+			flex: none;
+			padding: 0.4rem 0.85rem;
+			border-radius: 999px;
+			font-size: 0.8rem;
+			font-weight: 600;
+			white-space: nowrap;
+			text-decoration: none;
+			color: var(--gi-muted);
+			transition:
+				background 180ms ease,
+				color 180ms ease;
+		}
+		.gi-anchor:hover {
+			background: var(--gi-sunken);
+			color: var(--gi-accent);
+		}
+		.gi-anchor.is-active {
+			background: var(--gi-soft);
+			color: var(--gi-accent);
+			font-weight: 700;
+		}
+		/* 窄屏：去掉图标并收紧内边距，让 5 个入口在 390px 内排得下，不用横向滚动 */
+		@media (max-width: 639px) {
+			.gi-anchors {
+				border-radius: 16px;
+			}
+			.gi-anchor {
+				gap: 0;
+				padding: 0.36rem 0.55rem;
+				font-size: 0.72rem;
+			}
+			.gi-anchor svg {
+				display: none;
+			}
+		}
+
+		/* ===================== 滚动渐显 ===================== */
+		.gi [data-gi-reveal] {
+			opacity: 0;
+			transform: translateY(14px);
+			transition:
+				opacity 620ms ease,
+				transform 620ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		}
+		.gi [data-gi-reveal].is-visible {
+			opacity: 1;
+			transform: none;
+		}
+
+		/* ===================== 空状态 ===================== */
+		.gi-empty {
+			margin-top: 2.6rem;
+			padding: 2.5rem 1rem;
+			border: 1px dashed var(--gi-line);
+			border-radius: 18px;
+			text-align: center;
+			font-size: 0.85rem;
+			color: var(--gi-muted);
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.gi [data-gi-reveal] {
+				opacity: 1;
+				transform: none;
+				transition: none;
+			}
+		}
+	</style>
+
+	<script>
+		type GiWindow = Window & { __giObservers?: Array<{ disconnect: () => void }> };
+
+		function giGrowBars(scope: HTMLElement) {
+			for (const bar of scope.querySelectorAll<HTMLElement>("[data-gi-bar]")) {
+				const target = bar.dataset.giW;
+				if (!target) continue;
+				bar.style.setProperty("--gi-w", "0%");
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => bar.style.setProperty("--gi-w", target));
+				});
+			}
+		}
+
+		function initInternshipPage() {
+			const root = document.querySelector<HTMLElement>("[data-gi-root]");
+			if (!root) return;
+			const giWindow = window as GiWindow;
+
+			// 重新进入页面时先拆掉上一次的观察器，避免重复回调
+			for (const observer of giWindow.__giObservers ?? []) observer.disconnect();
+			giWindow.__giObservers = [];
+
+			const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+			const revealNodes = Array.from(
+				root.querySelectorAll<HTMLElement>("[data-gi-reveal]:not(.is-visible)"),
+			);
+
+			const showAll = () => {
+				for (const node of revealNodes) {
+					node.classList.add("is-visible");
+					giGrowBars(node);
+				}
+			};
+
+			if (reduceMotion || !("IntersectionObserver" in window)) {
+				showAll();
+			} else {
+				const revealObserver = new IntersectionObserver(
+					(entries, observer) => {
+						for (const entry of entries) {
+							if (!entry.isIntersecting) continue;
+							const node = entry.target as HTMLElement;
+							node.classList.add("is-visible");
+							giGrowBars(node);
+							observer.unobserve(node);
+						}
+					},
+					{ threshold: 0.12, rootMargin: "0px 0px -6% 0px" },
+				);
+				for (const node of revealNodes) revealObserver.observe(node);
+				giWindow.__giObservers?.push(revealObserver);
+			}
+
+			// ===================== 锚点导航 =====================
+			const links = Array.from(
+				root.querySelectorAll<HTMLAnchorElement>("[data-gi-anchor-link]"),
+			);
+			const sections = Array.from(root.querySelectorAll<HTMLElement>("[data-gi-anchor]"));
+			if (links.length === 0 || sections.length === 0) return;
+
+			for (const link of links) {
+				if (link.dataset.giBound === "1") continue;
+				link.dataset.giBound = "1";
+				link.addEventListener("click", (event) => {
+					event.preventDefault();
+					const id = link.dataset.giAnchorLink;
+					const target = id ? document.getElementById(id) : null;
+					if (!target) return;
+					const top =
+						target.getBoundingClientRect().top + window.scrollY - (window.innerWidth < 1024 ? 128 : 150);
+					window.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+					try {
+						history.replaceState(null, "", `#${id}`);
+					} catch {
+						// 隐私模式下 history 可能被限制，忽略即可
+					}
+				});
+			}
+
+			let ticking = false;
+			const syncActive = () => {
+				ticking = false;
+				const line = (window.innerWidth < 1024 ? 128 : 150) + 8;
+				let current = sections[0]?.id ?? "";
+				for (const section of sections) {
+					if (section.getBoundingClientRect().top <= line) current = section.id;
+				}
+				const atBottom =
+					window.innerHeight + window.scrollY >= document.body.scrollHeight - 4;
+				if (atBottom) current = sections[sections.length - 1]?.id ?? current;
+				for (const link of links) {
+					link.classList.toggle("is-active", link.dataset.giAnchorLink === current);
+				}
+			};
+
+			const onScroll = () => {
+				if (ticking) return;
+				ticking = true;
+				requestAnimationFrame(syncActive);
+			};
+
+			if (root.dataset.giScrollBound !== "1") {
+				root.dataset.giScrollBound = "1";
+				window.addEventListener("scroll", onScroll, { passive: true });
+				window.addEventListener("resize", onScroll, { passive: true });
+			}
+			syncActive();
+		}
+
+		initInternshipPage();
+		document.addEventListener("astro:page-load", initInternshipPage);
+		document.addEventListener("swup:contentReplaced", initInternshipPage);
+	</script>
+</MainGridLayout>

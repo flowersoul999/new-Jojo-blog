@@ -113,6 +113,8 @@ export const siteConfig: SiteConfig = {
 		anime: true,
 		// 日记页面开关
 		diary: true,
+		// 实习经历页面（Golden Experience）开关
+		internship: true,
 	},
 
 	// 分类导航栏开关，在首页、归档页和文章详情页顶部显示分类快捷导航

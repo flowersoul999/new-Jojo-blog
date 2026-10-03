@@ -1,0 +1,244 @@
+---
+// 面经详情：一场面试的完整记录 + 本场考到的八股
+import { type CollectionEntry, getCollection, render } from "astro:content";
+import { Icon } from "astro-icon/components";
+import InterviewShell from "@/components/interview/InterviewShell.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+	const entries = await getCollection("interviews", ({ data }) => !data.draft);
+	return entries.map((entry) => ({
+		params: { slug: entry.id },
+		props: { entry },
+	}));
+}
+
+interface Props {
+	entry: CollectionEntry<"interviews">;
+}
+
+const { entry } = Astro.props;
+const { company, position, date, stage, result, difficulty, tags, summary } =
+	entry.data;
+
+const { Content } = await render(entry);
+
+const RESULT_TONE: Record<string, string> = {
+	offer: "easy",
+	挂: "hard",
+	待定: "medium",
+	已约: "medium",
+};
+const tone = RESULT_TONE[result] ?? "medium";
+
+const LEVELS = [1, 2, 3, 4, 5];
+
+function formatDate(value: Date) {
+	const y = value.getFullYear();
+	const m = String(value.getMonth() + 1).padStart(2, "0");
+	const d = String(value.getDate()).padStart(2, "0");
+	return `${y}.${m}.${d}`;
+}
+
+/** 本场考到的八股：标签有交集就列出来，反向把面经和知识点串起来 */
+const allQuestions = await getCollection(
+	"questions",
+	({ data }) => !data.draft,
+);
+const related = allQuestions.filter((item) =>
+	item.data.tags.some((tag) => tags.includes(tag)),
+);
+
+const stats = [
+	{ label: "阶段", value: stage },
+	{ label: "结果", value: result },
+	{ label: "难度", value: `${difficulty}/5` },
+	{ label: "考点", value: tags.length },
+];
+---
+
+<MainGridLayout title={`${company} · ${stage}`} description={summary} hideSidebars>
+	<InterviewShell
+		kicker={`${position} · ${formatDate(date)}`}
+		title={company}
+		desc={summary}
+		current="experience"
+		stats={stats}
+	>
+		<article class="iv-detail">
+			<div class="iv-detail__top">
+				<span class:list={["iv-detail__result", `iv-detail__result--${tone}`]}>{result}</span>
+				<span class="iv-detail__diff" title={`主观难度 ${difficulty}/5`}>
+					{LEVELS.map((level) => (
+						<span class:list={["iv-detail__pip", { "is-on": level <= difficulty }]} />
+					))}
+				</span>
+			</div>
+
+			{tags.length > 0 && (
+				<ul class="iv-tags">
+					{tags.map((tag) => (
+						<li class="iv-tag">{tag}</li>
+					))}
+				</ul>
+			)}
+
+			<div class="iv-detail__body custom-md">
+				<Content />
+			</div>
+		</article>
+
+		{
+			related.length > 0 && (
+				<section class="iv-block">
+					<div class="iv-block__head">
+						<h2 class="iv-block__title">本场考到的八股</h2>
+						<span class="iv-block__count">{related.length} 条</span>
+					</div>
+					<div class="iv-related">
+						{related.map((item) => (
+							<a class="iv-related__item" href={`/interview/questions/#${item.id}`}>
+								<Icon is:inline name="material-symbols:menu-book" />
+								<span>{item.data.question}</span>
+								<span class="iv-related__cat">{item.data.category}</span>
+							</a>
+						))}
+					</div>
+				</section>
+			)
+		}
+
+		<div class="iv-detail__back">
+			<a class="iv-back-link" href="/interview/experience/">
+				<Icon is:inline name="material-symbols:arrow-back-rounded" />
+				返回面经列表
+			</a>
+		</div>
+	</InterviewShell>
+</MainGridLayout>
+
+<style>
+	.iv-detail {
+		padding: 1.2rem 1.25rem 1.3rem;
+		border-radius: 18px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+	}
+
+	.iv-detail__top {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+	}
+
+	.iv-detail__result {
+		padding: 0.2rem 0.7rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		border: 1px solid currentcolor;
+	}
+	.iv-detail__result--easy {
+		color: var(--iv-easy);
+		background: color-mix(in srgb, var(--iv-easy) 12%, transparent);
+	}
+	.iv-detail__result--medium {
+		color: var(--iv-medium);
+		background: color-mix(in srgb, var(--iv-medium) 12%, transparent);
+	}
+	.iv-detail__result--hard {
+		color: var(--iv-hard);
+		background: color-mix(in srgb, var(--iv-hard) 12%, transparent);
+	}
+
+	.iv-detail__diff {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.22rem;
+	}
+	.iv-detail__pip {
+		width: 0.45rem;
+		height: 0.45rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--text-color) 16%, transparent);
+	}
+	.iv-detail__pip.is-on {
+		background: var(--iv-accent);
+	}
+
+	.iv-detail__body {
+		margin-top: 1.1rem;
+		font-size: 0.88rem;
+	}
+	.iv-detail__body :global(h2) {
+		margin-top: 1.6rem;
+		font-size: 1rem;
+		font-weight: 800;
+		color: var(--iv-title);
+	}
+	.iv-detail__body :global(h2:first-child) {
+		margin-top: 0;
+	}
+	.iv-detail__body :global(blockquote) {
+		border-left: 3px solid color-mix(in srgb, var(--iv-accent) 45%, transparent);
+		padding-left: 0.9rem;
+		font-size: 0.84rem;
+		color: var(--iv-muted);
+	}
+
+	.iv-related {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.iv-related__item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 0.8rem;
+		border-radius: 12px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		font-size: 0.82rem;
+		line-height: 1.6;
+		color: var(--iv-body);
+		text-decoration: none;
+		transition:
+			border-color 180ms ease,
+			background-color 180ms ease;
+	}
+	.iv-related__item:hover {
+		border-color: color-mix(in srgb, var(--iv-accent) 45%, transparent);
+		background: var(--iv-soft);
+	}
+	.iv-related__item svg {
+		flex: none;
+		font-size: 1.05rem;
+		color: var(--iv-accent);
+	}
+	.iv-related__cat {
+		margin-left: auto;
+		flex: none;
+		font-size: 0.68rem;
+		color: var(--iv-faint);
+	}
+
+	.iv-detail__back {
+		margin-top: 1.5rem;
+	}
+	.iv-back-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--iv-accent);
+		text-decoration: none;
+	}
+	.iv-back-link:hover {
+		text-decoration: underline;
+	}
+</style>

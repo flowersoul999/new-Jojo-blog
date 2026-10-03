@@ -1,0 +1,133 @@
+---
+// 手撕题：白板手写代码 + 场景设计，两块分成两组，答案默认收起
+import { getCollection, render } from "astro:content";
+import FoldCard from "@/components/interview/FoldCard.astro";
+import InterviewShell from "@/components/interview/InterviewShell.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+const entries = await getCollection("handcraft", ({ data }) => !data.draft);
+
+const withContent = await Promise.all(
+	entries.map(async (entry) => ({
+		entry,
+		Content: (await render(entry)).Content,
+	})),
+);
+
+const KIND_ORDER = ["手写代码", "场景设计"];
+
+const buckets = new Map<string, typeof withContent>();
+for (const item of withContent) {
+	const key = item.entry.data.kind;
+	const bucket = buckets.get(key);
+	if (bucket) {
+		bucket.push(item);
+	} else {
+		buckets.set(key, [item]);
+	}
+}
+
+const orderOf = (kind: string) => {
+	const index = KIND_ORDER.indexOf(kind);
+	return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+};
+
+const groups = [...buckets]
+	.sort((a, b) => orderOf(a[0]) - orderOf(b[0]))
+	.map(([kind, list], index) => ({ kind, anchor: `kind-${index}`, list }));
+
+const countKind = (kind: string) =>
+	entries.filter((entry) => entry.data.kind === kind).length;
+
+const stats = [
+	{ label: "总题数", value: entries.length },
+	{ label: "手写代码", value: countKind("手写代码") },
+	{ label: "场景设计", value: countKind("场景设计") },
+];
+
+const KIND_NOTE: Record<string, string> = {
+	手写代码:
+		"白板上写，没有补全、没有搜索引擎。重点是边界条件和 this 指向这类细节。",
+	场景设计:
+		"面试官只给一个场景，考的是你把它拆成「状态 + 队列 + 时机」的能力。",
+};
+
+const title = "手撕题";
+const description =
+	"白板手写代码，和「给你一个场景你怎么设计」的开放题，都在这里。";
+---
+
+<MainGridLayout title={title} description={description} hideSidebars>
+	<InterviewShell
+		kicker="WHITEBOARD"
+		title="手撕题"
+		desc="这类题最难背，也最能看出真实水平。每道题记三样东西：场景是什么、代码怎么写、以及哪里最容易翻车。"
+		current="handcraft"
+		stats={stats}
+	>
+		{
+			groups.length === 0 && (
+				<div class="iv-empty">
+					还没有题。去 <code>src/content/handcraft/</code> 加一道试试。
+				</div>
+			)
+		}
+
+		{groups.map((group) => (
+			<section class="iv-block" id={group.anchor}>
+				<div class="iv-block__head">
+					<h2 class="iv-block__title">{group.kind}</h2>
+					<span class="iv-block__count">{group.list.length} 道</span>
+				</div>
+				{KIND_NOTE[group.kind] && <p class="iv-block__note">{KIND_NOTE[group.kind]}</p>}
+
+				<div class="iv-q-list">
+					{group.list.map(({ entry, Content }) => (
+						<FoldCard id={entry.id} title={entry.data.title}>
+							<Fragment slot="meta">
+								<span class="iv-tag">{entry.data.difficulty}</span>
+							</Fragment>
+							{entry.data.scenario && (
+								<p class="iv-scene">
+									<span class="iv-scene__label">场景</span>
+									{entry.data.scenario}
+								</p>
+							)}
+							<Content />
+						</FoldCard>
+					))}
+				</div>
+			</section>
+		))}
+	</InterviewShell>
+</MainGridLayout>
+
+<style>
+	.iv-q-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		margin-top: 0.7rem;
+	}
+
+	.iv-scene {
+		display: flex;
+		gap: 0.55rem;
+		margin: 0.85rem 0 0;
+		padding: 0.7rem 0.85rem;
+		border-radius: 12px;
+		background: var(--iv-sunken);
+		font-size: 0.82rem;
+		line-height: 1.8;
+		color: var(--iv-body);
+	}
+	.iv-scene__label {
+		flex: none;
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		color: var(--iv-accent);
+	}
+</style>

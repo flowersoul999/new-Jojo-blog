@@ -1,0 +1,106 @@
+---
+// 可折叠问答卡：八股文和手撕题共用
+// 答案默认收起 —— 先自己讲一遍，再展开对照，这样才有自测的价值
+import { Icon } from "astro-icon/components";
+
+interface Props {
+	title: string;
+	/** 默认展开（比如详情页里的第一题） */
+	defaultOpen?: boolean;
+	/** 锚点 id，供面经详情里的「本场考到的八股」跳转过来 */
+	id?: string;
+}
+
+const { title, defaultOpen = false, id } = Astro.props;
+---
+
+<details class="iv-fold" id={id} open={defaultOpen}>
+	<summary class="iv-fold__head">
+		<span class="iv-fold__title">{title}</span>
+		<span class="iv-fold__meta">
+			<slot name="meta" />
+		</span>
+		<Icon
+			is:inline
+			name="material-symbols:expand-more-rounded"
+			class="iv-fold__chevron"
+			aria-hidden="true"
+		/>
+	</summary>
+
+	<div class="iv-fold__body custom-md">
+		<slot />
+	</div>
+</details>
+
+<style>
+	.iv-fold {
+		border-radius: 16px;
+		border: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+		overflow: hidden;
+		transition:
+			border-color 200ms ease,
+			box-shadow 200ms ease;
+	}
+
+	.iv-fold[open] {
+		border-color: color-mix(in srgb, var(--iv-accent) 38%, transparent);
+	}
+
+	.iv-fold__head {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.85rem 1rem;
+		cursor: pointer;
+		list-style: none;
+		user-select: none;
+	}
+	.iv-fold__head::-webkit-details-marker {
+		display: none;
+	}
+	.iv-fold__head:hover {
+		background: var(--iv-sunken);
+	}
+
+	.iv-fold__title {
+		min-width: 0;
+		font-size: 0.9rem;
+		font-weight: 700;
+		line-height: 1.6;
+		color: var(--iv-title);
+	}
+
+	.iv-fold__meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.3rem;
+		margin-left: auto;
+	}
+	.iv-fold__meta:empty {
+		display: none;
+	}
+
+	.iv-fold__chevron {
+		flex: none;
+		font-size: 1.15rem;
+		color: var(--iv-faint);
+		transition: transform 220ms ease;
+	}
+	.iv-fold[open] .iv-fold__chevron {
+		transform: rotate(180deg);
+		color: var(--iv-accent);
+	}
+
+	.iv-fold__body {
+		padding: 0.1rem 1rem 1rem;
+		border-top: 1px dashed var(--iv-line);
+		margin-top: 0;
+		font-size: 0.86rem;
+	}
+	.iv-fold__body :global(> :first-child) {
+		margin-top: 0.8rem;
+	}
+</style>
