@@ -7,7 +7,7 @@
  * 数据就直接进岛屿自己的 JS chunk，页面 HTML 不会被撑大。
  */
 import SkillTree from "@/components/skills/SkillTree.svelte";
-import { CS_CHECK_COUNT, CS_CHECKS } from "@/data/csChecks";
+import { CS_CHECKS } from "@/data/csChecks";
 import { CS_GROUP_COLORS, CS_ICONS } from "@/data/csIcons";
 import {
 	CS_ATTR_MAP,
@@ -28,7 +28,6 @@ import {
 	groupAttr={CS_GROUP_ATTR}
 	attrMap={CS_ATTR_MAP}
 	checks={CS_CHECKS}
-	checkCount={CS_CHECK_COUNT}
 	preset={CS_PRESET}
 	totalSkills={CS_TOTAL_SKILLS}
 	icons={CS_ICONS}

@@ -1,13 +1,14 @@
 <script lang="ts">
 /**
- * 前端技能图
+ * 通用技能图（前端 / 计算机基础 / 后端 / Agent 开发 共用）
  *
  * 形态：按「前置依赖」自动分层的技能图，不是树也不是清单。
  *   每一层的技术份量相同；方块上是真实技术 logo；
  *   连线 = requires 里声明的真实前置关系，全部从浅层指向深层，绝不乱指。
  *
- * 亮度：level 0-5 用四重信号同时表达 —— 方块内的水位高度、logo 饱和度、
- *       描边亮度、高等级的外发光。0 级还会打斜纹并虚线描边。
+ * 亮度：按「完成比例」用四重信号同时表达 —— 方块内的水位高度、logo 饱和度、
+ *       描边亮度、勾满的外发光。一条没勾还会打斜纹并虚线描边。
+ *       比例的分母就是该技能自己的清单条数，所以 3 条和 8 条读起来一样直观。
  *
  * 解锁：requires 里所有技能都 ≥1 级，本技能才可点。未解锁时点击会抖动并提示。
  *
@@ -20,10 +21,7 @@ import { onMount, tick } from "svelte";
 // 所以这里必须自己取 .src。
 import avatarMeta from "@/assets/images/jojo-avatar.webp";
 import { profileConfig } from "@/config/profileConfig";
-import {
-	CHECK_COUNT as FE_CHECK_COUNT,
-	SKILL_CHECKS as FE_CHECKS,
-} from "@/data/skillChecks";
+import { SKILL_CHECKS as FE_CHECKS } from "@/data/skillChecks";
 import {
 	ATTR_MAP as FE_ATTR_MAP,
 	ATTRS as FE_ATTRS,
@@ -54,9 +52,12 @@ const FE_TITLES = [
 ];
 
 /**
- * 这是一个「通用技能图」组件，站内几张图共用它（前端技能图 / 计算机基础技能图…）。
+ * 这是一个「通用技能图」组件，站内几张图共用它（前端 / 计算机基础 / 后端 / Agent 开发）。
  * 下面的默认值就是前端技能图，所以 /skills/ 页面一行都不用改；
- * 想开第三张图，照着 src/data/csSkills.ts 备一套数据传进来即可。
+ * 想开新图，照着 src/data/csSkills.ts 备一套数据传进来即可。
+ *
+ * 等级不再固定 0-5：**每个技能的等级上限 = 它自己的学习清单条数**
+ * （简单概念 3 条、硬核概念 8 条都行），所以技能点、水位比例、属性上限全部现算。
  */
 let {
 	skills: SKILLS = FE_SKILLS,
@@ -65,9 +66,9 @@ let {
 	groupAttr: GROUP_ATTR = FE_GROUP_ATTR,
 	attrMap: ATTR_MAP = FE_ATTR_MAP,
 	levels: LEVELS = FE_LEVELS,
+	/** 只作兜底：技能没配清单时按它算上限 */
 	maxLevel: MAX_LEVEL = FE_MAX_LEVEL,
 	checks: SKILL_CHECKS = FE_CHECKS,
-	checkCount: CHECK_COUNT = FE_CHECK_COUNT,
 	preset: PRESET = FE_PRESET,
 	totalSkills: TOTAL_SKILLS = FE_TOTAL_SKILLS,
 	icons: TECH_ICONS = FE_TECH_ICONS,
@@ -85,7 +86,6 @@ function iconColor(id: string, group: string, state: IconState, dark: boolean) {
 }
 
 const avatarUrl = avatarMeta.src;
-const MAX_POINTS = TOTAL_SKILLS * MAX_LEVEL;
 const SKILL_MAP: Record<string, Skill> = Object.fromEntries(
 	SKILLS.map((s) => [s.id, s]),
 );
@@ -213,11 +213,43 @@ function checksOf(id: string): [string, string][] {
 	return SKILL_CHECKS[id] ?? [];
 }
 
-/** 等级 = 已勾选数，面板、水位、连线、属性全从这里读 */
+/**
+ * 这个技能的等级上限 = 它自己的清单条数。
+ * 清单没配的技能兜底用 maxLevel（正常数据不会走到这儿，自检脚本会拦住）。
+ */
+function capOf(id: string): number {
+	return totalOf(id) || MAX_LEVEL;
+}
+
+/**
+ * 等级称号按「完成比例」取，而不是按绝对级数：
+ * 清单 3 条和 8 条的人读到的是同一套称号，勾满就是 LEVELS 的最后一档（精通）。
+ */
+function levelTier(id: string, lv: number): number {
+	const cap = capOf(id);
+	if (lv <= 0) return 0;
+	if (lv >= cap) return MAX_LEVEL - 1;
+	const r = lv / cap;
+	if (r < 0.4) return 1;
+	if (r < 0.7) return 2;
+	return 3;
+}
+
+/** 全部技能的清单都勾满能有多少技能点 */
+const MAX_POINTS = SKILLS.reduce((n, s) => n + capOf(s.id), 0);
+
+/** 每个方向的满点上限 = 方向内所有技能的清单条数之和 —— 用来算方向进度条 */
+const GROUP_MAX: Record<string, number> = (() => {
+	const m: Record<string, number> = {};
+	for (const s of SKILLS) m[s.group] = (m[s.group] ?? 0) + capOf(s.id);
+	return m;
+})();
+
+/** 等级 = 已勾选数（上限是这个技能自己的清单条数），面板、水位、连线、属性全从这里读 */
 const levels = $derived.by(() => {
 	const m: Record<string, number> = {};
 	for (const s of SKILLS)
-		m[s.id] = Math.min(MAX_LEVEL, (done[s.id] ?? []).length);
+		m[s.id] = Math.min(capOf(s.id), (done[s.id] ?? []).length);
 	return m;
 });
 
@@ -427,7 +459,7 @@ const focusSet = $derived.by(() => {
 function stateOf(s: Skill): "locked" | "ready" | "learning" | "max" {
 	if (!s.requires.every((r) => (levels[r] ?? 0) > 0)) return "locked";
 	const lv = levels[s.id] ?? 0;
-	if (lv >= MAX_LEVEL) return "max";
+	if (lv >= capOf(s.id)) return "max";
 	if (lv > 0) return "learning";
 	return "ready";
 }
@@ -452,10 +484,10 @@ const stats = $derived.by(() => {
 		const lv = levels[s.id] ?? 0;
 		points += lv;
 		if (lv > 0) lit++;
-		if (lv >= MAX_LEVEL) maxed++;
+		if (lv >= capOf(s.id)) maxed++;
 		if (lv < 3) untouched++;
 		groupPoints[s.group] = (groupPoints[s.group] ?? 0) + lv;
-		if (lv >= MAX_LEVEL) groupMaxed[s.group] = (groupMaxed[s.group] ?? 0) + 1;
+		if (lv >= capOf(s.id)) groupMaxed[s.group] = (groupMaxed[s.group] ?? 0) + 1;
 	}
 	const pct = Math.round((points / MAX_POINTS) * 100);
 	let title = TITLES[0];
@@ -478,7 +510,7 @@ const stats = $derived.by(() => {
 
 /**
  * 属性点规则（只在这里定义）：
- *   每升 1 级 → 所属方向的属性 +1；满级（Lv5）再额外 +2。
+ *   每升 1 级 → 所属方向的属性 +1；把这个技能的清单全部勾完，再额外 +2。
  */
 function attrIdOf(s: Skill): string {
 	return GROUP_ATTR[s.group] ?? "dex";
@@ -487,7 +519,7 @@ function attrIdOf(s: Skill): string {
 /** 这个技能当前贡献了多少属性点 */
 function attrGain(s: Skill): number {
 	const lv = levels[s.id] ?? 0;
-	return lv + (lv >= MAX_LEVEL ? 2 : 0);
+	return lv + (lv >= capOf(s.id) ? 2 : 0);
 }
 
 /** 满级后再多给多少 —— 提示浮层里要显示 */
@@ -508,9 +540,9 @@ const attrStats = $derived.by(() => {
 		const id = attrIdOf(s);
 		const lv = levels[s.id] ?? 0;
 		count[id] = (count[id] ?? 0) + 1;
-		max[id] = (max[id] ?? 0) + MAX_LEVEL + ATTR_MAX_BONUS;
+		max[id] = (max[id] ?? 0) + capOf(s.id) + ATTR_MAX_BONUS;
 		value[id] = (value[id] ?? 0) + attrGain(s);
-		if (lv >= MAX_LEVEL) maxed[id] = (maxed[id] ?? 0) + 1;
+		if (lv >= capOf(s.id)) maxed[id] = (maxed[id] ?? 0) + 1;
 	}
 	return { value, max, count, maxed };
 });
@@ -831,7 +863,10 @@ $effect(() => {
 									}}
 								>
 									<span class="sk-face">
-										<span class="sk-water" style={`height:${(lv / MAX_LEVEL) * 100}%`}></span>
+										<span
+											class="sk-water"
+											style={`height:${(lv / capOf(s.id)) * 100}%`}
+										></span>
 										<svg class="sk-logo" viewBox="0 0 24 24" aria-hidden="true">
 											<path
 												d={TECH_ICONS[s.id]?.d ?? ""}
@@ -906,7 +941,7 @@ $effect(() => {
 							</span>
 						</p>
 						<p class="sk-detail-lv">
-							等级 <b>{lv}</b> / {MAX_LEVEL} · {LEVELS[lv]?.name}
+							等级 <b>{lv}</b> / {capOf(active.id)} · {LEVELS[levelTier(active.id, lv)]?.name}
 							{#if st === "locked"}<i class="sk-tag-warn">未解锁</i>{/if}
 							{#if st === "max"}<i class="sk-tag-max">已精通</i>{/if}
 						</p>
@@ -940,15 +975,15 @@ $effect(() => {
 					</ul>
 				{/if}
 				<p class="sk-detail-judge">
-					{#if lv >= MAX_LEVEL}
-						<em>已全部学完</em>{LEVELS[MAX_LEVEL]?.judge ?? ""}
+					{#if lv >= capOf(active.id)}
+						<em>已全部学完</em>{LEVELS[MAX_LEVEL - 1]?.judge ?? ""}
 					{:else}
 						{@const next = checksOf(active.id).findIndex(
 							(_, i) => !(done[active.id] ?? []).includes(i),
 						)}
 						<em>下一项</em>
 						{next >= 0 ? checksOf(active.id)[next][0] : ""}
-						· 勾上后到 Lv{Math.min(MAX_LEVEL, lv + 1)}
+						· 勾上后到 Lv{Math.min(capOf(active.id), lv + 1)}
 					{/if}
 				</p>
 			{:else}
@@ -975,7 +1010,7 @@ $effect(() => {
 				{#each GROUPS as g (g.id)}
 					{@const gp = stats.groupPoints[g.id] ?? 0}
 					{@const gsize = GROUP_SIZE[g.id] ?? 1}
-					{@const gmax = gsize * MAX_LEVEL}
+					{@const gmax = GROUP_MAX[g.id] ?? 1}
 					{@const gpct = gmax ? Math.round((gp / gmax) * 100) : 0}
 					{@const gattr = ATTR_MAP[GROUP_ATTR[g.id] ?? "dex"]}
 					<li
@@ -997,9 +1032,9 @@ $effect(() => {
 					<li><b>{stats.points}</b><span>技能点<em>满 {MAX_POINTS}</em></span></li>
 					<li><b>{stats.pct}%</b><span>总掌握度<em>{stats.title.name}</em></span></li>
 					<li><b>{stats.lit}<em>/{TOTAL_SKILLS}</em></b><span>已点亮<em>还有 {TOTAL_SKILLS - stats.lit} 个没碰</em></span></li>
-					<li><b>{stats.maxed}</b><span>已精通<em>Lv{MAX_LEVEL} 技能数</em></span></li>
+					<li><b>{stats.maxed}</b><span>已学完<em>清单全勾完的技能数</em></span></li>
 					<li><b>{stats.litGroups}<em>/{GROUPS.length}</em></b><span>已开启方向<em>至少点亮 1 个</em></span></li>
-					<li><b>{stats.maxedGroups}</b><span>满级方向<em>整块都到 Lv{MAX_LEVEL}</em></span></li>
+					<li><b>{stats.maxedGroups}</b><span>学完的方向<em>整块清单都勾满</em></span></li>
 				</ul>
 				<p class="sk-summary-note">
 					技术是学不完的，能学完的只有「今天这一块」。把上面的条一条条填满，比收藏一百篇文章都管用。
@@ -1039,10 +1074,10 @@ $effect(() => {
 						</span>
 					</p>
 					<p class="sk-tip-lv">
-						等级 <b>{alv}</b> / {MAX_LEVEL} · {LEVELS[alv]?.name}
+						等级 <b>{alv}</b> / {capOf(active.id)} · {LEVELS[levelTier(active.id, alv)]?.name}
 					</p>
 				</div>
-				<span class="sk-tip-pct">{Math.round((alv / MAX_LEVEL) * 100)}%</span>
+				<span class="sk-tip-pct">{Math.round((alv / capOf(active.id)) * 100)}%</span>
 			</div>
 
 			<p class="sk-tip-note">{active.note}</p>
@@ -1067,9 +1102,9 @@ $effect(() => {
 				<span class="sk-tip-gain" style={`--ac:#${aattr?.color ?? "7a6a4a"}`}>
 					+1 {aattr?.name ?? ""}<em>/级</em>
 				</span>
-				{#if alv >= MAX_LEVEL}
+				{#if alv >= capOf(active.id)}
 					<span class="sk-tip-gain is-bonus" style={`--ac:#${aattr?.color ?? "7a6a4a"}`}>
-						精通再 +{ATTR_MAX_BONUS}
+						学完再 +{ATTR_MAX_BONUS}
 					</span>
 				{/if}
 			</div>
@@ -1149,7 +1184,7 @@ $effect(() => {
 					</div>
 					<div class="sk-modal-lv">
 						<b>Lv{mlv}</b>
-						<span>{LEVELS[mlv]?.name}</span>
+						<span>{LEVELS[levelTier(m.id, mlv)]?.name}</span>
 						<span class="sk-modal-pips">
 							{#each pips as p (p)}
 								<i class:on={p < mlv}></i>
@@ -1168,7 +1203,7 @@ $effect(() => {
 							style={`width:${mtotal ? (mdone.length / mtotal) * 100 : 0}%`}
 						></span>
 					</span>
-					<span class="sk-modal-prog-hint">勾一项涨一级，勾满就是 Lv{MAX_LEVEL}</span>
+					<span class="sk-modal-prog-hint">勾一项涨一级，勾满就是 Lv{mtotal}</span>
 				</div>
 
 				<ul class="sk-modal-list">
@@ -1224,7 +1259,7 @@ $effect(() => {
 							style={`--ac:#${mattr?.color ?? "7a6a4a"}`}
 						>
 							+{attrGain(m)} {mattr?.name ?? ""}
-							<em>{mlv >= MAX_LEVEL ? `精通 +${ATTR_MAX_BONUS}` : "每项 +1"}</em>
+							<em>{mlv >= capOf(m.id) ? `学完 +${ATTR_MAX_BONUS}` : "每项 +1"}</em>
 						</span>
 						<button
 							type="button"
