@@ -1,17 +1,17 @@
 ---
 // 技能图切换条：站内每张技能图的页面顶部都放一条，用来在几张图之间来回换。
-// 用纯 <a> 而不是 <button>：两张图各有独立地址，能新开标签、能被分享，
+// 用纯 <a> 而不是 <button>：每张图各有独立地址，能新开标签、能被分享，
 // 而且不依赖 JS —— 技能图岛屿万一没加载出来，这个入口照样能点。
 import { Icon } from "astro-icon/components";
 
 interface Props {
 	/** 当前所在的那张图，用来把对应项点亮 */
-	current: "fe" | "cs";
+	current: "fe" | "cs" | "be";
 }
 
 const { current } = Astro.props;
 
-/** 想看第三张图时，往这里加一项、再写个页面就行 */
+/** 想看下一张图时，往这里加一项、再写个页面就行 */
 const graphs = [
 	{
 		id: "fe",
@@ -26,6 +26,13 @@ const graphs = [
 		meta: "68 个方块 · 10 层",
 		href: "/cs/",
 		icon: "material-symbols:school",
+	},
+	{
+		id: "be",
+		name: "后端技能图",
+		meta: "51 个方块 · 9 层",
+		href: "/backend/",
+		icon: "material-symbols:storage",
 	},
 ] as const;
 ---

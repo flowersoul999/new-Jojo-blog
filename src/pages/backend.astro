@@ -1,0 +1,21 @@
+---
+// 后端技能图：站在「已经有前端基础」上往全栈转，最上面两个起点方块默认点亮
+// 数据见 src/data/backendSkills.ts（技能与依赖）· backendIcons.ts（图标）· backendChecks.ts（学习清单）
+// 组件见 src/components/skills/BackendSkillTree.svelte
+import BackendSkillTree from "@/components/skills/BackendSkillTree.svelte";
+import SkillGraphSwitch from "@/components/skills/SkillGraphSwitch.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+const title = "后端技能图";
+const description =
+	"站在前端基础之上往全栈转的技能图：从运行时的进程与内存，到接口、数据、缓存与消息，再到认证、部署、可观测性与架构演进。最上面两层是默认点亮的起点（前端底子和会写简单接口），往下每一层才是真正要补的。连线代表「先会了上面，才能解锁下面」。";
+---
+
+<MainGridLayout title={title} description={description} hideSidebars fullWidth>
+	<div class="card-base z-10 relative w-full overflow-hidden">
+		<div class="px-3 sm:px-5 md:px-7 py-5 sm:py-7 max-w-[78rem] mx-auto">
+			<SkillGraphSwitch current="be" />
+			<BackendSkillTree client:load />
+		</div>
+	</div>
+</MainGridLayout>

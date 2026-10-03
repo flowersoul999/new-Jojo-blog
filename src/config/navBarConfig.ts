@@ -39,6 +39,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 	// 计算机基础技能图（补科班底子：数学 / 组原 / 操作系统 / 网络 / 数据库 …）
 	links.push(LinkPresets.CsSkills);
 
+	// 后端技能图（在前端基础上往全栈转：运行时 / 接口 / 数据 / 安全 / 运维 / 架构）
+	links.push(LinkPresets.BackendSkills);
+
 	// 面试（求职准备：面经 / 八股 / Hot100 / 手撕题）
 	links.push(LinkPresets.Interview);
 
@@ -167,6 +170,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		name: "计算机基础",
 		url: "/cs/",
 		icon: "material-symbols:school",
+	},
+	BackendSkills: {
+		name: "后端技能图",
+		url: "/backend/",
+		icon: "material-symbols:storage",
 	},
 	Interview: {
 		name: "面试",
