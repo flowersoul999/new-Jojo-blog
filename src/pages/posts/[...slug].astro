@@ -51,14 +51,6 @@ const { Content, headings } = await render(entry);
 
 const { remarkPluginFrontmatter } = await render(entry);
 
-const bannerPostMeta = {
-	title: entry.data.title,
-	published: entry.data.published,
-	updated: entry.data.updated,
-	words: remarkPluginFrontmatter.words,
-	minutes: remarkPluginFrontmatter.minutes,
-};
-
 // 处理随机图：如果image为"api"，则从配置的API获取随机图
 const processedImage = processCoverImageSync(entry.data.image, entry.id);
 const preservePostCoverRatio = [
@@ -146,6 +138,11 @@ const jsonLd = {
 
 const relatedPosts = await getRelatedPosts(entry, 5);
 
+// AI 摘要优先取 frontmatter 的 aiSummary，缺省时回退到文章描述，
+// 保证每篇文章都有一份可读的导读。
+const resolvedAiSummary =
+	entry.data.aiSummary?.trim() || entry.data.description?.trim() || "";
+
 type MonthlyMomentItem = {
 	friendTitle: string;
 	avatar: string;
@@ -218,8 +215,6 @@ if (entry.id === "monthly-2026-08") {
   postSlug={entry.id}
   postCategory={entry.data.category || undefined}
   headings={headings}
-  bannerPostMeta={bannerPostMeta}
-  bannerPostAiSummary={entry.data.aiSummary}
 >
   <!-- KaTeX 按需加载 - 仅在文章页面 -->
   <KatexManager slot="head" />
@@ -319,6 +314,28 @@ if (entry.id === "monthly-2026-08") {
           )
         }
       </div>
+
+      <!-- AI 摘要：原先渲染在壁纸首屏，读者必须先滚动一次才能看到。
+           现在放在标题与元信息之后、正文之前，进入文章即可读到。 -->
+      {
+        resolvedAiSummary && (
+          <div
+            class="post-ai-summary onload-animation"
+            role="note"
+            aria-label="AI摘要，由 ChatGPT Sol 5.6 Max 提供"
+          >
+            <div class="post-ai-summary__label">
+              <Icon is:inline name="material-symbols:auto-awesome-rounded" class="text-[1.05em]" />
+              <span>AI摘要</span>
+              <span class="post-ai-summary__provider">由 ChatGPT Sol 5.6 Max 提供</span>
+            </div>
+            <p>
+              {resolvedAiSummary}
+            </p>
+            <div class="post-ai-summary__disclaimer">本文已使用Ai进行辅助创作，注意甄别</div>
+          </div>
+        )
+      }
 
       <!-- always show cover as long as it has one -->
 
@@ -592,6 +609,57 @@ if (entry.id === "monthly-2026-08") {
 </MainGridLayout>
 
 <style is:global>
+  /* AI 摘要现在住在正文卡片里，需要一套贴合卡片的浅色样式：
+     跟随 --card-bg / --primary 变量，浅色与暗色模式自动成立。 */
+  #post-container .post-ai-summary {
+    margin: 0 0 1.5rem;
+    padding: 0.9rem 1.1rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line-divider));
+    border-radius: 0.85rem;
+    background: color-mix(in srgb, var(--primary) 7%, var(--card-bg));
+    box-shadow: 0 0.5rem 1.4rem -0.9rem color-mix(in srgb, var(--primary) 32%, transparent);
+  }
+
+  #post-container .post-ai-summary__label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+    color: color-mix(in srgb, var(--primary) 82%, var(--deep-text));
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  #post-container .post-ai-summary__label svg {
+    color: var(--primary);
+    filter: drop-shadow(0 0 0.4rem color-mix(in srgb, var(--primary) 42%, transparent));
+  }
+
+  #post-container .post-ai-summary__provider {
+    color: var(--content-meta);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  #post-container .post-ai-summary p {
+    margin: 0;
+    color: var(--deep-text);
+    font-size: 0.9rem;
+    line-height: 1.78;
+    overflow-wrap: anywhere;
+  }
+
+  #post-container .post-ai-summary__disclaimer {
+    margin-top: 0.55rem;
+    color: var(--content-meta);
+    font-size: 0.7rem;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
   /* Keep selected 2:1 article covers complete at every viewport size. */
   #post-cover.post-cover-preserve-ratio.banner-container {
     aspect-ratio: 2 / 1;

@@ -117,62 +117,12 @@
     letter-spacing: 0.01em;
 }
 
-.mobile-post-ai-summary-shell {
-    display: none;
-}
+/* 文章页的 AI 摘要已移入正文卡片（见 posts/[...slug].astro 的 .post-ai-summary），
+   横幅上不再渲染摘要，因此这里不保留移动端摘要副本的样式。 */
 
 @media (max-width: 1023px) {
     .banner-post-ai-summary {
         display: none;
-    }
-
-    .mobile-post-ai-summary-shell {
-        display: block;
-        min-width: 0;
-        margin: 0 0 1rem;
-    }
-
-    .mobile-post-ai-summary {
-        display: block !important;
-        box-sizing: border-box;
-        min-width: 0;
-        width: 100%;
-        margin: 0;
-        border-color: color-mix(in srgb, var(--primary) 24%, var(--line-divider));
-        background: color-mix(in srgb, var(--primary) 8%, var(--card-bg));
-        box-shadow: 0 0.65rem 1.4rem color-mix(in srgb, var(--primary) 10%, transparent);
-        color: #243447;
-        text-shadow: none;
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
-    }
-
-    .mobile-post-ai-summary .banner-post-ai-summary__label {
-        color: #20344d;
-    }
-
-    .mobile-post-ai-summary .banner-post-ai-summary__provider {
-        color: rgba(44, 68, 94, 0.68);
-    }
-
-    .mobile-post-ai-summary .banner-post-ai-summary__label svg {
-        color: var(--primary);
-        filter: drop-shadow(0 0 0.45rem color-mix(in srgb, var(--primary) 45%, transparent));
-    }
-
-    .mobile-post-ai-summary p {
-        min-height: 0;
-        max-height: none;
-        overflow: visible;
-        min-width: 0;
-        white-space: normal;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-        color: rgba(36, 52, 71, 0.88);
-    }
-
-    .mobile-post-ai-summary .banner-post-ai-summary__disclaimer {
-        color: rgba(44, 68, 94, 0.68);
     }
 
     .banner-post-ai-summary.friends-ai-recommendation--inline {
@@ -213,7 +163,6 @@
         color: rgba(36, 52, 71, 0.88) !important;
     }
 
-    :root.dark .mobile-post-ai-summary,
     :root.dark .banner-post-ai-summary.friends-ai-recommendation--inline {
         border-color: color-mix(in srgb, var(--primary) 34%, var(--line-divider)) !important;
         background: color-mix(in srgb, var(--card-bg) 82%, var(--primary) 18%) !important;
@@ -221,24 +170,15 @@
         color: #edf5ff !important;
     }
 
-    :root.dark .mobile-post-ai-summary .banner-post-ai-summary__label,
     :root.dark .banner-post-ai-summary.friends-ai-recommendation--inline .banner-post-ai-summary__label {
         color: #f5f8ff !important;
     }
 
-    :root.dark .mobile-post-ai-summary .banner-post-ai-summary__provider,
     :root.dark .banner-post-ai-summary.friends-ai-recommendation--inline .banner-post-ai-summary__provider {
         color: rgba(216, 229, 243, 0.72) !important;
     }
 
-    :root.dark .mobile-post-ai-summary p,
     :root.dark .banner-post-ai-summary.friends-ai-recommendation--inline p {
         color: rgba(235, 243, 251, 0.9) !important;
     }
-
-    :root.dark .mobile-post-ai-summary .banner-post-ai-summary__disclaimer {
-        color: rgba(216, 229, 243, 0.72);
-    }
-
-    /* 移动端沿用打字机摘要，确保桌面端与手机端的阅读节奏一致。 */
 }

@@ -29,9 +29,6 @@ import {
 	BANNER_HEIGHT_EXTEND,
 	MAIN_PANEL_OVERLAPS_BANNER_HEIGHT,
 } from "@/constants/constants";
-import I18nKey from "@/i18n/i18nKey";
-import { i18n } from "@/i18n/translation";
-import { formatDateToYYYYMMDD } from "@/utils/date-utils";
 import { getImageQuality } from "@/utils/image-utils";
 import { getBackgroundImages, isHomePage } from "@/utils/layout-utils";
 import {
@@ -42,6 +39,7 @@ import {
 	getResponsiveSidebarConfig,
 	type ResponsiveSidebarConfig,
 } from "@/utils/responsive-utils";
+import { url } from "@/utils/url-utils";
 import Layout from "./Layout.astro";
 
 import "@/styles/markdown.css";
@@ -58,14 +56,6 @@ interface Props {
 	postSlug?: string;
 	postCategory?: string;
 	headings?: MarkdownHeading[];
-	bannerPostMeta?: {
-		title: string;
-		published: Date;
-		updated?: Date;
-		words?: number;
-		minutes?: number;
-	};
-	bannerPostAiSummary?: string;
 	bannerPageAiRecommendation?: {
 		text: string;
 		segments?: Array<{
@@ -97,8 +87,6 @@ const {
 	postSlug,
 	postCategory,
 	headings = [],
-	bannerPostMeta,
-	bannerPostAiSummary,
 	bannerPageAiRecommendation,
 	hideSidebars = false,
 	fullWidth = false,
@@ -143,6 +131,17 @@ const shouldRenderGradient =
 // 检查是否为首页
 const isHomePageCheck = isHomePage(Astro.url.pathname);
 
+// 分类导航栏只在「首页」「归档页」「文章详情页」显示。
+// 它位于 swup 替换容器之外（客户端切页不会重建它），所以这里只负责首屏的初始显隐，
+// 站内切页过程中的显隐由 CategoryBar 的脚本按当前 URL 同步。
+const categoryBarPath = Astro.url.pathname.replace(/\/$/, "");
+const archivePagePath = url("/archive/").replace(/\/$/, "");
+const postsPathPrefix = url("/posts/").replace(/\/$/, "");
+const isArchivePageCheck = categoryBarPath === archivePagePath;
+const isPostDetailPageCheck = categoryBarPath.startsWith(`${postsPathPrefix}/`);
+const isCategoryBarPage =
+	isHomePageCheck || isArchivePageCheck || isPostDetailPageCheck;
+
 const shouldRenderCategoryBar = !!siteConfig.categoryBar;
 
 // 检查是否在文章详情页
@@ -173,17 +172,6 @@ const randomSubtitle = getRandomSubtitle();
 const homeTextEnable = backgroundWallpaper.common?.homeText?.enable;
 const showHomeText = isBannerMode && !!homeTextEnable && isHomePageCheck;
 
-const showBannerPostMeta =
-	(isBannerMode || isFullscreenMode) &&
-	isBackgroundEnabled &&
-	!isHomePageCheck &&
-	isPostPage &&
-	!!bannerPostMeta;
-const resolvedBannerPostAiSummary =
-	bannerPostAiSummary?.trim() || description?.trim() || "";
-const showBannerPostAiSummary =
-	showBannerPostMeta && !!resolvedBannerPostAiSummary;
-
 const showBannerDim = (isBannerMode || isFullscreenMode) && isBackgroundEnabled;
 const dimOpacity = backgroundWallpaper.common?.dimOpacity ?? 0.15;
 
@@ -195,6 +183,12 @@ const showBannerPageTitle =
 	!!title;
 // 手机端非首页不显示banner的CSS类
 const mobileNonHomeBannerClass = !isHomePageCheck ? "mobile-hide-banner" : "";
+
+// 文章详情页不再保留占满首屏的壁纸英雄区：壁纸固定为背景，正文直接从导航栏下方开始。
+// 这里只输出标记类，实际定位交给 CSS 与 Layout.astro 的 swup 钩子，
+// 避免 SSR 首屏与客户端切页出现两套不一致的定位结果。
+const isPostDetailWallpaperMode =
+	isPostPage && !isHomePageCheck && (isBannerMode || isFullscreenMode);
 
 // 计算主内容区域位置，考虑手机端非首页时banner被隐藏
 const mainPanelTop =
@@ -383,6 +377,7 @@ const hasMultipleImages =
 	isOverlayMode ? 'wallpaper-overlay' : '',
 	isFullscreenMode ? 'wallpaper-fullscreen' : '',
 	isHomePageCheck && (isFullscreenMode || isWallpaperSwitchable) ? 'homepage-fullscreen-decor' : '',
+	isPostDetailWallpaperMode ? "post-detail-fixed-bg" : "",
 ]} style={
 	isOverlayMode
 		? `${wallpaperOverlayVars} ${wallpaperFallbackStyle}`
@@ -846,73 +841,11 @@ const hasMultipleImages =
         </div>
     )}
 
-    <!-- Non-home post banner meta overlay (desktop only) -->
-    {showBannerPostMeta && bannerPostMeta && (
-        <div class="banner-post-meta-overlay absolute inset-0 z-20 hidden lg:flex items-center justify-center pointer-events-none">
-            <div class="w-4/5 lg:w-3/4 text-center mb-0">
-                <div class="flex flex-col items-center gap-3">
-                    <div
-                        class:list={[
-                            "banner-post-title font-bold text-white leading-tight",
-                            bannerPostMeta.title.includes("\n") && "banner-post-title-break",
-                        ]}
-                    >
-                        {bannerPostMeta.title}
-                    </div>
-                    <div class="banner-post-meta-list flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-white/90 text-sm md:text-base">
-                        <span class="inline-flex items-center gap-1.5">
-                            <Icon is:inline name="material-symbols:calendar-month-outline-rounded" class="text-[1.05em]" />
-                            <span>{i18n(I18nKey.publishedAt)} {formatDateToYYYYMMDD(bannerPostMeta.published)}</span>
-                        </span>
-                        {bannerPostMeta.updated &&
-                            bannerPostMeta.updated.getTime() !== bannerPostMeta.published.getTime() && (
-                                <span class="inline-flex items-center gap-1.5">
-                                    <Icon is:inline name="material-symbols:update-rounded" class="text-[1.05em]" />
-                                    <span>{i18n(I18nKey.updatedAt)} {formatDateToYYYYMMDD(bannerPostMeta.updated)}</span>
-                                </span>
-                            )}
-                        {typeof bannerPostMeta.words === "number" && (
-                            <span class="inline-flex items-center gap-1.5">
-                                <Icon is:inline name="material-symbols:ink-pen-outline-rounded" class="text-[1.05em]" />
-                                <span>
-                                    {bannerPostMeta.words} {i18n(bannerPostMeta.words === 1 ? I18nKey.wordCount : I18nKey.wordsCount)}
-                                </span>
-                            </span>
-                        )}
-                        {typeof bannerPostMeta.minutes === "number" && (
-                            <span class="inline-flex items-center gap-1.5">
-                                <Icon is:inline name="material-symbols:schedule-outline-rounded" class="text-[1.05em]" />
-                                <span>
-                                    {bannerPostMeta.minutes} {i18n(bannerPostMeta.minutes === 1 ? I18nKey.minuteCount : I18nKey.minutesCount)} · {i18n(I18nKey.readTime)}
-                                </span>
-                            </span>
-                        )}
-                    </div>
-                    {showBannerPostAiSummary && (
-                        <div class="banner-post-ai-summary" role="note" aria-label="AI摘要，由 ChatGPT Sol 5.6 Max 提供">
-                            <div class="banner-post-ai-summary__label">
-                                <Icon is:inline name="material-symbols:auto-awesome-rounded" class="text-[1.05em]" />
-                                <span>AI摘要</span>
-                                <span class="banner-post-ai-summary__provider">由 ChatGPT Sol 5.6 Max 提供</span>
-                            </div>
-                            <p aria-live="polite" aria-label={resolvedBannerPostAiSummary}>
-                                <TypewriterText
-                                    text={resolvedBannerPostAiSummary}
-                                    speed={20}
-                                    class="banner-post-ai-summary__typewriter"
-                                />
-                                <noscript>{resolvedBannerPostAiSummary}</noscript>
-                            </p>
-                            <div class="banner-post-ai-summary__disclaimer">本文已使用Ai进行辅助创作，注意甄别</div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    )}
+    <!-- 文章详情页的标题、元信息与 AI 摘要已移入正文卡片首屏，
+         壁纸只作为背景展示，避免读者需要额外滚动一次才能开始阅读。 -->
 
     <!-- Fullscreen 模式下显示向下滚动指示器 -->
-    {(isFullscreenMode || isWallpaperSwitchable) && <ScrollDownIndicator />}
+    {(isFullscreenMode || isWallpaperSwitchable) && !isPostDetailWallpaperMode && <ScrollDownIndicator />}
     </div>
 
     <!-- Water waves effect - 如果允许切换或任一设备启用则渲染 -->
@@ -986,7 +919,7 @@ const hasMultipleImages =
 )}
 
 <!-- Main content -->
-<div class={`absolute w-full z-30 pointer-events-none ${mobileNonHomeBannerClass ? 'mobile-main-no-banner' : ''} ${!(isBannerMode && isBackgroundEnabled) ? 'no-banner-layout' : ''}`} style={isFullscreenMode ? 'top: 0;' : `top: ${finalMainPanelTop}`}>
+<div class={`absolute w-full z-30 pointer-events-none ${mobileNonHomeBannerClass ? 'mobile-main-no-banner' : ''} ${!(isBannerMode && isBackgroundEnabled) ? 'no-banner-layout' : ''} ${isPostDetailWallpaperMode ? 'post-detail-main' : ''}`} style={isFullscreenMode ? 'top: 0;' : `top: ${finalMainPanelTop}`}>
     <!-- The pointer-events-none here prevent blocking the click event of the TOC -->
     <div class={`relative w-full ${fullWidth ? '' : 'xl:w-[92vw] max-w-(--page-width)'} mx-auto pointer-events-auto`}>
         <div id="main-grid"
@@ -1032,8 +965,12 @@ const hasMultipleImages =
                     
             {/* 主内容区包装器 - 包含静态栏位和swup容器，作为单个grid item */}
             <div class={staticBarClass}>
-                {/* 分类导航栏 - 全站渲染并显示 */}
-                {shouldRenderCategoryBar && <div id="category-bar-wrapper"><CategoryBar currentPostCategory={postCategory} /></div>}
+                {/* 分类导航栏 - 仅首页/归档页/文章详情页显示，其余页面用 hidden 隐藏（切页由脚本重算） */}
+                {shouldRenderCategoryBar && (
+                    <div id="category-bar-wrapper" hidden={!isCategoryBarPage}>
+                        <CategoryBar currentPostCategory={postCategory} />
+                    </div>
+                )}
                 {/* 主内容区 - 始终渲染，确保 Swup 容器存在 */}
                 <main
                     id="swup-container"
@@ -1045,26 +982,6 @@ const hasMultipleImages =
                 {/* 为每个页面提供一个隐藏的h1标题，用于SEO和可访问性 */}
                 <h1 class="sr-only">{title}</h1>
                 <div id="content-wrapper" class="onload-animation transition-leaving">
-                    {showBannerPostAiSummary && (
-                        <div class="mobile-post-ai-summary-shell">
-                            <div class="banner-post-ai-summary mobile-post-ai-summary" role="note" aria-label="AI摘要，由 ChatGPT Sol 5.6 Max 提供">
-                                <div class="banner-post-ai-summary__label">
-                                    <Icon is:inline name="material-symbols:auto-awesome-rounded" class="text-[1.05em]" />
-                                    <span>AI摘要</span>
-                                    <span class="banner-post-ai-summary__provider">由 ChatGPT Sol 5.6 Max 提供</span>
-                                </div>
-                                <p aria-live="polite" aria-label={resolvedBannerPostAiSummary}>
-                                    <TypewriterText
-                                        text={resolvedBannerPostAiSummary}
-                                        speed={20}
-                                        class="banner-post-ai-summary__typewriter"
-                                    />
-                                    <noscript>{resolvedBannerPostAiSummary}</noscript>
-                                </p>
-                                <div class="banner-post-ai-summary__disclaimer">本文已使用Ai进行辅助创作，注意甄别</div>
-                            </div>
-                        </div>
-                    )}
                     <slot></slot>
                 </div>
             </main>
@@ -1133,6 +1050,44 @@ const hasMultipleImages =
 </Layout>
 
 <style is:global>
+  /* 文章详情页：壁纸固定为视口背景，不再占据 100vh 文档流，
+     正文卡片直接从导航栏下方开始，读者点进文章即可开始阅读。
+     该类由 MainGridLayout 在文章页输出，切换到其它页面时会被移除。 */
+  #wallpaper-wrapper.post-detail-fixed-bg {
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    height: 100lvh !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    transform: none !important;
+    /* 壁纸退到内容之下，pointer-events 交给上层内容处理 */
+    z-index: 0 !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
+  }
+
+  /* 固定壁纸下，水波纹与底部渐变会随视口悬在正文之上，需隐藏以免遮挡文字。 */
+  #wallpaper-wrapper.post-detail-fixed-bg #header-waves,
+  #wallpaper-wrapper.post-detail-fixed-bg #wallpaper-gradient,
+  #wallpaper-wrapper.post-detail-fixed-bg .scroll-down-indicator {
+    display: none !important;
+  }
+
+  /* 主内容回到常规文档流，从导航栏下方开始，与移动端非首页保持一致的落位。 */
+  .absolute.w-full.z-30.post-detail-main {
+    position: relative !important;
+    top: 5.5rem !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: 30 !important;
+    margin-top: 0 !important;
+    min-height: calc(100vh - 5.5rem) !important;
+  }
+
   /* Page-title content may extend below the banner, but animated waves must
      never widen the document. A direct refresh otherwise creates a horizontal
      scroll range while an in-site Swup navigation does not. */

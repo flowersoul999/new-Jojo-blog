@@ -15,6 +15,8 @@ const categories = await getCategoryList();
 const totalPosts = (await getSortedPostsList()).length;
 const homeUrl = url("/");
 const archiveUrl = url("/archive/");
+// 文章详情页路径前缀，供脚本判断当前路由是否允许显示分类栏
+const postsPathPrefix = url("/posts/").replace(/\/$/, "");
 ---
 
 <div
@@ -22,6 +24,7 @@ const archiveUrl = url("/archive/");
   id="category-bar"
   data-home-path={homeUrl}
   data-archive-path={archiveUrl}
+  data-post-path-prefix={postsPathPrefix}
   data-current-post-category={currentPostCategory || ""}
 >
   <div class="category-bar-inner flex gap-2">
@@ -80,6 +83,10 @@ const archiveUrl = url("/archive/");
 <style>
   .category-bar {
     margin-bottom: 1rem;
+  }
+  /* 包装器隐藏态：只依赖 [hidden] 属性，避免和别的 display 规则打架 */
+  :global(#category-bar-wrapper[hidden]) {
+    display: none;
   }
   .category-divider {
     width: 1px;
@@ -193,18 +200,36 @@ const archiveUrl = url("/archive/");
     const pathname = currentUrl.pathname.replace(/\/$/, "");
     const homePath = (bar.getAttribute("data-home-path") || "/").replace(/\/$/, "");
     const archivePath = (bar.getAttribute("data-archive-path") || "/archive").replace(/\/$/, "");
+    const postsPathPrefix = (bar.getAttribute("data-post-path-prefix") || "/posts").replace(/\/$/, "");
     const isHome = pathname === homePath || pathname === "" || pathname === "/";
     const isArchive = pathname === archivePath;
     const isCategories = pathname === "/categories";
+    const isPostDetail = pathname.startsWith(`${postsPathPrefix}/`);
 
     return {
       isHome,
       isArchive,
       isCategories,
+      isPostDetail,
+      // 分类栏只在首页、归档页、文章详情页显示
+      isAllowed: isHome || isArchive || isPostDetail,
       activeCategory: currentUrl.searchParams.get("category") || "",
       hasTag: currentUrl.searchParams.has("tag"),
       hasUncategorized: currentUrl.searchParams.has("uncategorized"),
     };
+  }
+
+  /**
+   * 同步分类栏的显隐。
+   * 分类栏本身位于 swup 替换容器之外，站内切页不会重建它，
+   * 因此每次 URL 变化后都要按当前路由重新决定是否隐藏。
+   */
+  function updateCategoryBarVisibility(bar: HTMLElement, currentUrl: URL) {
+    const wrapper = bar.closest<HTMLElement>("#category-bar-wrapper") || bar.parentElement;
+    if (!wrapper) return;
+
+    const { isAllowed } = getCategoryBarState(bar, currentUrl);
+    wrapper.toggleAttribute("hidden", !isAllowed);
   }
 
   function setActiveCategory(bar: HTMLElement, currentUrl: URL) {
@@ -285,6 +310,7 @@ const archiveUrl = url("/archive/");
       bar.setAttribute("data-current-post-category", currentPostCategory);
     }
 
+    updateCategoryBarVisibility(bar, currentUrl);
     setActiveCategory(bar, currentUrl);
 
     const deferScroll = options.deferScroll ?? shouldDeferCategoryScroll(bar, currentUrl);
@@ -427,6 +453,7 @@ const archiveUrl = url("/archive/");
       const bar = document.getElementById("category-bar");
       if (!bar) return;
       const targetUrl = new URL(visit.to.url, window.location.href);
+      // 只切激活态；显隐统一留到内容替换后再改，避免过渡开始时肉眼可见的布局跳动
       setActiveCategory(bar, targetUrl);
     });
   }

@@ -89,7 +89,7 @@ export type SiteConfig = {
 		diary: boolean; // 日记页面开关
 	};
 
-	// 分类导航栏开关
+	// 分类导航栏开关（仅首页 / 归档页 / 文章详情页显示）
 	categoryBar?: boolean;
 
 	// 归档页是否折叠非最新年份文章

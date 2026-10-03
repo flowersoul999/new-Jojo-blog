@@ -116,7 +116,7 @@ const BROWSER_HEADERS = {
 function normalizeTitle(s: string): string {
 	return s
 		.toLowerCase()
-		.replace(/[（(\[【][^）)\]】]*[）)\]】]/g, "") // 去掉所有括号及其内容
+		.replace(/[（([【][^）)\]】]*[）)\]】]/g, "") // 去掉所有括号及其内容
 		.replace(
 			/(live|remix|dj版??|伴奏|cover|片段|纯音乐|official|正版|原唱|主题曲|剪辑版)/g,
 			"",

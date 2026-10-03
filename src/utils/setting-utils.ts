@@ -17,6 +17,7 @@ import {
 	siteConfig,
 } from "../config";
 import { isHomePage as checkIsHomePage } from "./layout-utils";
+import { url } from "./url-utils";
 
 // Declare global functions
 declare global {
@@ -697,6 +698,28 @@ function updateNavbarTransparency(mode: WALLPAPER_MODE) {
 // 跟踪全屏模式动画的 setTimeout，快速切换时需要取消
 let fullscreenAnimationTimeout: ReturnType<typeof setTimeout> | null = null;
 
+// 文章详情页在 banner / fullscreen 模式下把壁纸固定为背景层，
+// 让正文直接从导航栏下方开始，读者不必先滚过一次首屏英雄区。
+// 返回是否处于「壁纸固定为背景」的状态，供主内容定位复用同一判定。
+function syncPostDetailFixedWallpaper(
+	mode: WALLPAPER_MODE | "banner" | "none" | "overlay" | "fullscreen",
+) {
+	const postsBasePath = url("/posts/").replace(/\/+$/, "");
+	const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
+	const shouldFixWallpaper =
+		!checkIsHomePage(window.location.pathname) &&
+		postsBasePath.length > 0 &&
+		(normalizedPath === postsBasePath ||
+			normalizedPath.startsWith(`${postsBasePath}/`)) &&
+		(mode === "banner" || mode === "fullscreen");
+
+	document
+		.getElementById("wallpaper-wrapper")
+		?.classList.toggle("post-detail-fixed-bg", shouldFixWallpaper);
+
+	return shouldFixWallpaper;
+}
+
 function adjustMainContentPosition(
 	mode: WALLPAPER_MODE | "banner" | "none" | "overlay" | "fullscreen",
 	animate = false,
@@ -714,6 +737,22 @@ function adjustMainContentPosition(
 
 	// 移除现有的位置类
 	mainContent.classList.remove("mobile-main-no-banner", "no-banner-layout");
+
+	// 文章详情页在 banner / fullscreen 模式下壁纸固定为背景，正文从导航栏下方开始。
+	// 用户在设置里切换壁纸模式时也必须维持这个落位，否则会被下面的分支覆盖成 top:0。
+	const isPostDetailBgMode = syncPostDetailFixedWallpaper(mode);
+	if (isPostDetailBgMode) {
+		mainContent.classList.add("post-detail-main");
+		mainContent.style.setProperty("position", "relative", "important");
+		mainContent.style.setProperty("top", "5.5rem", "important");
+		mainContent.style.setProperty("margin-top", "0", "important");
+		mainContent.style.minHeight = "";
+		mainContent.style.transition = "";
+		mainContent.style.visibility = "visible";
+		document.body.classList.add("wallpaper-initialized");
+		return;
+	}
+	mainContent.classList.remove("post-detail-main");
 
 	switch (mode) {
 		case "banner": {

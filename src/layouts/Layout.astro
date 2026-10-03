@@ -505,7 +505,27 @@ const canonicalUrl = new URL(
             }
             // 全屏壁纸模式：用 relative 定位让内容紧跟壁纸（移动端非首页除外，壁纸已隐藏）
             const isMobileNonHome = window.innerWidth < 1024 && !isHomePage;
-            if (wallpaperMode === WALLPAPER_FULLSCREEN && !isMobileNonHome) {
+            // 文章详情页：壁纸已固定为背景层，内容直接落到导航栏下方
+            const postsBasePath = url("/posts/").replace(/\/+$/, "");
+            const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+            const isPostDetailHere =
+              postsBasePath.length > 0 &&
+              (currentPath === postsBasePath ||
+                currentPath.startsWith(`${postsBasePath}/`));
+            const isPostDetailBgMode =
+              isPostDetailHere &&
+              (wallpaperMode === WALLPAPER_FULLSCREEN ||
+                wallpaperMode === WALLPAPER_BANNER);
+            if (isPostDetailBgMode) {
+              mainContentWrapper.classList.add("post-detail-main");
+              mainContentWrapper.classList.remove(
+                "mobile-main-no-banner",
+                "no-banner-layout",
+              );
+              mainContentWrapper.style.setProperty("position", "relative", "important");
+              mainContentWrapper.style.setProperty("top", "5.5rem", "important");
+              mainContentWrapper.style.setProperty("margin-top", "0", "important");
+            } else if (wallpaperMode === WALLPAPER_FULLSCREEN && !isMobileNonHome) {
               mainContentWrapper.style.position = "relative";
               mainContentWrapper.style.top = "0";
               mainContentWrapper.style.zIndex = "30";
@@ -1076,6 +1096,18 @@ function disableAnimation() {
     });
   }
 
+  // 文章详情页（/posts/xxx）：壁纸固定为背景，正文直接从导航栏下方开始。
+  // 这里统一判定路径，供三个 Swup 钩子复用，避免各处重复写路径匹配。
+  const isPostDetailPath = (pathname: string) => {
+    const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
+    const postsPath = url("/posts/").replace(/\/+$/, "");
+    return (
+      postsPath.length > 0 &&
+      (normalizedPathname === postsPath ||
+        normalizedPathname.startsWith(`${postsPath}/`))
+    );
+  };
+
   // 只有主页、文章列表/详情和友链保留在页面 0，
   // 其余所有站内页面都直接进入主内容页面 1。
   const isPageZeroPath = (pathname: string) => {
@@ -1166,6 +1198,17 @@ function disableAnimation() {
       isHome &&
       (wallpaperMode === "fullscreen" ||
         wallpaperWrapper.classList.contains("wallpaper-fullscreen"));
+
+    // 文章详情页把壁纸固定为背景层，脱离文档流，正文不再被顶到第二屏。
+    // 壁纸模式为 overlay / none 时本身就不是首屏英雄区，无需干预。
+    const shouldFixWallpaperOnPostDetail =
+      !isHome &&
+      isPostDetailPath(pathname) &&
+      (wallpaperMode === "banner" || wallpaperMode === "fullscreen");
+    wallpaperWrapper.classList.toggle(
+      "post-detail-fixed-bg",
+      shouldFixWallpaperOnPostDetail,
+    );
 
     wallpaperWrapper.classList.toggle(
       "homepage-fullscreen-decor",
@@ -1281,6 +1324,20 @@ function disableAnimation() {
       const currentMode = document.documentElement.getAttribute("data-wallpaper-mode");
       const isMobileForBanner = window.innerWidth < 1024;
       const mainEl = document.querySelector(".w-full.z-30.pointer-events-none") as HTMLElement | null;
+
+      syncWallpaperWrapperClasses(window.location.pathname);
+
+      // 文章详情页：壁纸已固定为背景层，主内容直接落到导航栏下方。
+      // 必须早于下面的模式分支返回，否则会被 fullscreen 的 top:0 覆盖回去。
+      if (!isHome && isPostDetailPath(window.location.pathname) && mainEl) {
+        if (currentMode === "banner" || currentMode === "fullscreen") {
+          mainEl.classList.add("post-detail-main");
+          mainEl.classList.remove("mobile-main-no-banner", "no-banner-layout");
+          mainEl.style.setProperty("position", "relative", "important");
+          mainEl.style.setProperty("top", "5.5rem", "important");
+          mainEl.style.setProperty("margin-top", "0", "important");
+        }
+      }
 
       // 移动端 banner/全屏模式非首页：隐藏壁纸并调整内容位置（首页由 visit:start 和 page:view 处理）
       if (isMobileForBanner && (currentMode === "banner" || currentMode === "fullscreen") && !isHome) {
@@ -1506,18 +1563,33 @@ function disableAnimation() {
           mainContentWrapper.classList.remove("mobile-main-no-banner");
           // 桌面端全屏壁纸模式：壁纸始终可见，内容用 relative 定位紧跟壁纸
           const visitDesktopMode = document.documentElement.getAttribute("data-wallpaper-mode");
-          if (visitDesktopMode === "fullscreen") {
-            mainContentWrapper.style.position = "relative";
-            mainContentWrapper.style.zIndex = "30";
-            mainContentWrapper.style.setProperty("top", "0", "important");
-            mainContentWrapper.style.setProperty("margin-top", "1rem", "important");
-          }
-          // 桌面端横幅模式：统一用banner高度定位，不改变grid transform
-          if (visitDesktopMode === "banner") {
-            mainContentWrapper.style.setProperty("top", "calc(var(--banner-height) - 3.5rem)", "important");
-            mainContentWrapper.style.position = "";
-            mainContentWrapper.style.zIndex = "";
+          // 目标页是文章详情页时，壁纸固定为背景，内容从导航栏下方开始
+          const targetIsPostDetail =
+            !isHomePage && isPostDetailPath(targetPathname);
+          if (
+            targetIsPostDetail &&
+            (visitDesktopMode === "banner" || visitDesktopMode === "fullscreen")
+          ) {
+            mainContentWrapper.classList.add("post-detail-main");
+            mainContentWrapper.classList.remove("no-banner-layout");
+            mainContentWrapper.style.setProperty("position", "relative", "important");
+            mainContentWrapper.style.setProperty("top", "5.5rem", "important");
             mainContentWrapper.style.setProperty("margin-top", "0", "important");
+          } else {
+            mainContentWrapper.classList.remove("post-detail-main");
+            if (visitDesktopMode === "fullscreen") {
+              mainContentWrapper.style.position = "relative";
+              mainContentWrapper.style.zIndex = "30";
+              mainContentWrapper.style.setProperty("top", "0", "important");
+              mainContentWrapper.style.setProperty("margin-top", "1rem", "important");
+            }
+            // 桌面端横幅模式：统一用banner高度定位，不改变grid transform
+            if (visitDesktopMode === "banner") {
+              mainContentWrapper.style.setProperty("top", "calc(var(--banner-height) - 3.5rem)", "important");
+              mainContentWrapper.style.position = "";
+              mainContentWrapper.style.zIndex = "";
+              mainContentWrapper.style.setProperty("margin-top", "0", "important");
+            }
           }
         }
       }
@@ -1593,19 +1665,40 @@ function disableAnimation() {
       }
 
       // 桌面端全屏壁纸模式：壁纸始终可见，内容用 relative 定位紧跟壁纸
+      // 文章详情页例外：壁纸固定为背景，内容从导航栏下方开始
+      const isPostDetailNow =
+        !isHome && isPostDetailPath(window.location.pathname);
       if (!isMobileForBanner && currentMode === "fullscreen" && mainEl) {
-        mainEl.style.position = "relative";
-        mainEl.style.zIndex = "30";
-        mainEl.style.setProperty("top", "0", "important");
-        mainEl.style.setProperty("margin-top", "1rem", "important");
+        if (isPostDetailNow) {
+          mainEl.classList.add("post-detail-main");
+          mainEl.classList.remove("no-banner-layout");
+          mainEl.style.setProperty("position", "relative", "important");
+          mainEl.style.setProperty("top", "5.5rem", "important");
+          mainEl.style.setProperty("margin-top", "0", "important");
+        } else {
+          mainEl.classList.remove("post-detail-main");
+          mainEl.style.position = "relative";
+          mainEl.style.zIndex = "30";
+          mainEl.style.setProperty("top", "0", "important");
+          mainEl.style.setProperty("margin-top", "1rem", "important");
+        }
       }
 
       // 桌面端横幅模式：统一用banner高度定位，不改变grid transform
       if (!isMobileForBanner && currentMode === "banner" && mainEl) {
-        mainEl.style.setProperty("top", "calc(var(--banner-height) - 3.5rem)", "important");
-        mainEl.style.position = "";
-        mainEl.style.zIndex = "";
-        mainEl.style.setProperty("margin-top", "0", "important");
+        if (isPostDetailNow) {
+          mainEl.classList.add("post-detail-main");
+          mainEl.classList.remove("no-banner-layout");
+          mainEl.style.setProperty("position", "relative", "important");
+          mainEl.style.setProperty("top", "5.5rem", "important");
+          mainEl.style.setProperty("margin-top", "0", "important");
+        } else {
+          mainEl.classList.remove("post-detail-main");
+          mainEl.style.setProperty("top", "calc(var(--banner-height) - 3.5rem)", "important");
+          mainEl.style.position = "";
+          mainEl.style.zIndex = "";
+          mainEl.style.setProperty("margin-top", "0", "important");
+        }
       }
 
       syncWallpaperWrapperClasses(window.location.pathname);
