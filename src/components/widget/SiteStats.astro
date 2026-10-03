@@ -54,9 +54,12 @@ function formatNumber(num: number): string {
 }
 
 // 取最新一篇文章的发布日期作为最后活动时间
-const lastPostDate = posts.length > 0
-	? new Date(Math.max(...posts.map((p) => new Date(p.data.published).getTime()))).toISOString()
-	: new Date().toISOString();
+const lastPostDate =
+	posts.length > 0
+		? new Date(
+				Math.max(...posts.map((p) => new Date(p.data.published).getTime())),
+			).toISOString()
+		: new Date().toISOString();
 
 const todayText = i18n(I18nKey.today);
 type SiteStat = {
