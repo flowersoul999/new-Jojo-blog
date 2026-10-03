@@ -42,6 +42,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 	// 后端技能图（在前端基础上往全栈转：运行时 / 接口 / 数据 / 安全 / 运维 / 架构）
 	links.push(LinkPresets.BackendSkills);
 
+	// Agent 开发技能图（大模型应用：提示 / RAG / 工具编排 / 评测 / 上线）
+	links.push(LinkPresets.AgentSkills);
+
 	// 面试（求职准备：面经 / 八股 / Hot100 / 手撕题）
 	links.push(LinkPresets.Interview);
 
@@ -175,6 +178,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		name: "后端技能图",
 		url: "/backend/",
 		icon: "material-symbols:storage",
+	},
+	AgentSkills: {
+		name: "Agent 开发",
+		url: "/agent/",
+		icon: "material-symbols:smart-toy",
 	},
 	Interview: {
 		name: "面试",

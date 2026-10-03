@@ -6,7 +6,7 @@ import { Icon } from "astro-icon/components";
 
 interface Props {
 	/** 当前所在的那张图，用来把对应项点亮 */
-	current: "fe" | "cs" | "be";
+	current: "fe" | "cs" | "be" | "ag";
 }
 
 const { current } = Astro.props;
@@ -33,6 +33,13 @@ const graphs = [
 		meta: "51 个方块 · 9 层",
 		href: "/backend/",
 		icon: "material-symbols:storage",
+	},
+	{
+		id: "ag",
+		name: "Agent 开发",
+		meta: "43 个方块 · 9 层",
+		href: "/agent/",
+		icon: "material-symbols:smart-toy",
 	},
 ] as const;
 ---
