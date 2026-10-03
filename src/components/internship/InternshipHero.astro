@@ -10,7 +10,11 @@ interface Props {
 }
 
 const { profile, title, tagline } = Astro.props;
-const initial = profile.name.slice(0, 1);
+// 头像方块里的字：中文姓名取姓（一格更干净），英文昵称则整体显示
+const rawName = profile.name.trim();
+const initial = /[\u4e00-\u9fff]/u.test(rawName)
+	? rawName.slice(0, 1)
+	: rawName;
 ---
 
 <header class="gi-head" data-gi-reveal>
@@ -36,7 +40,16 @@ const initial = profile.name.slice(0, 1);
 				decoding="async"
 			/>
 		) : (
-			<div class="gi-avatar gi-avatar--text" aria-hidden="true">{initial}</div>
+			<div
+				class:list={[
+					"gi-avatar",
+					"gi-avatar--text",
+					{ "gi-avatar--wide": initial.length > 1 },
+				]}
+				aria-hidden="true"
+			>
+				{initial}
+			</div>
 		)}
 		<div class="gi-hero__id">
 			<div class="gi-hero__nameline">
@@ -168,6 +181,12 @@ const initial = profile.name.slice(0, 1);
 		font-size: 1.7rem;
 		font-weight: 800;
 		color: var(--gi-accent);
+	}
+	/* 昵称是多字母时（如 jojo），缩小字号让它在同一格方块里站得住 */
+	.gi-avatar--wide {
+		font-size: 1.05rem;
+		letter-spacing: 0.02em;
+		font-weight: 800;
 	}
 	.gi-hero__id {
 		min-width: 0;

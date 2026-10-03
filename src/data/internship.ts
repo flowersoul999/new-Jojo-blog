@@ -84,7 +84,8 @@ export interface InternshipRetro {
 export const internshipProfile: InternshipProfile = {
 	title: "Golden Experience",
 	tagline: "实习经历 · 在共享用工 SaaS 里打怪升级的这几个月",
-	name: "刘文博",
+	// 对外一律用昵称，不放真名
+	name: "jojo",
 	role: "前端开发实习生",
 	team: "共享用工 SaaS · 中控端 / 超管端",
 	period: "2026.06 – 至今",
