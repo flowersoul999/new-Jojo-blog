@@ -15,8 +15,12 @@
  *       位置交给 CSS 弹性布局，箭头在 DOM 渲染后实测坐标再画，所以任何屏宽都不会错位。
  */
 import { onMount, tick } from "svelte";
-import avatarUrl from "@/assets/images/jojo-avatar.webp";
+// Astro 会把图片 import 转成 ImageMetadata 对象（{ src, width, height, format }）。
+// 在 .astro 里 Astro 编译器会自动取 URL，但在 Svelte 里直接塞进 src 会渲染成 "[object Object]"，
+// 所以这里必须自己取 .src。
+import avatarMeta from "@/assets/images/jojo-avatar.webp";
 import { profileConfig } from "@/config/profileConfig";
+import { CHECK_COUNT, SKILL_CHECKS } from "@/data/skillChecks";
 import {
 	ATTR_MAP,
 	ATTRS,
@@ -38,6 +42,7 @@ import {
 } from "@/data/techIcons";
 
 const STORAGE_KEY = "aemeath-skill-tree";
+const avatarUrl = avatarMeta.src;
 const MAX_POINTS = TOTAL_SKILLS * MAX_LEVEL;
 const GROUP_MAP: Record<string, (typeof GROUPS)[number]> = Object.fromEntries(
 	GROUPS.map((g) => [g.id, g]),
@@ -149,36 +154,86 @@ const JITTER: Record<string, number> = Object.fromEntries(
 	}),
 );
 
-/* ===================== 等级状态 ===================== */
-let levels = $state<Record<string, number>>({ ...PRESET });
+/* ===================== 学习进度 ===================== */
+/**
+ * 进度模型：每个技能有 5 个学习项，「已勾选的项索引」是唯一的状态源。
+ *   技能等级 = 已勾选数（0-5）—— 勾一项涨一级，勾满就是 Lv5。
+ * 不直接存等级数字，是为了让「单独取消某一项」这种操作精确可逆。
+ */
+const PRESET_DONE: Record<string, number[]> = Object.fromEntries(
+	SKILLS.map((s) => {
+		const n = Math.min(totalOf(s.id), Math.max(0, PRESET[s.id] ?? 0));
+		return [s.id, Array.from({ length: n }, (_, i) => i)];
+	}),
+);
+
+let done = $state<Record<string, number[]>>({ ...PRESET_DONE });
+
+/** 这个技能有几项可勾 */
+function totalOf(id: string): number {
+	return SKILL_CHECKS[id]?.length ?? 0;
+}
+
+function checksOf(id: string): [string, string][] {
+	return SKILL_CHECKS[id] ?? [];
+}
+
+/** 等级 = 已勾选数，面板、水位、连线、属性全从这里读 */
+const levels = $derived.by(() => {
+	const m: Record<string, number> = {};
+	for (const s of SKILLS)
+		m[s.id] = Math.min(MAX_LEVEL, (done[s.id] ?? []).length);
+	return m;
+});
 
 function persist() {
 	try {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(levels));
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(done));
 	} catch {
 		/* 隐私模式下写不进去也无所谓 */
 	}
 }
 
-/** 读取本地进度：既认新格式 {id: level}，也认老格式 [id, ...] */
+/** 归一化：去重、排序、丢掉越界索引 */
+function clean(list: unknown, total: number): number[] {
+	if (!Array.isArray(list)) return [];
+	const set = new Set<number>();
+	for (const v of list) {
+		const i = Math.round(Number(v));
+		if (Number.isFinite(i) && i >= 0 && i < total) set.add(i);
+	}
+	return [...set].sort((a, b) => a - b);
+}
+
+/**
+ * 读取本地进度，认三种格式：
+ *   新：{ id: [0,1,2] }  已勾选的项索引
+ *   旧：{ id: 3 }        等级数字 → 换算成「勾了前 3 项」
+ *   更早：[id, ...]      已点亮的 id 列表 → 每个按 2 级算
+ */
 function readStored() {
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
 		if (!raw) return;
-		const parsed = JSON.parse(raw);
-		const next: Record<string, number> = {};
+		const parsed: unknown = JSON.parse(raw);
+		const next: Record<string, number[]> = {};
 		if (Array.isArray(parsed)) {
 			const ids = new Set(SKILLS.map((s) => s.id));
 			for (const id of parsed)
-				if (typeof id === "string" && ids.has(id)) next[id] = 2;
+				if (typeof id === "string" && ids.has(id))
+					next[id] = clean([0, 1], totalOf(id));
 		} else if (parsed && typeof parsed === "object") {
 			for (const s of SKILLS) {
 				const v = (parsed as Record<string, unknown>)[s.id];
-				if (typeof v === "number")
-					next[s.id] = Math.min(MAX_LEVEL, Math.max(0, Math.round(v)));
+				if (Array.isArray(v)) {
+					next[s.id] = clean(v, totalOf(s.id));
+				} else if (typeof v === "number") {
+					const n = Math.min(totalOf(s.id), Math.max(0, Math.round(v)));
+					next[s.id] = Array.from({ length: n }, (_, i) => i);
+				}
 			}
 		}
-		if (Object.keys(next).length) levels = next;
+		if (Object.keys(next).length) done = next;
 	} catch {
 		/* 数据坏了就用预设 */
 	}
@@ -474,7 +529,9 @@ const wires = $derived.by(() => {
 
 const active = $derived(hoverId ? SKILL_MAP[hoverId] : null);
 const dirty = $derived(
-	SKILLS.some((s) => (levels[s.id] ?? 0) !== PRESET[s.id]),
+	SKILLS.some(
+		(s) => (done[s.id] ?? []).join(",") !== PRESET_DONE[s.id].join(","),
+	),
 );
 
 /* ===================== 操作 ===================== */
@@ -485,37 +542,97 @@ function flash(msg: string) {
 	}, 2600);
 }
 
-function bump(s: Skill, delta: number) {
-	if (stateOf(s) === "locked") {
-		const missing = s.requires.filter((r) => (levels[r] ?? 0) <= 0);
-		shakeId = s.id;
-		setTimeout(() => {
-			if (shakeId === s.id) shakeId = null;
-		}, 480);
-		flash(
-			`先点亮：${missing.map((r) => SKILL_MAP[r]?.short ?? r).join(" · ")}`,
-		);
-		return;
-	}
-	const cur = levels[s.id] ?? 0;
-	const next = Math.min(MAX_LEVEL, Math.max(0, cur + delta));
-	if (next === cur) return;
-	levels = { ...levels, [s.id]: next };
+/** 前置没点亮就抖一下并提示；返回 true 表示这次操作被拦下了 */
+function blocked(s: Skill): boolean {
+	if (stateOf(s) !== "locked") return false;
+	const missing = s.requires.filter((r) => (levels[r] ?? 0) <= 0);
+	shakeId = s.id;
+	setTimeout(() => {
+		if (shakeId === s.id) shakeId = null;
+	}, 480);
+	flash(`先点亮：${missing.map((r) => SKILL_MAP[r]?.short ?? r).join(" · ")}`);
+	return true;
+}
+
+function writeDone(id: string, list: number[]) {
+	done = { ...done, [id]: list };
 	persist();
 }
 
+/** 勾上 / 取消某一项 —— 弹窗里逐项点的就是这个 */
+function toggle(s: Skill, i: number) {
+	if (blocked(s)) return;
+	const cur = done[s.id] ?? [];
+	writeDone(
+		s.id,
+		cur.includes(i)
+			? cur.filter((x) => x !== i)
+			: [...cur, i].sort((a, b) => a - b),
+	);
+}
+
+/** 左键：按从易到难的顺序勾下一项（已经中间挖空时，优先补上第一个空位） */
+function stepUp(s: Skill) {
+	if (blocked(s)) return;
+	const cur = done[s.id] ?? [];
+	const total = totalOf(s.id);
+	if (total === 0) return;
+	const free = Array.from({ length: total }, (_, i) => i).find(
+		(i) => !cur.includes(i),
+	);
+	if (free === undefined) {
+		flash(`${s.short} 的 ${total} 项已经全部学完了`);
+		return;
+	}
+	writeDone(
+		s.id,
+		[...cur, free].sort((a, b) => a - b),
+	);
+}
+
+/** 右键：退掉最后勾上的那一项 */
+function stepDown(s: Skill) {
+	const cur = done[s.id] ?? [];
+	if (!cur.length) return;
+	writeDone(
+		s.id,
+		cur.filter((x) => x !== Math.max(...cur)),
+	);
+}
+
 function resetToPreset() {
-	levels = { ...PRESET };
+	done = Object.fromEntries(SKILLS.map((s) => [s.id, [...PRESET_DONE[s.id]]]));
 	persist();
 	flash("已恢复出厂预设");
 }
 
 function clearAll() {
-	const next: Record<string, number> = {};
-	for (const s of SKILLS) next[s.id] = 0;
-	levels = next;
+	done = Object.fromEntries(SKILLS.map((s) => [s.id, []]));
 	persist();
 	flash("已全部清零，从头再来");
+}
+
+/* ===================== 学习清单弹窗 ===================== */
+/**
+ * 用原生 <dialog> + showModal()：它会渲染到 top layer，
+ * 不受主题 #content-wrapper 上那个 transform 的影响（fixed 定位会受影响，dialog 不会），
+ * 顺带白拿焦点循环、ESC 关闭和 ::backdrop。
+ */
+let openId = $state<string | null>(null);
+let dialogEl = $state<HTMLDialogElement | null>(null);
+const openSkill = $derived(openId ? (SKILL_MAP[openId] ?? null) : null);
+
+function openPanel(s: Skill) {
+	if (blocked(s)) return;
+	if (openId === s.id && dialogEl?.open) return;
+	openId = s.id;
+	tick().then(() => {
+		if (!dialogEl?.open) dialogEl?.showModal();
+	});
+}
+
+function closePanel() {
+	dialogEl?.close();
 }
 
 /* ===================== 生命周期 ===================== */
@@ -582,7 +699,8 @@ $effect(() => {
 			<h2 class="sk-title">前端技能图</h2>
 			<p class="sk-desc">
 				每一层的技术份量相同，方块上是真实的技术 logo。连线代表真实的前置关系——
-				上面点亮了，下面才解锁。把鼠标放到方块上，会高亮它的整条学习链路。
+				上面点亮了，下面才解锁。<b>左键点方块</b>会打开它的学习清单，一项项勾，
+				勾一项涨一级；悬停可以看到它的整条学习链路。
 			</p>
 		</div>
 		<div class="sk-stats">
@@ -665,15 +783,16 @@ $effect(() => {
 									data-id={s.id}
 									data-lv={lv}
 									data-state={st}
-									aria-label={`${s.name}，当前 ${LEVELS[lv]?.name ?? ""}`}
+									data-done={(done[s.id] ?? []).length}
+									aria-label={`${s.name}，清单 ${(done[s.id] ?? []).length}/${totalOf(s.id)} 项，等级 ${lv}`}
 									onmouseenter={() => (hoverId = s.id)}
 									onmouseleave={() => (hoverId = null)}
 									onfocus={() => (hoverId = s.id)}
 									onblur={() => (hoverId = null)}
-									onclick={() => bump(s, 1)}
+									onclick={() => openPanel(s)}
 									oncontextmenu={(e) => {
 										e.preventDefault();
-										bump(s, -1);
+										stepDown(s);
 									}}
 								>
 									<span class="sk-face">
@@ -773,23 +892,39 @@ $effect(() => {
 						解锁：{CHILDREN[active.id].map((c) => SKILL_MAP[c]?.short ?? c).join(" · ")}
 					</p>
 				{/if}
-				<ul class="sk-detail-tips">
-					{#each active.tips.slice(0, 3) as t (t)}
-						<li>{t}</li>
-					{/each}
-				</ul>
+				{#if checksOf(active.id).length}
+					<ul class="sk-detail-tips">
+						{#each checksOf(active.id) as [title, note], i (i)}
+							{@const on = (done[active.id] ?? []).includes(i)}
+							<li class:on>
+								<i aria-hidden="true">{on ? "✓" : "○"}</i>
+								<b>{title}</b>
+								<span>{note}</span>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 				<p class="sk-detail-judge">
-					<em>到 {LEVELS[Math.min(MAX_LEVEL, lv + 1)]?.name}</em>
-					{LEVELS[lv]?.judge ?? ""}
+					{#if lv >= MAX_LEVEL}
+						<em>已全部学完</em>{LEVELS[MAX_LEVEL]?.judge ?? ""}
+					{:else}
+						{@const next = checksOf(active.id).findIndex(
+							(_, i) => !(done[active.id] ?? []).includes(i),
+						)}
+						<em>下一项</em>
+						{next >= 0 ? checksOf(active.id)[next][0] : ""}
+						· 勾上后到 Lv{Math.min(MAX_LEVEL, lv + 1)}
+					{/if}
 				</p>
 			{:else}
 				<p class="sk-detail-hint">
-					把鼠标移到任意方块上，这里会显示它的说明、前置与解锁项，技能图里会同步高亮整条链路。
+					把鼠标移到任意方块上，这里会显示它的说明、学习清单与解锁项，技能图里会同步高亮整条链路。
 				</p>
 				<ul class="sk-detail-tips">
-					<li>左键点方块升一级，右键降一级，进度自动存在浏览器里</li>
-					<li>方块里的水位越高越亮，说明掌握得越扎实</li>
-					<li>虚线框加斜纹的方块还没解锁，先把它的前置点亮</li>
+					<li><i>1</i><b>左键点方块</b><span>打开它的学习清单，一项项勾</span></li>
+					<li><i>2</i><b>勾一项涨一级</b><span>方块水位上升、属性与总统计实时跟着变</span></li>
+					<li><i>3</i><b>右键退一项</b><span>勾错了不用进弹窗，右键点一下就行</span></li>
+					<li><i>4</i><b>虚线斜纹方块</b><span>前置还没点亮，先把它上面的技术学了</span></li>
 				</ul>
 			{/if}
 		</div>
@@ -877,10 +1012,17 @@ $effect(() => {
 
 			<p class="sk-tip-note">{active.note}</p>
 
-			{#if active.tips.length}
+			{#if checksOf(active.id).length}
+				<p class="sk-tip-cap sk-tip-cap-list">
+					学习清单
+					<em>{(done[active.id] ?? []).length}/{totalOf(active.id)}</em>
+				</p>
 				<ul class="sk-tip-tips">
-					{#each active.tips.slice(0, 3) as t (t)}
-						<li>{t}</li>
+					{#each checksOf(active.id) as [title], i (i)}
+						<li class:on={(done[active.id] ?? []).includes(i)}>
+							<i aria-hidden="true">{(done[active.id] ?? []).includes(i) ? "✓" : "○"}</i
+							>{title}
+						</li>
 					{/each}
 				</ul>
 			{/if}
@@ -926,11 +1068,149 @@ $effect(() => {
 				</p>
 			{:else}
 				<p class="sk-tip-open">
-					{active.requires.length ? "前置已打通" : "起点技能"} · 左键升级 / 右键降级
+					{active.requires.length ? "前置已打通" : "起点技能"} · 左键打开学习清单
 				</p>
 			{/if}
 		</div>
 	{/if}
+
+	<!-- ===================== 学习清单弹窗 ===================== -->
+	<dialog
+		class="sk-modal"
+		bind:this={dialogEl}
+		aria-labelledby="sk-modal-name"
+		onclose={() => (openId = null)}
+		onclick={(e) => {
+			if (e.target === dialogEl) closePanel();
+		}}
+	>
+		{#if openSkill}
+			{@const m = openSkill}
+			{@const mlv = levels[m.id] ?? 0}
+			{@const mdone = done[m.id] ?? []}
+			{@const mtotal = totalOf(m.id)}
+			{@const mlist = checksOf(m.id)}
+			{@const mattr = ATTR_MAP[attrIdOf(m)]}
+			{@const pips = Array.from({ length: mtotal }, (_, i) => i)}
+			<div class="sk-modal-box">
+				<header class="sk-modal-head">
+					<svg class="sk-modal-logo" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d={TECH_ICONS[m.id]?.d ?? ""}
+							fill={iconColor(m.id, m.group, iconState(m), dark)}
+						></path>
+					</svg>
+					<div class="sk-modal-title">
+						<p class="sk-modal-name" id="sk-modal-name">
+							{m.name}
+							<span
+								class="sk-modal-group"
+								style={`--gc:${GROUP_COLORS[m.group] ?? "#9a8f78"}`}
+							>
+								{GROUP_MAP[m.group]?.short ?? ""}
+							</span>
+						</p>
+						<p class="sk-modal-note">{m.note}</p>
+					</div>
+					<div class="sk-modal-lv">
+						<b>Lv{mlv}</b>
+						<span>{LEVELS[mlv]?.name}</span>
+						<span class="sk-modal-pips">
+							{#each pips as p (p)}
+								<i class:on={p < mlv}></i>
+							{/each}
+						</span>
+					</div>
+				</header>
+
+				<div class="sk-modal-prog">
+					<span class="sk-modal-cap">学习清单</span>
+					<span class="sk-modal-prog-num">
+						<b>{mdone.length}</b>/{mtotal} 项
+					</span>
+					<span class="sk-modal-prog-bar">
+						<span
+							style={`width:${mtotal ? (mdone.length / mtotal) * 100 : 0}%`}
+						></span>
+					</span>
+					<span class="sk-modal-prog-hint">勾一项涨一级，勾满就是 Lv{MAX_LEVEL}</span>
+				</div>
+
+				<ul class="sk-modal-list">
+					{#each mlist as [title, note], i (i)}
+						{@const on = mdone.includes(i)}
+						<li>
+							<button
+								type="button"
+								class="sk-check"
+								class:on
+								data-ci={i}
+								aria-pressed={on}
+								onclick={() => toggle(m, i)}
+							>
+								<span class="sk-check-box" aria-hidden="true"
+									>{on ? "✓" : ""}</span
+								>
+								<span class="sk-check-txt">
+									<b>{title}</b>
+									<em>{note}</em>
+								</span>
+							</button>
+						</li>
+					{/each}
+				</ul>
+
+				<footer class="sk-modal-foot">
+					<div class="sk-modal-rel">
+						<p>
+							<span class="sk-modal-cap">前置</span>
+							{#if m.requires.length}
+								{m.requires
+									.map((r) => `${SKILL_MAP[r]?.short ?? r}·${levels[r] ?? 0}`)
+									.join(" · ")}
+							{:else}
+								无，这是起点
+							{/if}
+						</p>
+						{#if CHILDREN[m.id]?.length}
+							<p>
+								<span class="sk-modal-cap">解锁</span>
+								<span class="sk-modal-kids">
+									{CHILDREN[m.id]
+										.map((c) => SKILL_MAP[c]?.short ?? c)
+										.join(" · ")}
+								</span>
+							</p>
+						{/if}
+					</div>
+					<div class="sk-modal-acts">
+						<span
+							class="sk-modal-gain"
+							style={`--ac:#${mattr?.color ?? "7a6a4a"}`}
+						>
+							+{attrGain(m)} {mattr?.name ?? ""}
+							<em>{mlv >= MAX_LEVEL ? `精通 +${ATTR_MAX_BONUS}` : "每项 +1"}</em>
+						</span>
+						<button
+							type="button"
+							class="sk-modal-btn"
+							disabled={!mdone.length}
+							onclick={() => stepDown(m)}
+						>
+							退一项
+						</button>
+						<button
+							type="button"
+							class="sk-modal-btn is-primary"
+							onclick={closePanel}
+						>
+							完成
+						</button>
+					</div>
+				</footer>
+			</div>
+		{/if}
+	</dialog>
 
 	{#if toast}
 		<p class="sk-toast">{toast}</p>
@@ -1599,26 +1879,39 @@ $effect(() => {
 		color: var(--ink-2);
 	}
 	.sk-detail-tips {
+		display: grid;
+		gap: 0.22rem;
 		margin: 0.55rem 0 0;
 		padding: 0;
 		list-style: none;
 	}
 	.sk-detail-tips li {
-		position: relative;
-		padding-left: 0.85rem;
-		font-size: 0.72rem;
-		line-height: 1.68;
+		display: grid;
+		grid-template-columns: 0.85rem minmax(3.6rem, auto) minmax(0, 1fr);
+		gap: 0.42rem;
+		align-items: baseline;
+		font-size: 0.7rem;
+		line-height: 1.6;
 		color: var(--ink-2);
 	}
-	.sk-detail-tips li::before {
-		content: "";
-		position: absolute;
-		left: 0.15rem;
-		top: 0.62em;
-		width: 4px;
-		height: 4px;
-		border-radius: 50%;
-		background: var(--gold);
+	.sk-detail-tips li i {
+		font-style: normal;
+		font-size: 0.66rem;
+		text-align: center;
+		color: color-mix(in srgb, var(--ink-2) 62%, transparent);
+	}
+	.sk-detail-tips li b {
+		font-weight: 700;
+		color: var(--ink);
+	}
+	.sk-detail-tips li span {
+		color: color-mix(in srgb, var(--ink-2) 88%, transparent);
+	}
+	.sk-detail-tips li.on i {
+		color: var(--gold-dp);
+	}
+	.sk-detail-tips li.on b {
+		color: var(--gold-dp);
 	}
 	.sk-detail-judge {
 		margin: 0.6rem 0 0;
@@ -1744,26 +2037,45 @@ $effect(() => {
 	}
 	.sk-tip-tips {
 		display: grid;
-		gap: 0.2rem;
-		margin: 0.44rem 0 0;
+		gap: 0.18rem;
+		margin: 0.3rem 0 0;
 		padding: 0;
 		list-style: none;
 	}
 	.sk-tip-tips li {
-		position: relative;
-		padding-left: 0.74rem;
+		display: grid;
+		grid-template-columns: 0.78rem minmax(0, 1fr);
+		gap: 0.24rem;
+		align-items: baseline;
 		font-size: 0.68rem;
-		color: rgb(233 226 211 / 0.7);
+		line-height: 1.5;
+		color: rgb(233 226 211 / 0.66);
 	}
-	.sk-tip-tips li::before {
-		content: "";
-		position: absolute;
-		left: 0.18rem;
-		top: 0.5em;
-		width: 3px;
-		height: 3px;
-		border-radius: 50%;
-		background: color-mix(in srgb, var(--gold) 85%, transparent);
+	.sk-tip-tips li i {
+		font-style: normal;
+		font-size: 0.62rem;
+		text-align: center;
+		color: rgb(233 226 211 / 0.42);
+	}
+	.sk-tip-tips li.on {
+		color: rgb(246 223 168 / 0.96);
+		font-weight: 600;
+	}
+	.sk-tip-tips li.on i {
+		color: var(--gold-lt);
+	}
+	.sk-tip-cap-list {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin: 0.5rem 0 0;
+	}
+	.sk-tip-cap-list em {
+		font-style: normal;
+		font-weight: 700;
+		color: var(--gold-lt);
+		font-variant-numeric: tabular-nums;
 	}
 	.sk-tip-rewards {
 		display: flex;
@@ -1976,7 +2288,355 @@ $effect(() => {
 		color: var(--ink-2);
 	}
 
+	/* ===================== 学习清单弹窗 ===================== */
+	/* 用原生 dialog：它渲染在 top layer，不受祖先 transform 影响，
+	   白拿焦点循环、ESC 关闭和 ::backdrop。 */
+	.sk-modal {
+		max-width: none;
+		max-height: none;
+		margin: auto;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		overflow: visible;
+		color: var(--ink);
+	}
+	.sk-modal::backdrop {
+		background: rgb(18 15 10 / 0.5);
+	}
+	.sk-modal-box {
+		display: flex;
+		flex-direction: column;
+		width: min(600px, 92vw);
+		max-height: min(84vh, 760px);
+		border: 1px solid color-mix(in srgb, var(--gold) 52%, transparent);
+		border-radius: 1.1rem;
+		background: var(--panel-1);
+		box-shadow:
+			inset 0 0 0 1px color-mix(in srgb, var(--gold) 14%, transparent),
+			0 24px 60px rgb(0 0 0 / 0.34);
+		overflow: hidden;
+	}
+	.sk-modal-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.85rem;
+		padding: 1.05rem 1.15rem 0.9rem;
+		border-bottom: 1px solid var(--line);
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--gold) 11%, transparent),
+			transparent
+		);
+	}
+	.sk-modal-logo {
+		flex: none;
+		width: 42px;
+		height: 42px;
+		padding: 7px;
+		border: 1px solid color-mix(in srgb, var(--gold) 42%, transparent);
+		border-radius: 0.7rem;
+		background: var(--face-1);
+		filter: var(--logo-shadow);
+	}
+	.sk-modal-title {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	.sk-modal-name {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+		margin: 0;
+		font-size: 1.05rem;
+		font-weight: 800;
+		color: var(--ink);
+	}
+	.sk-modal-group {
+		padding: 0.06rem 0.36rem;
+		border: 1px solid color-mix(in srgb, var(--gc) 55%, transparent);
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--gc) 16%, transparent);
+		font-size: 0.62rem;
+		font-weight: 600;
+		color: color-mix(in srgb, var(--gc) 78%, var(--ink));
+	}
+	.sk-modal-note {
+		margin: 0.28rem 0 0;
+		font-size: 0.74rem;
+		line-height: 1.6;
+		color: var(--ink-2);
+	}
+	.sk-modal-lv {
+		flex: none;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.08rem;
+	}
+	.sk-modal-lv b {
+		font-size: 1.2rem;
+		font-weight: 800;
+		line-height: 1;
+		color: var(--gold-dp);
+		font-variant-numeric: tabular-nums;
+	}
+	.sk-modal-lv > span {
+		font-size: 0.64rem;
+		color: var(--ink-2);
+	}
+	.sk-modal-pips {
+		display: inline-flex;
+		gap: 3px;
+		margin-top: 0.2rem;
+	}
+	.sk-modal-pips i {
+		display: block;
+		width: 13px;
+		height: 5px;
+		border-radius: 2px;
+		background: color-mix(in srgb, var(--ink-2) 24%, transparent);
+		transition: background 240ms ease;
+	}
+	.sk-modal-pips i.on {
+		background: linear-gradient(90deg, var(--gold), var(--gold-dp));
+	}
+	.sk-modal-prog {
+		display: grid;
+		grid-template-columns: auto auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.7rem 1.15rem;
+		border-bottom: 1px dashed var(--line);
+	}
+	.sk-modal-cap {
+		font-size: 0.64rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		color: var(--ink-2);
+	}
+	.sk-modal-prog-num {
+		font-size: 0.7rem;
+		color: var(--ink-2);
+		font-variant-numeric: tabular-nums;
+	}
+	.sk-modal-prog-num b {
+		font-size: 0.88rem;
+		color: var(--gold-dp);
+	}
+	.sk-modal-prog-bar {
+		height: 6px;
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--ink-2) 18%, transparent);
+		overflow: hidden;
+	}
+	.sk-modal-prog-bar > span {
+		display: block;
+		height: 100%;
+		border-radius: 99px;
+		background: linear-gradient(90deg, var(--gold), var(--gold-dp));
+		transition: width 320ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.sk-modal-prog-hint {
+		font-size: 0.62rem;
+		color: var(--ink-2);
+		opacity: 0.85;
+	}
+	.sk-modal-list {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: grid;
+		gap: 0.42rem;
+		margin: 0;
+		padding: 0.85rem 1.15rem;
+		list-style: none;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+	.sk-check {
+		display: grid;
+		grid-template-columns: 1.35rem minmax(0, 1fr);
+		gap: 0.6rem;
+		align-items: start;
+		width: 100%;
+		padding: 0.6rem 0.7rem;
+		border: 1px solid var(--line);
+		border-radius: 0.7rem;
+		background: var(--face-1);
+		text-align: left;
+		cursor: pointer;
+		transition:
+			border-color 180ms ease,
+			background 180ms ease,
+			transform 180ms ease;
+	}
+	.sk-check:hover {
+		border-color: color-mix(in srgb, var(--gold) 58%, transparent);
+		background: color-mix(in srgb, var(--gold) 7%, var(--face-1));
+		transform: translateX(2px);
+	}
+	.sk-check-box {
+		display: grid;
+		place-items: center;
+		width: 1.35rem;
+		height: 1.35rem;
+		border: 1.5px dashed color-mix(in srgb, var(--ink-2) 46%, transparent);
+		border-radius: 0.34rem;
+		background: var(--panel-2);
+		font-size: 0.74rem;
+		font-weight: 900;
+		color: #fff8e6;
+		transition:
+			background 200ms ease,
+			border-color 200ms ease,
+			box-shadow 200ms ease;
+	}
+	.sk-check-txt {
+		display: grid;
+		gap: 0.14rem;
+		min-width: 0;
+	}
+	.sk-check-txt b {
+		font-size: 0.8rem;
+		font-weight: 700;
+		line-height: 1.4;
+		color: var(--ink);
+	}
+	.sk-check-txt em {
+		font-style: normal;
+		font-size: 0.71rem;
+		line-height: 1.6;
+		color: var(--ink-2);
+	}
+	.sk-check.on {
+		border-color: color-mix(in srgb, var(--gold) 62%, transparent);
+		background: color-mix(in srgb, var(--gold) 11%, var(--face-1));
+	}
+	.sk-check.on .sk-check-box {
+		border: 1.5px solid var(--gold-dp);
+		background: linear-gradient(180deg, var(--gold), var(--gold-dp));
+		box-shadow: 0 2px 8px color-mix(in srgb, var(--gold) 45%, transparent);
+	}
+	.sk-check.on .sk-check-txt b {
+		color: var(--gold-dp);
+	}
+	.sk-modal-foot {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.55rem 1rem;
+		padding: 0.75rem 1.15rem 0.9rem;
+		border-top: 1px solid var(--line);
+		background: var(--panel-2);
+	}
+	.sk-modal-rel {
+		display: grid;
+		gap: 0.14rem;
+		min-width: 0;
+	}
+	.sk-modal-rel p {
+		display: flex;
+		align-items: baseline;
+		gap: 0.4rem;
+		margin: 0;
+		font-size: 0.68rem;
+		line-height: 1.5;
+		color: var(--ink-2);
+	}
+	.sk-modal-kids {
+		color: var(--ink);
+	}
+	.sk-modal-acts {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		margin-left: auto;
+	}
+	.sk-modal-gain {
+		padding: 0.16rem 0.52rem;
+		border: 1px solid color-mix(in srgb, var(--ac) 55%, transparent);
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--ac) 16%, transparent);
+		font-size: 0.66rem;
+		font-weight: 800;
+		color: color-mix(in srgb, var(--ac) 86%, var(--ink));
+	}
+	.sk-modal-gain em {
+		margin-left: 0.26rem;
+		font-style: normal;
+		font-weight: 600;
+		opacity: 0.75;
+	}
+	.sk-modal-btn {
+		padding: 0.34rem 0.8rem;
+		border: 1px solid var(--line);
+		border-radius: 99px;
+		background: var(--face-1);
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--ink-2);
+		cursor: pointer;
+		transition:
+			color 180ms ease,
+			border-color 180ms ease,
+			background 180ms ease;
+	}
+	.sk-modal-btn:hover:not(:disabled) {
+		border-color: color-mix(in srgb, var(--gold) 55%, transparent);
+		color: var(--gold-dp);
+	}
+	.sk-modal-btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.sk-modal-btn.is-primary {
+		border-color: color-mix(in srgb, var(--gold) 62%, transparent);
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--gold) 88%, #fff),
+			var(--gold-dp)
+		);
+		color: #fff9ea;
+	}
+
 	/* ===================== 响应式 ===================== */
+	@media (max-width: 560px) {
+		.sk-modal-box {
+			width: 94vw;
+			max-height: 88vh;
+		}
+		.sk-modal-head {
+			gap: 0.6rem;
+			padding: 0.9rem 0.9rem 0.75rem;
+		}
+		.sk-modal-logo {
+			width: 36px;
+			height: 36px;
+			padding: 6px;
+		}
+		.sk-modal-prog {
+			grid-template-columns: auto auto minmax(0, 1fr);
+			padding: 0.6rem 0.9rem;
+		}
+		.sk-modal-prog-hint {
+			display: none;
+		}
+		.sk-modal-list {
+			padding: 0.7rem 0.9rem;
+		}
+		.sk-modal-foot {
+			padding: 0.65rem 0.9rem 0.8rem;
+		}
+		.sk-modal-acts {
+			width: 100%;
+			margin-left: 0;
+		}
+		.sk-modal-gain {
+			margin-right: auto;
+		}
+	}
 	@media (max-width: 1240px) {
 		.sk-canvas {
 			--tile: 48px;
@@ -2030,7 +2690,11 @@ $effect(() => {
 		.sk-water,
 		.sk-logo,
 		.sk-wire,
-		.sk-tip {
+		.sk-tip,
+		.sk-check,
+		.sk-check-box,
+		.sk-modal-prog-bar > span,
+		.sk-modal-pips i {
 			transition: none !important;
 			animation: none !important;
 		}
