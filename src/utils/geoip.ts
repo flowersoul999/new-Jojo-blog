@@ -31,7 +31,7 @@ const GEO_TTL = 24 * 60 * 60 * 1000;
 const GEO_CACHE_MAX = 3000;
 const FETCH_TIMEOUT = 4000;
 
-const geoCache = new Map<string, { geo: GeoInfo; at: number }>();
+const geoCache = new Map<string, { geo: GeoInfo; at: number; ttl: number }>();
 
 /** 最近一次定位诊断（后台展示用，避免「只到国家」时无从排查） */
 export interface GeoDiag {
@@ -242,7 +242,7 @@ export async function resolveGeo(
 	lastNote = "";
 
 	const cached = geoCache.get(ip);
-	if (cached && Date.now() - cached.at < GEO_TTL) return cached.geo;
+	if (cached && Date.now() - cached.at < cached.ttl) return cached.geo;
 
 	const headerGeo = geoFromHeaders(request);
 	let geo: GeoInfo = headerGeo;
@@ -267,7 +267,14 @@ export async function resolveGeo(
 	}
 
 	if (geoCache.size >= GEO_CACHE_MAX) geoCache.clear();
-	geoCache.set(ip, { geo, at: Date.now() });
+	// 缓存策略：定位到省及以上才算「有效结果」，长缓存 24 小时；
+	// 仅有国家/无结果（多为外部源暂时失败或配额耗尽）只短缓存 5 分钟，
+	// 避免外部服务恢复后（如刚领取配额）仍长时间返回空归属地。
+	const ttl =
+		geo.level === "district" || geo.level === "city" || geo.level === "province"
+			? GEO_TTL
+			: 5 * 60 * 1000;
+	geoCache.set(ip, { geo, at: Date.now(), ttl });
 
 	// 记录本轮定位结果，供后台诊断展示：无论成功失败都更新，
 	// 失败时把数据源写入 lastNote 的具体原因一并带出
