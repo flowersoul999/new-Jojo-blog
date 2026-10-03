@@ -3,6 +3,7 @@
 // 数据见 src/data/csSkills.ts（技能与依赖）· csIcons.ts（图标）· csChecks.ts（学习清单）
 // 组件见 src/components/skills/CsSkillTree.svelte
 import CsSkillTree from "@/components/skills/CsSkillTree.svelte";
+import SkillGraphSwitch from "@/components/skills/SkillGraphSwitch.astro";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
 
 const title = "计算机基础";
@@ -13,6 +14,7 @@ const description =
 <MainGridLayout title={title} description={description} hideSidebars fullWidth>
 	<div class="card-base z-10 relative w-full overflow-hidden">
 		<div class="px-3 sm:px-5 md:px-7 py-5 sm:py-7 max-w-[78rem] mx-auto">
+			<SkillGraphSwitch current="cs" />
 			<CsSkillTree client:load />
 		</div>
 	</div>
