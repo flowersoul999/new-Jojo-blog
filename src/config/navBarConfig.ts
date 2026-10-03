@@ -150,7 +150,7 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		icon: "material-symbols:construction-rounded",
 	},
 	Skills: {
-		name: "技能树",
+		name: "技能图",
 		url: "/skills/",
 		icon: "material-symbols:account-tree-rounded",
 	},
