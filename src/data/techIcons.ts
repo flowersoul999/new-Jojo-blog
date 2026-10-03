@@ -360,8 +360,12 @@ export function iconColor(
 	group: string,
 	state: IconState,
 	dark: boolean,
+	/** 图标表：不同的技能图可以各带一份（默认用前端那张） */
+	icons: Record<string, TechIcon> = TECH_ICONS,
+	/** 方向兜底色：同上 */
+	colors: Record<string, string> = GROUP_COLORS,
 ): string {
-	const base = TECH_ICONS[id]?.brand ?? GROUP_COLORS[group] ?? "8E6BC8";
+	const base = icons[id]?.brand ?? colors[group] ?? "8E6BC8";
 	const vivid = tune(base, dark);
 	if (state === "lit") return `#${vivid}`;
 

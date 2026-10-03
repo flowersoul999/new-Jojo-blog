@@ -20,30 +20,75 @@ import { onMount, tick } from "svelte";
 // 所以这里必须自己取 .src。
 import avatarMeta from "@/assets/images/jojo-avatar.webp";
 import { profileConfig } from "@/config/profileConfig";
-import { CHECK_COUNT, SKILL_CHECKS } from "@/data/skillChecks";
 import {
-	ATTR_MAP,
-	ATTRS,
-	GROUP_ATTR,
-	GROUPS,
-	LEVELS,
-	MAX_LEVEL,
-	PRESET,
-	SKILL_MAP,
-	SKILLS,
+	CHECK_COUNT as FE_CHECK_COUNT,
+	SKILL_CHECKS as FE_CHECKS,
+} from "@/data/skillChecks";
+import {
+	ATTR_MAP as FE_ATTR_MAP,
+	ATTRS as FE_ATTRS,
+	GROUP_ATTR as FE_GROUP_ATTR,
+	GROUPS as FE_GROUPS,
+	LEVELS as FE_LEVELS,
+	MAX_LEVEL as FE_MAX_LEVEL,
+	PRESET as FE_PRESET,
+	SKILLS as FE_SKILLS,
+	TOTAL_SKILLS as FE_TOTAL_SKILLS,
 	type Skill,
-	TOTAL_SKILLS,
 } from "@/data/skills";
 import {
-	GROUP_COLORS,
+	GROUP_COLORS as FE_GROUP_COLORS,
+	TECH_ICONS as FE_TECH_ICONS,
 	type IconState,
-	iconColor,
-	TECH_ICONS,
+	iconColor as tintIcon,
 } from "@/data/techIcons";
 
-const STORAGE_KEY = "aemeath-skill-tree";
+/** 前端技能图的角色称号阶梯；别的图可以自己传一套 */
+const FE_TITLES = [
+	{ min: 0, name: "初识前端", note: "地基还没打完，慢慢来" },
+	{ min: 10, name: "略有小成", note: "能照着文档做出东西了" },
+	{ min: 25, name: "独当一面", note: "能扛需求，也能自己排错" },
+	{ min: 40, name: "炉火纯青", note: "知道什么场景不该用什么" },
+	{ min: 58, name: "一方宗师", note: "能带人，也能定规范" },
+	{ min: 75, name: "登峰造极", note: "造轮子，影响一整个生态" },
+];
+
+/**
+ * 这是一个「通用技能图」组件，站内几张图共用它（前端技能图 / 计算机基础技能图…）。
+ * 下面的默认值就是前端技能图，所以 /skills/ 页面一行都不用改；
+ * 想开第三张图，照着 src/data/csSkills.ts 备一套数据传进来即可。
+ */
+let {
+	skills: SKILLS = FE_SKILLS,
+	groups: GROUPS = FE_GROUPS,
+	attrs: ATTRS = FE_ATTRS,
+	groupAttr: GROUP_ATTR = FE_GROUP_ATTR,
+	attrMap: ATTR_MAP = FE_ATTR_MAP,
+	levels: LEVELS = FE_LEVELS,
+	maxLevel: MAX_LEVEL = FE_MAX_LEVEL,
+	checks: SKILL_CHECKS = FE_CHECKS,
+	checkCount: CHECK_COUNT = FE_CHECK_COUNT,
+	preset: PRESET = FE_PRESET,
+	totalSkills: TOTAL_SKILLS = FE_TOTAL_SKILLS,
+	icons: TECH_ICONS = FE_TECH_ICONS,
+	groupColors: GROUP_COLORS = FE_GROUP_COLORS,
+	storageKey: STORAGE_KEY = "aemeath-skill-tree",
+	/** 图的大标题 */
+	heading: HEADING = "前端技能图",
+	/** 角色称号阶梯：按总掌握度百分比给 */
+	titles: TITLES = FE_TITLES,
+} = $props();
+
+/** 图标配色：把这张图自己的图标表与方向配色喂进去 */
+function iconColor(id: string, group: string, state: IconState, dark: boolean) {
+	return tintIcon(id, group, state, dark, TECH_ICONS, GROUP_COLORS);
+}
+
 const avatarUrl = avatarMeta.src;
 const MAX_POINTS = TOTAL_SKILLS * MAX_LEVEL;
+const SKILL_MAP: Record<string, Skill> = Object.fromEntries(
+	SKILLS.map((s) => [s.id, s]),
+);
 const GROUP_MAP: Record<string, (typeof GROUPS)[number]> = Object.fromEntries(
 	GROUPS.map((g) => [g.id, g]),
 );
@@ -54,16 +99,6 @@ const GROUP_SIZE: Record<string, number> = (() => {
 	for (const s of SKILLS) m[s.group] = (m[s.group] ?? 0) + 1;
 	return m;
 })();
-
-/** 角色称号：按总掌握度百分比给 */
-const TITLES = [
-	{ min: 0, name: "初识前端", note: "地基还没打完，慢慢来" },
-	{ min: 10, name: "略有小成", note: "能照着文档做出东西了" },
-	{ min: 25, name: "独当一面", note: "能扛需求，也能自己排错" },
-	{ min: 40, name: "炉火纯青", note: "知道什么场景不该用什么" },
-	{ min: 58, name: "一方宗师", note: "能带人，也能定规范" },
-	{ min: 75, name: "登峰造极", note: "造轮子，影响一整个生态" },
-];
 
 /* ===================== 图结构（静态，只算一次） ===================== */
 
@@ -696,7 +731,7 @@ $effect(() => {
 	<header class="sk-head">
 		<div class="sk-head-l">
 			<p class="sk-eyebrow">SKILL GRAPH</p>
-			<h2 class="sk-title">前端技能图</h2>
+			<h2 class="sk-title">{HEADING}</h2>
 			<p class="sk-desc">
 				每一层的技术份量相同，方块上是真实的技术 logo。连线代表真实的前置关系——
 				上面点亮了，下面才解锁。<b>左键点方块</b>会打开它的学习清单，一项项勾，
