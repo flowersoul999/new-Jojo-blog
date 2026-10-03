@@ -157,6 +157,31 @@
 		return "晚上好";
 	}
 
+	/**
+	 * 欢迎卡片只对外展示到市级：区/县及更细的粒度只保留在后台管理，避免前台暴露过细的归属地。
+	 * 数据源（v2.xxapi.cn）返回的 address 形如「中国广东省广州市增城区」，这里统一裁到「市」。
+	 */
+	function toCityLevel(address: string): string {
+		const value = address.trim();
+		if (!value) return "";
+
+		// 港澳没有「市」这一级，截到特别行政区即可，避免露出油尖旺区/氹仔等区级细节
+		const sar = value.match(/^(中国)?(香港|澳门)特别行政区/);
+		if (sar) return `${sar[1] ?? ""}${sar[2]}特别行政区`;
+
+		// 市级边界取「市」与「自治州 / 地区 / 盟」中先出现的一个：
+		// 既覆盖「阿坝藏族羌族自治州汶川县」，也覆盖「伊犁哈萨克自治州伊宁市」这类州内含县级市的情况
+		const cityIndex = value.indexOf("市");
+		const prefecture = value.match(/^.*?(自治州|地区|盟)/);
+		if (prefecture && (cityIndex === -1 || prefecture[0].length - 1 < cityIndex)) {
+			return prefecture[0];
+		}
+		if (cityIndex !== -1) return value.slice(0, cityIndex + 1);
+
+		// 拿不到可识别的市级边界时保持原样，宁可少裁也不要裁错
+		return value;
+	}
+
 	function readLocation(payload: unknown): string {
 		if (!payload || typeof payload !== "object") return "";
 		const data = payload as Record<string, unknown>;
@@ -229,7 +254,7 @@
 					signal: this.abortController.signal,
 				});
 				if (!response.ok) throw new Error("location unavailable");
-				const location = readLocation(await response.json());
+				const location = toCityLevel(readLocation(await response.json()));
 				if (message) {
 					message.textContent = location
 						? `来自 ${location}，很高兴遇见你。`
