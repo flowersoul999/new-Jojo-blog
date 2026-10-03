@@ -56,6 +56,13 @@ export function getGeoDiag(): GeoDiag {
 
 const EMPTY_GEO: GeoInfo = { cc: "", rg: "", level: "none", source: "none" };
 
+/**
+ * 本轮定位过程中产生的提示（各数据源查询时写入，resolveGeo 收尾时读入诊断）。
+ * 早期实现直接修改 geoDiag.note，但失败时不更新 at/source，
+ * 导致后台出现「at:0 + 有提示」的割裂展示，故改为独立变量统一收口。
+ */
+let lastNote = "";
+
 /** 是否配置了区县级数据源（用于后台诊断） */
 export function districtSourceReady(): boolean {
 	return !!(import.meta.env.TENCENT_MAP_KEY || process.env.TENCENT_MAP_KEY);
@@ -113,18 +120,30 @@ async function queryTencent(ip: string): Promise<GeoInfo | null> {
 		if (!res.ok) return null;
 		payload = await res.json();
 	} catch {
-		geoDiag.note = "腾讯定位请求失败（网络/超时），已退回兜底";
+		lastNote = "腾讯定位请求失败（网络/超时），已退回兜底";
 		return null;
 	}
+	const root = payload as { status?: number; message?: string };
 	const data = (
 		payload as {
-			status?: number;
 			result?: { ad_info?: Record<string, string> };
 		}
 	)?.result?.ad_info;
-	const root = payload as { status?: number };
 	if (root.status !== 0 || !data) {
-		geoDiag.note = `腾讯定位返回 status=${root.status ?? "?"}（检查 key 是否启用 WebServiceAPI / 配额）`;
+		// 按腾讯官方状态码给出可操作的排查提示（文案对应官网状态码表）
+		const status = root.status ?? "?";
+		const hintMap: Record<number, string> = {
+			110: "请求来源未被授权（检查 key 的域名/IP 安全设置）",
+			111: "签名验证失败（key 启用了 SN 校验，需改用带签名的调用方式）",
+			112: "服务器出口 IP 未被授权（Vercel 出口 IP 动态，授权 IP 请留空）",
+			113: "此功能未被授权（需在控制台为 key 申请 IP 定位配额）",
+			120: "此 key 每秒请求量已达上限（限流，稍后自动恢复）",
+			121: "此 key 每日调用量已达上限（请到控制台查看配额与今日用量，警惕 key 被盗用）",
+			190: "无效的 KEY（核对 Vercel 中 TENCENT_MAP_KEY 的值）",
+			199: "此 key 未开启 WebServiceAPI 功能（请到 key 设置中勾选启用）",
+			311: "key 格式错误（核对是否多了空格/换行）",
+		};
+		lastNote = `腾讯定位返回 status=${status}：${hintMap[root.status ?? -1] || root.message || "未知错误"}`;
 		return null;
 	}
 
@@ -219,6 +238,9 @@ export async function resolveGeo(
 ): Promise<GeoInfo> {
 	if (isSkippableIp(ip)) return EMPTY_GEO;
 
+	// 重置本轮提示，避免上次失败的文案污染本次诊断
+	lastNote = "";
+
 	const cached = geoCache.get(ip);
 	if (cached && Date.now() - cached.at < GEO_TTL) return cached.geo;
 
@@ -247,21 +269,24 @@ export async function resolveGeo(
 	if (geoCache.size >= GEO_CACHE_MAX) geoCache.clear();
 	geoCache.set(ip, { geo, at: Date.now() });
 
-	// 记录最近一次定位结果，供后台诊断展示
-	if (!geoDiag.note || geo.source === "tencent") {
-		geoDiag = {
-			at: Date.now(),
-			source: geo.source,
-			level: geo.level,
-			cc: geo.cc,
-			rg: geo.rg,
-			note:
-				geo.source === "tencent"
-					? "腾讯定位成功"
-					: geo.source === "pconline"
-						? "腾讯未配置/失败，已用太平洋库（仅 IPv4，多到市）"
-						: "未配置 TENCENT_MAP_KEY，仅兜底到国家（Cloudflare/Vercel 请求头）",
-		};
-	}
+	// 记录本轮定位结果，供后台诊断展示：无论成功失败都更新，
+	// 失败时把数据源写入 lastNote 的具体原因一并带出
+	const defaultNote =
+		geo.source === "tencent"
+			? "腾讯定位成功"
+			: geo.source === "pconline"
+				? "腾讯未配置/失败，已用太平洋库（仅 IPv4，多到市）"
+				: districtSourceReady()
+					? "已配置 key 但各数据源均未给出归属地，仅兜底到国家"
+					: "未配置 TENCENT_MAP_KEY，仅兜底到国家（Cloudflare/Vercel 请求头）";
+	geoDiag = {
+		at: Date.now(),
+		source: geo.source,
+		level: geo.level,
+		cc: geo.cc,
+		rg: geo.rg,
+		note: lastNote || defaultNote,
+	};
+	lastNote = "";
 	return geo;
 }
