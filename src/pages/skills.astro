@@ -1,0 +1,18 @@
+---
+// 技能树页：把前端从入门到专家的学习路径长成一棵会发光的树
+// 节点亮度 = 我的掌握度（Lv0-Lv5），交互与数据见 src/components/skills/SkillTree.svelte
+import SkillTree from "@/components/skills/SkillTree.svelte";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+const title = "技能树";
+const description =
+	"把前端从前端小白到技术专家的学习路径，长成一棵会发光的技能树。节点越亮，说明掌握得越扎实。";
+---
+
+<MainGridLayout title={title} description={description}>
+	<div class="card-base z-10 relative w-full overflow-hidden">
+		<div class="px-4 sm:px-6 md:px-9 py-5 sm:py-7">
+			<SkillTree client:load />
+		</div>
+	</div>
+</MainGridLayout>

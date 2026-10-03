@@ -33,6 +33,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		],
 	});
 
+	// 技能树
+	links.push(LinkPresets.Skills);
+
 	// 站点统计（暂时隐藏，页面仍可通过 /analytics/ 访问）
 	// links.push(LinkPresets.Analytics);
 
@@ -145,6 +148,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		name: "工具",
 		url: "/tools/",
 		icon: "material-symbols:construction-rounded",
+	},
+	Skills: {
+		name: "技能树",
+		url: "/skills/",
+		icon: "material-symbols:account-tree-rounded",
 	},
 	Friends: {
 		name: "友链",
