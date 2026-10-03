@@ -14,10 +14,13 @@
  * 排列：层由依赖深度算出，层内顺序用「父节点序号的重心」迭代排序，尽量少交叉。
  *       位置交给 CSS 弹性布局，箭头在 DOM 渲染后实测坐标再画，所以任何屏宽都不会错位。
  */
-import { onMount } from "svelte";
+import { onMount, tick } from "svelte";
 import avatarUrl from "@/assets/images/jojo-avatar.webp";
 import { profileConfig } from "@/config/profileConfig";
 import {
+	ATTR_MAP,
+	ATTRS,
+	GROUP_ATTR,
 	GROUPS,
 	LEVELS,
 	MAX_LEVEL,
@@ -39,6 +42,13 @@ const MAX_POINTS = TOTAL_SKILLS * MAX_LEVEL;
 const GROUP_MAP: Record<string, (typeof GROUPS)[number]> = Object.fromEntries(
 	GROUPS.map((g) => [g.id, g]),
 );
+
+/** 每个方向有多少个技能 —— 用来算方向的满点上限与平均值 */
+const GROUP_SIZE: Record<string, number> = (() => {
+	const m: Record<string, number> = {};
+	for (const s of SKILLS) m[s.group] = (m[s.group] ?? 0) + 1;
+	return m;
+})();
 
 /** 角色称号：按总掌握度百分比给 */
 const TITLES = [
@@ -209,6 +219,98 @@ let hoverId = $state<string | null>(null);
 let shakeId = $state<string | null>(null);
 let toast = $state("");
 
+/* ---------- 悬停浮层：跟着方块走，永远不出屏 ---------- */
+let tipEl = $state<HTMLDivElement | null>(null);
+let tipPos = $state({ x: 0, y: 0, above: false, ready: false });
+
+/**
+ * 找 position:fixed 的「包含块」。
+ * 主题的 #content-wrapper 上有 transform: translateZ(0)（GPU 合成用），
+ * 只要祖先里有一个 transform / filter / will-change，fixed 就不再相对视口定位，
+ * 而是相对那个祖先。这里把祖先的矩形算出来，后面统一换算，位置才不会偏。
+ */
+function fixedContainingBlock(el: HTMLElement | null) {
+	let p = el?.parentElement ?? null;
+	while (p && p !== document.body && p !== document.documentElement) {
+		const cs = getComputedStyle(p);
+		if (
+			cs.transform !== "none" ||
+			cs.filter !== "none" ||
+			cs.perspective !== "none" ||
+			cs.willChange === "transform" ||
+			cs.contain.includes("paint") ||
+			cs.contain.includes("layout")
+		) {
+			const r = p.getBoundingClientRect();
+			return { x: r.left, y: r.top, w: r.width, h: r.height };
+		}
+		p = p.parentElement;
+	}
+	return { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+}
+
+function placeTip() {
+	const el = canvasEl;
+	const id = hoverId;
+	if (!el || !id) {
+		tipPos = { ...tipPos, ready: false };
+		return;
+	}
+	const tile = el.querySelector<HTMLElement>(`.sk-tile[data-id="${id}"]`);
+	if (!tile) {
+		tipPos = { ...tipPos, ready: false };
+		return;
+	}
+	const r = tile.getBoundingClientRect();
+	const w = tipEl?.offsetWidth || 276;
+	const h = tipEl?.offsetHeight || 250;
+
+	// 坐标统一换算到「包含块坐标系」里。
+	// 注意要从浮层自身往上找，不能从方块往上找 —— 方块所在的 .sk-cell 悬停时
+	// 有 translateY(-3px)，那是方块的包含块，跟浮层完全无关。
+	const cb = fixedContainingBlock(tipEl ?? el);
+	const left = r.left - cb.x;
+	const top = r.top - cb.y;
+	const bottom = r.bottom - cb.y;
+	// 包含块可能比视口大，可视区间取两者交集
+	const visTop = Math.max(0, cb.y) - cb.y;
+	const visBottom = Math.min(window.innerHeight, cb.y + cb.h) - cb.y;
+	const visLeft = Math.max(0, cb.x) - cb.x;
+	const visRight = Math.min(window.innerWidth, cb.x + cb.w) - cb.x;
+	const gap = 12;
+	const pad = 10;
+
+	// 默认挂下方；下方放不下就翻到上方；上下都放不下就夹在可视区里
+	let above = false;
+	let y = bottom + gap;
+	if (y + h > visBottom - pad) {
+		above = true;
+		y = top - gap - h;
+	}
+	if (y < visTop + pad) {
+		above = false;
+		y = Math.max(visTop + pad, Math.min(visBottom - h - pad, bottom + gap));
+	}
+
+	const minX = visLeft + pad;
+	const maxX = visRight - w - pad;
+	const x = Math.max(
+		minX,
+		Math.min(left + r.width / 2 - w / 2, Math.max(minX, maxX)),
+	);
+
+	tipPos = { x, y, above, ready: true };
+}
+
+/** 悬停目标、等级、滚动、缩放任何一种变化，浮层都要重新贴位 */
+$effect(() => {
+	void hoverId;
+	void levels;
+	void tipEl;
+	if (!hoverId) return;
+	tick().then(() => placeTip());
+});
+
 /** 悬浮时点亮的整条链路：自己 + 所有前置 + 所有后置 */
 const focusSet = $derived.by(() => {
 	const set = new Set<string>();
@@ -251,6 +353,7 @@ function iconState(s: Skill): IconState {
 
 const stats = $derived.by(() => {
 	const groupPoints: Record<string, number> = {};
+	const groupMaxed: Record<string, number> = {};
 	let points = 0;
 	let lit = 0;
 	let maxed = 0;
@@ -262,6 +365,7 @@ const stats = $derived.by(() => {
 		if (lv >= MAX_LEVEL) maxed++;
 		if (lv < 3) untouched++;
 		groupPoints[s.group] = (groupPoints[s.group] ?? 0) + lv;
+		if (lv >= MAX_LEVEL) groupMaxed[s.group] = (groupMaxed[s.group] ?? 0) + 1;
 	}
 	const pct = Math.round((points / MAX_POINTS) * 100);
 	let title = TITLES[0];
@@ -273,8 +377,52 @@ const stats = $derived.by(() => {
 		untouched,
 		pct,
 		title,
+		groupPoints,
+		groupMaxed,
 		litGroups: GROUPS.filter((g) => (groupPoints[g.id] ?? 0) > 0).length,
+		maxedGroups: GROUPS.filter((g) => (groupMaxed[g.id] ?? 0) > 0).length,
 	};
+});
+
+/* ===================== 角色属性 ===================== */
+
+/**
+ * 属性点规则（只在这里定义）：
+ *   每升 1 级 → 所属方向的属性 +1；满级（Lv5）再额外 +2。
+ */
+function attrIdOf(s: Skill): string {
+	return GROUP_ATTR[s.group] ?? "dex";
+}
+
+/** 这个技能当前贡献了多少属性点 */
+function attrGain(s: Skill): number {
+	const lv = levels[s.id] ?? 0;
+	return lv + (lv >= MAX_LEVEL ? 2 : 0);
+}
+
+/** 满级后再多给多少 —— 提示浮层里要显示 */
+const ATTR_MAX_BONUS = 2;
+
+const attrStats = $derived.by(() => {
+	const value: Record<string, number> = {};
+	const max: Record<string, number> = {};
+	const count: Record<string, number> = {};
+	const maxed: Record<string, number> = {};
+	for (const a of ATTRS) {
+		value[a.id] = 0;
+		max[a.id] = 0;
+		count[a.id] = 0;
+		maxed[a.id] = 0;
+	}
+	for (const s of SKILLS) {
+		const id = attrIdOf(s);
+		const lv = levels[s.id] ?? 0;
+		count[id] = (count[id] ?? 0) + 1;
+		max[id] = (max[id] ?? 0) + MAX_LEVEL + ATTR_MAX_BONUS;
+		value[id] = (value[id] ?? 0) + attrGain(s);
+		if (lv >= MAX_LEVEL) maxed[id] = (maxed[id] ?? 0) + 1;
+	}
+	return { value, max, count, maxed };
 });
 
 /** 连线：起点是前置方块底边中心，终点是后置方块顶边中心，中间走直角折线 */
@@ -395,12 +543,26 @@ onMount(() => {
 		for (const child of el.children) ro.observe(child);
 	}
 	window.addEventListener("resize", scheduleMeasure);
+	// 浮层用的是包含块坐标，页面或技能图一滚就得重新贴位；用 rAF 节流，别每个事件都算
+	let tipRaf = 0;
+	const onScroll = () => {
+		if (!hoverId || tipRaf) return;
+		tipRaf = requestAnimationFrame(() => {
+			tipRaf = 0;
+			placeTip();
+		});
+	};
+	window.addEventListener("scroll", onScroll, true);
+	window.addEventListener("resize", onScroll);
 	document.fonts?.ready.then(() => measure()).catch(() => {});
 
 	return () => {
 		mo.disconnect();
 		ro.disconnect();
 		window.removeEventListener("resize", scheduleMeasure);
+		window.removeEventListener("scroll", onScroll, true);
+		window.removeEventListener("resize", onScroll);
+		if (tipRaf) cancelAnimationFrame(tipRaf);
 	};
 });
 
@@ -553,9 +715,17 @@ $effect(() => {
 				</p>
 				<p class="sk-hero-note">{stats.title.note}</p>
 				<ul class="sk-attrs">
-					<li><span>熟练度</span><b>{stats.pct}%</b></li>
-					<li><span>满级技能</span><b>{stats.maxed}</b></li>
-					<li><span>待攻克</span><b>{stats.untouched}</b></li>
+					{#each ATTRS as a (a.id)}
+						{@const v = attrStats.value[a.id] ?? 0}
+						{@const m = attrStats.max[a.id] ?? 1}
+						<li style={`--ac:#${a.color}`}>
+							<span class="sk-attr-cap">{a.short}</span>
+							<b>{v}<em>/{m}</em></b>
+							<span class="sk-attr-bar">
+								<span style={`width:${m ? Math.round((v / m) * 100) : 0}%`}></span>
+							</span>
+						</li>
+					{/each}
 				</ul>
 			</div>
 		</div>
@@ -623,7 +793,144 @@ $effect(() => {
 				</ul>
 			{/if}
 		</div>
+
+		<!-- ===================== 总统计 ===================== -->
+		<section class="sk-summary">
+			<div class="sk-summary-head">
+				<h3>总统计</h3>
+				<p>按方向看进度：条越满，这块越扎实；最右边是它喂养的属性。</p>
+			</div>
+
+			<ul class="sk-summary-list">
+				{#each GROUPS as g (g.id)}
+					{@const gp = stats.groupPoints[g.id] ?? 0}
+					{@const gsize = GROUP_SIZE[g.id] ?? 1}
+					{@const gmax = gsize * MAX_LEVEL}
+					{@const gpct = gmax ? Math.round((gp / gmax) * 100) : 0}
+					{@const gattr = ATTR_MAP[GROUP_ATTR[g.id] ?? "dex"]}
+					<li
+						class="sk-sum-row"
+						style={`--gc:${GROUP_COLORS[g.id] ?? "#9a8f78"};--ac:#${gattr?.color ?? "7a6a4a"}`}
+					>
+						<span class="sk-sum-name">{g.name}</span>
+						<span class="sk-sum-bar"><span style={`width:${gpct}%`}></span></span>
+						<span class="sk-sum-val">{gp}<em>/{gmax}</em></span>
+						<span class="sk-sum-pct">{gpct}%</span>
+						<span class="sk-sum-maxed">满级 {stats.groupMaxed[g.id] ?? 0}/{gsize}</span>
+						<span class="sk-sum-attr">{gattr?.short}</span>
+					</li>
+				{/each}
+			</ul>
+
+			<div class="sk-summary-foot">
+				<ul class="sk-summary-nums">
+					<li><b>{stats.points}</b><span>技能点<em>满 {MAX_POINTS}</em></span></li>
+					<li><b>{stats.pct}%</b><span>总掌握度<em>{stats.title.name}</em></span></li>
+					<li><b>{stats.lit}<em>/{TOTAL_SKILLS}</em></b><span>已点亮<em>还有 {TOTAL_SKILLS - stats.lit} 个没碰</em></span></li>
+					<li><b>{stats.maxed}</b><span>已精通<em>Lv{MAX_LEVEL} 技能数</em></span></li>
+					<li><b>{stats.litGroups}<em>/{GROUPS.length}</em></b><span>已开启方向<em>至少点亮 1 个</em></span></li>
+					<li><b>{stats.maxedGroups}</b><span>满级方向<em>整块都到 Lv{MAX_LEVEL}</em></span></li>
+				</ul>
+				<p class="sk-summary-note">
+					技术是学不完的，能学完的只有「今天这一块」。把上面的条一条条填满，比收藏一百篇文章都管用。
+				</p>
+			</div>
+		</section>
 	</footer>
+
+	<!-- ===================== 悬停浮层 ===================== -->
+	{#if active}
+		{@const alv = levels[active.id] ?? 0}
+		{@const aattr = ATTR_MAP[attrIdOf(active)]}
+		{@const missing = active.requires.filter((r) => (levels[r] ?? 0) <= 0)}
+		<div
+			class="sk-tip"
+			class:above={tipPos.above}
+			class:ready={tipPos.ready}
+			bind:this={tipEl}
+			style={`left:${tipPos.x}px;top:${tipPos.y}px`}
+			role="tooltip"
+		>
+			<div class="sk-tip-head">
+				<svg class="sk-tip-logo" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d={TECH_ICONS[active.id]?.d ?? ""}
+						fill={iconColor(active.id, active.group, iconState(active), dark)}
+					></path>
+				</svg>
+				<div class="sk-tip-title">
+					<p class="sk-tip-name">
+						{active.name}
+						<span
+							class="sk-tip-group"
+							style={`--gc:${GROUP_COLORS[active.group] ?? "#9a8f78"}`}
+						>
+							{GROUP_MAP[active.group]?.short ?? ""}
+						</span>
+					</p>
+					<p class="sk-tip-lv">
+						等级 <b>{alv}</b> / {MAX_LEVEL} · {LEVELS[alv]?.name}
+					</p>
+				</div>
+				<span class="sk-tip-pct">{Math.round((alv / MAX_LEVEL) * 100)}%</span>
+			</div>
+
+			<p class="sk-tip-note">{active.note}</p>
+
+			{#if active.tips.length}
+				<ul class="sk-tip-tips">
+					{#each active.tips.slice(0, 3) as t (t)}
+						<li>{t}</li>
+					{/each}
+				</ul>
+			{/if}
+
+			<div class="sk-tip-rewards">
+				<span class="sk-tip-cap">属性</span>
+				<span class="sk-tip-gain" style={`--ac:#${aattr?.color ?? "7a6a4a"}`}>
+					+1 {aattr?.name ?? ""}<em>/级</em>
+				</span>
+				{#if alv >= MAX_LEVEL}
+					<span class="sk-tip-gain is-bonus" style={`--ac:#${aattr?.color ?? "7a6a4a"}`}>
+						精通再 +{ATTR_MAX_BONUS}
+					</span>
+				{/if}
+			</div>
+
+			<p class="sk-tip-rel">
+				<span class="sk-tip-cap">前置</span>
+				{#if active.requires.length}
+					{#each active.requires as r, i (r)}
+						{#if i > 0}<i class="sk-tip-sep">·</i>{/if}
+						<span class:ok={(levels[r] ?? 0) > 0} class:need={(levels[r] ?? 0) <= 0}>
+							{SKILL_MAP[r]?.short ?? r}<em>({levels[r] ?? 0})</em>
+						</span>
+					{/each}
+				{:else}
+					<span class="ok">无，这是起点</span>
+				{/if}
+			</p>
+
+			{#if CHILDREN[active.id]?.length}
+				<p class="sk-tip-rel">
+					<span class="sk-tip-cap">解锁</span>
+					<span class="sk-tip-kids">
+						{CHILDREN[active.id].map((c) => SKILL_MAP[c]?.short ?? c).join(" · ")}
+					</span>
+				</p>
+			{/if}
+
+			{#if missing.length}
+				<p class="sk-tip-locked">
+					先点亮 {missing.map((r) => SKILL_MAP[r]?.short ?? r).join(" · ")}，才能学它
+				</p>
+			{:else}
+				<p class="sk-tip-open">
+					{active.requires.length ? "前置已打通" : "起点技能"} · 左键升级 / 右键降级
+				</p>
+			{/if}
+		</div>
+	{/if}
 
 	{#if toast}
 		<p class="sk-toast">{toast}</p>
@@ -1181,26 +1488,53 @@ $effect(() => {
 		font-size: 0.72rem;
 		color: var(--ink-2);
 	}
+	/* ===================== 角色属性（魅力 / 灵巧 / 硬核） ===================== */
 	.sk-attrs {
-		display: flex;
-		gap: 1rem;
+		display: grid;
+		gap: 0.36rem;
 		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
 	.sk-attrs li {
-		display: flex;
-		flex-direction: column;
-		gap: 0.05rem;
+		display: grid;
+		grid-template-columns: 2rem 3rem minmax(0, 1fr);
+		align-items: center;
+		gap: 0.4rem;
 	}
-	.sk-attrs span {
+	.sk-attr-cap {
 		font-size: 0.62rem;
 		color: var(--ink-2);
+		white-space: nowrap;
 	}
 	.sk-attrs b {
-		font-size: 0.86rem;
-		color: var(--gold-dp);
+		font-size: 0.8rem;
+		color: color-mix(in srgb, var(--ac) 76%, var(--ink));
 		font-variant-numeric: tabular-nums;
+	}
+	.sk-attrs b em {
+		font-style: normal;
+		font-size: 0.6rem;
+		font-weight: 500;
+		opacity: 0.55;
+	}
+	.sk-attr-bar {
+		display: block;
+		height: 5px;
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--ink) 11%, transparent);
+		overflow: hidden;
+	}
+	.sk-attr-bar > span {
+		display: block;
+		height: 100%;
+		border-radius: 99px;
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--ac) 55%, transparent),
+			var(--ac)
+		);
+		transition: width 420ms cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.sk-detail-head {
@@ -1326,6 +1660,322 @@ $effect(() => {
 		box-shadow: 0 6px 18px color-mix(in srgb, var(--gold-dp) 34%, transparent);
 	}
 
+	/* ===================== 悬停浮层 ===================== */
+	/* 始终用深色卡片：像游戏里的物品说明，浅色底和深色底都只有它一个反色块，最醒目 */
+	.sk-tip {
+		position: fixed;
+		z-index: 80;
+		width: 276px;
+		max-width: calc(100vw - 20px);
+		padding: 0.74rem 0.82rem 0.7rem;
+		border: 1px solid color-mix(in srgb, var(--gold) 58%, transparent);
+		border-radius: 0.72rem;
+		background:
+			linear-gradient(165deg, #2e2618, #191510);
+		box-shadow:
+			0 14px 34px rgb(0 0 0 / 0.42),
+			inset 0 1px 0 rgb(255 255 255 / 0.06);
+		font-size: 0.72rem;
+		line-height: 1.55;
+		color: #e9e2d3;
+		opacity: 0;
+		transform: translateY(-5px);
+		transition:
+			opacity 140ms ease,
+			transform 140ms ease;
+		pointer-events: none;
+	}
+	.sk-tip.above {
+		transform: translateY(5px);
+	}
+	.sk-tip.ready {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	.sk-tip-head {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.sk-tip-logo {
+		flex: none;
+		width: 26px;
+		height: 26px;
+	}
+	.sk-tip-title {
+		flex: 1;
+		min-width: 0;
+	}
+	.sk-tip-name {
+		display: flex;
+		align-items: center;
+		gap: 0.34rem;
+		margin: 0;
+		font-size: 0.84rem;
+		font-weight: 800;
+		color: #f6dfa8;
+	}
+	.sk-tip-group {
+		padding: 0.02rem 0.32rem;
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--gc) 30%, transparent);
+		font-size: 0.56rem;
+		font-weight: 600;
+		color: color-mix(in srgb, var(--gc) 48%, #fff);
+	}
+	.sk-tip-lv {
+		margin: 0.12rem 0 0;
+		font-size: 0.64rem;
+		color: rgb(233 226 211 / 0.64);
+	}
+	.sk-tip-lv b {
+		color: #f6dfa8;
+	}
+	.sk-tip-pct {
+		flex: none;
+		font-size: 0.74rem;
+		font-weight: 800;
+		color: #f6dfa8;
+		font-variant-numeric: tabular-nums;
+	}
+	.sk-tip-note {
+		margin: 0.5rem 0 0;
+		color: rgb(233 226 211 / 0.84);
+	}
+	.sk-tip-tips {
+		display: grid;
+		gap: 0.2rem;
+		margin: 0.44rem 0 0;
+		padding: 0;
+		list-style: none;
+	}
+	.sk-tip-tips li {
+		position: relative;
+		padding-left: 0.74rem;
+		font-size: 0.68rem;
+		color: rgb(233 226 211 / 0.7);
+	}
+	.sk-tip-tips li::before {
+		content: "";
+		position: absolute;
+		left: 0.18rem;
+		top: 0.5em;
+		width: 3px;
+		height: 3px;
+		border-radius: 50%;
+		background: color-mix(in srgb, var(--gold) 85%, transparent);
+	}
+	.sk-tip-rewards {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.3rem;
+		margin-top: 0.54rem;
+		padding-top: 0.48rem;
+		border-top: 1px dashed rgb(246 223 168 / 0.22);
+	}
+	.sk-tip-cap {
+		font-size: 0.6rem;
+		color: rgb(233 226 211 / 0.48);
+	}
+	.sk-tip-gain {
+		padding: 0.06rem 0.36rem;
+		border: 1px solid color-mix(in srgb, var(--ac) 62%, transparent);
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--ac) 24%, transparent);
+		font-size: 0.64rem;
+		font-weight: 700;
+		color: color-mix(in srgb, var(--ac) 30%, #fff);
+	}
+	.sk-tip-gain em {
+		font-style: normal;
+		font-weight: 500;
+		opacity: 0.66;
+	}
+	.sk-tip-gain.is-bonus {
+		background: color-mix(in srgb, var(--ac) 40%, transparent);
+	}
+	.sk-tip-rel {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.26rem;
+		margin: 0.4rem 0 0;
+		font-size: 0.68rem;
+	}
+	.sk-tip-rel .ok {
+		color: #93d6a4;
+	}
+	.sk-tip-rel .need {
+		color: #ff9280;
+		font-weight: 700;
+	}
+	.sk-tip-rel em {
+		font-style: normal;
+		opacity: 0.6;
+	}
+	.sk-tip-sep {
+		font-style: normal;
+		color: rgb(233 226 211 / 0.3);
+	}
+	.sk-tip-kids {
+		color: rgb(233 226 211 / 0.6);
+	}
+	.sk-tip-locked {
+		margin: 0.46rem 0 0;
+		padding: 0.3rem 0.46rem;
+		border-radius: 0.36rem;
+		background: color-mix(in srgb, #ff5a3c 20%, transparent);
+		font-size: 0.66rem;
+		font-weight: 600;
+		color: #ffb6a6;
+	}
+	.sk-tip-open {
+		margin: 0.46rem 0 0;
+		font-size: 0.62rem;
+		color: rgb(233 226 211 / 0.44);
+	}
+
+	/* ===================== 总统计 ===================== */
+	.sk-summary {
+		grid-column: 1 / -1;
+		padding: 0.95rem 1.05rem;
+		border: 1px solid var(--line);
+		border-radius: 1rem;
+		background: linear-gradient(160deg, var(--panel-1), var(--panel-2));
+	}
+	.sk-summary-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.6rem;
+	}
+	.sk-summary-head h3 {
+		margin: 0;
+		font-size: 0.94rem;
+		color: var(--gold-dp);
+	}
+	.sk-summary-head p {
+		margin: 0;
+		font-size: 0.7rem;
+		color: var(--ink-2);
+	}
+	.sk-summary-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+		gap: 0.34rem 1.4rem;
+		margin: 0.75rem 0 0;
+		padding: 0;
+		list-style: none;
+	}
+	.sk-sum-row {
+		display: grid;
+		grid-template-columns: 6.6rem minmax(2.6rem, 1fr) 3.1rem 2.4rem 4.2rem 2rem;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.68rem;
+	}
+	.sk-sum-name {
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		color: var(--ink);
+	}
+	.sk-sum-bar {
+		display: block;
+		height: 6px;
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--ink) 11%, transparent);
+		overflow: hidden;
+	}
+	.sk-sum-bar > span {
+		display: block;
+		height: 100%;
+		border-radius: 99px;
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--gc) 62%, transparent),
+			var(--gc)
+		);
+		transition: width 420ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.sk-sum-val {
+		font-weight: 700;
+		color: var(--gold-dp);
+		font-variant-numeric: tabular-nums;
+	}
+	.sk-sum-val em {
+		font-style: normal;
+		font-weight: 500;
+		opacity: 0.55;
+	}
+	.sk-sum-pct {
+		text-align: right;
+		color: var(--ink-2);
+		font-variant-numeric: tabular-nums;
+	}
+	.sk-sum-maxed {
+		white-space: nowrap;
+		color: var(--ink-2);
+		opacity: 0.82;
+	}
+	.sk-sum-attr {
+		justify-self: end;
+		padding: 0.02rem 0.34rem;
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--ac) 20%, transparent);
+		font-size: 0.6rem;
+		font-weight: 600;
+		color: color-mix(in srgb, var(--ac) 74%, var(--ink));
+	}
+	.sk-summary-foot {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 19rem);
+		gap: 1rem;
+		margin-top: 0.9rem;
+		padding-top: 0.8rem;
+		border-top: 1px dashed var(--line);
+	}
+	.sk-summary-nums {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+		gap: 0.6rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.sk-summary-nums li {
+		display: flex;
+		flex-direction: column;
+		gap: 0.06rem;
+	}
+	.sk-summary-nums b {
+		font-size: 1rem;
+		color: var(--gold-dp);
+		font-variant-numeric: tabular-nums;
+	}
+	.sk-summary-nums b em {
+		font-style: normal;
+		font-size: 0.7rem;
+		opacity: 0.6;
+	}
+	.sk-summary-nums span {
+		font-size: 0.62rem;
+		color: var(--ink-2);
+	}
+	.sk-summary-nums span em {
+		display: block;
+		font-style: normal;
+		font-size: 0.58rem;
+		opacity: 0.72;
+	}
+	.sk-summary-note {
+		margin: 0;
+		font-size: 0.7rem;
+		line-height: 1.7;
+		color: var(--ink-2);
+	}
+
 	/* ===================== 响应式 ===================== */
 	@media (max-width: 1240px) {
 		.sk-canvas {
@@ -1341,6 +1991,9 @@ $effect(() => {
 			--gy: 34px;
 		}
 		.sk-foot {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.sk-summary-foot {
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
@@ -1361,6 +2014,14 @@ $effect(() => {
 		.sk-lockmark {
 			display: none;
 		}
+		/* 窄屏放不下 6 列，砍掉「满级 / 属性」两列，保留名字、进度、数值 */
+		.sk-sum-row {
+			grid-template-columns: 5.6rem minmax(2.2rem, 1fr) 3rem 2.2rem;
+		}
+		.sk-sum-maxed,
+		.sk-sum-attr {
+			display: none;
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -1368,7 +2029,8 @@ $effect(() => {
 		.sk-cell,
 		.sk-water,
 		.sk-logo,
-		.sk-wire {
+		.sk-wire,
+		.sk-tip {
 			transition: none !important;
 			animation: none !important;
 		}

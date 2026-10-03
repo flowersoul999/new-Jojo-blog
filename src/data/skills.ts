@@ -1387,3 +1387,67 @@ export const PRESET: Record<string, number> = {
 
 /** 依赖最深的一条链有多长，用于给技能图分列 */
 export const MAX_DEPTH = 0; // 运行时由组件按 requires 计算，此处占位
+
+/* ===================== 角色属性 ===================== */
+
+/**
+ * 属性点：给技能升级就会长属性，像角色面板一样。
+ *
+ * 规则（组件里按此计算，不写在数据里，改规则只改一处）：
+ *   每升 1 级 → 所属方向的属性 +1
+ *   满级（Lv5）→ 再额外 +2
+ * 所以某个属性的上限 = 该属性的技能数 × (MAX_LEVEL + 2)。
+ */
+export interface SkillAttr {
+	id: string;
+	/** 显示名，如「魅力值」 */
+	name: string;
+	/** 面板里的短标签 */
+	short: string;
+	/** 这个属性代表什么能力 */
+	note: string;
+	/** 面板上色用的品牌色 */
+	color: string;
+}
+
+export const ATTRS: SkillAttr[] = [
+	{
+		id: "charm",
+		name: "魅力值",
+		short: "魅力",
+		note: "让人眼前一亮的能力：视觉、动效、以及把技术讲出去的影响力。",
+		color: "C2419B",
+	},
+	{
+		id: "dex",
+		name: "灵巧值",
+		short: "灵巧",
+		note: "写代码的手艺：语言、类型、框架与工程化，日常搬砖的硬功夫。",
+		color: "2273C9",
+	},
+	{
+		id: "hard",
+		name: "硬核值",
+		short: "硬核",
+		note: "底层功力：浏览器、质量、服务端与架构，决定你能扛多重的活。",
+		color: "C77A16",
+	},
+];
+
+/** 方向 → 属性。哪个方向加哪个属性，改这里即可。 */
+export const GROUP_ATTR: Record<string, string> = {
+	"lang-basics": "dex",
+	"type-system": "dex",
+	framework: "dex",
+	engineering: "dex",
+	visual: "charm",
+	growth: "charm",
+	browser: "hard",
+	quality: "hard",
+	backend: "hard",
+	architecture: "hard",
+};
+
+export const ATTR_MAP: Record<string, SkillAttr> = Object.fromEntries(
+	ATTRS.map((a) => [a.id, a]),
+);
