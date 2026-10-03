@@ -1,0 +1,1108 @@
+---
+/**
+ * 后台管理 · 站点统计（嵌入页）
+ *
+ * 用途：作为 /admin 后台「站点统计」页签的 iframe 内容，不套用任何站点布局。
+ * 设计：复刻 Aemeath 主题 analytics 页面的视觉语言（样式见 styles/analytics-embed.css）。
+ * 数据：本后台自建的访问埋点，接口 /api/admin/stats/?days=N（同源 cookie 鉴权）。
+ */
+import { Icon } from "astro-icon/components";
+import { siteConfig } from "@/config";
+import "@/styles/variables.styl";
+import "@/styles/main.css";
+import "@/styles/analytics-embed.css";
+
+const hue = siteConfig.themeColor.hue;
+const defaultMode = siteConfig.themeColor.defaultMode;
+const year = new Date().getFullYear();
+---
+
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>站点统计</title>
+		<script is:inline define:vars={{ hue, defaultMode }}>
+			// 与后台 AdminLayout 保持一致的主题初始化（localStorage key: theme / hue）
+			const LIGHT_MODE = "light";
+			const DARK_MODE = "dark";
+			const SYSTEM_MODE = "system";
+			function getSystemTheme() {
+				return window.matchMedia("(prefers-color-scheme: dark)").matches ? DARK_MODE : LIGHT_MODE;
+			}
+			function resolveTheme(value) {
+				return value === SYSTEM_MODE ? getSystemTheme() : value;
+			}
+			function applyTheme() {
+				const theme = localStorage.getItem("theme") || defaultMode;
+				const resolved = resolveTheme(theme);
+				document.documentElement.classList.toggle("dark", resolved === DARK_MODE);
+				document.documentElement.style.setProperty("--hue", localStorage.getItem("hue") || hue);
+			}
+			applyTheme();
+			// 后台切换深浅色时同步（同源 iframe 可收到 storage 事件）
+			window.addEventListener("storage", (event) => {
+				if (!event.key || event.key === "theme" || event.key === "hue") applyTheme();
+			});
+		</script>
+	</head>
+	<body class="analytics-embed-body">
+		<section class="analytics-page" data-analytics-embed aria-labelledby="analytics-title">
+			<!-- ======================== 顶部概览 ======================== -->
+			<header class="analytics-hero card-base onload-animation">
+				<div class="analytics-hero__grid">
+					<div class="analytics-hero__copy">
+						<div class="analytics-kicker">
+							<span class="analytics-kicker__signal" aria-hidden="true"></span>
+							<span>SELF-HOSTED / SITE TELEMETRY</span>
+						</div>
+						<h1 id="analytics-title">站点统计</h1>
+						<p class="analytics-hero__lead">
+							这里展示的是本站的整体趋势，数据来自后台自建埋点，不记录任何可识别个人身份的信息。
+						</p>
+						<div class="analytics-hero__notes">
+							<span><Icon is:inline name="material-symbols:lock-open-rounded" aria-hidden="true" />仅后台可见</span>
+							<span><Icon is:inline name="material-symbols:calendar-today-rounded" aria-hidden="true" />按北京时间汇总</span>
+						</div>
+					</div>
+
+					<div class="analytics-hero__meta">
+						<div class="analytics-status" data-analytics-status data-state="loading" role="status" aria-live="polite">
+							<span class="analytics-status__dot" aria-hidden="true"></span>
+							<span data-analytics-status-text>连接中</span>
+						</div>
+						<div class="analytics-hero__stamp">
+							<span>DATA SOURCE</span>
+							<strong>自建埋点</strong>
+							<small data-analytics-last-update>读取后台数据 · 自动刷新</small>
+						</div>
+					</div>
+				</div>
+
+				<div class="analytics-hero__rail" aria-hidden="true">
+					<span>ADMIN / {year}</span>
+					<span></span>
+					<span>MEASURE WHAT MATTERS</span>
+				</div>
+			</header>
+
+			<section class="analytics-summary" aria-label="站点概览">
+				<article class="analytics-summary-card analytics-summary-card--blue">
+					<div class="analytics-summary-card__topline">
+						<span class="analytics-summary-card__label">ALL-TIME</span>
+						<Icon is:inline name="material-symbols:group-rounded" aria-hidden="true" />
+					</div>
+					<strong data-stat="cumulativeVisitors" aria-live="polite">加载中</strong>
+					<span>累计访客</span>
+					<small>自建埋点累计去重访客</small>
+				</article>
+				<article class="analytics-summary-card analytics-summary-card--mint">
+					<div class="analytics-summary-card__topline">
+						<span class="analytics-summary-card__label">ALL-TIME</span>
+						<Icon is:inline name="material-symbols:visibility-rounded" aria-hidden="true" />
+					</div>
+					<strong data-stat="cumulativePageviews" aria-live="polite">加载中</strong>
+					<span>累计浏览</span>
+					<small>自建埋点累计浏览量</small>
+				</article>
+				<article class="analytics-summary-card analytics-summary-card--gold">
+					<div class="analytics-summary-card__topline">
+						<span class="analytics-summary-card__label">TODAY</span>
+						<Icon is:inline name="material-symbols:person-search-rounded" aria-hidden="true" />
+					</div>
+					<strong data-stat="todayVisitors" aria-live="polite">加载中</strong>
+					<span>今日访客</span>
+					<small>北京时间 00:00 起</small>
+				</article>
+				<article class="analytics-summary-card analytics-summary-card--violet">
+					<div class="analytics-summary-card__topline">
+						<span class="analytics-summary-card__label">TODAY</span>
+						<Icon is:inline name="material-symbols:trending-up-rounded" aria-hidden="true" />
+					</div>
+					<strong data-stat="todayPageviews" aria-live="polite">加载中</strong>
+					<span>今日浏览</span>
+					<small>实时公开数据</small>
+				</article>
+			</section>
+
+			<div class="analytics-layout">
+				<main class="analytics-main">
+					<!-- ======================== 访问脉冲 ======================== -->
+					<section class="analytics-panel analytics-traffic card-base" aria-labelledby="analytics-traffic-title">
+						<header class="analytics-panel__header">
+							<div>
+								<p class="analytics-section-kicker">TRAFFIC / SIGNAL</p>
+								<h2 id="analytics-traffic-title">访问脉冲</h2>
+								<p class="analytics-panel__description">每天的浏览量与访客数</p>
+							</div>
+							<div class="analytics-panel__controls">
+								<div class="analytics-controls-stack">
+									<aside class="analytics-traffic__tutorial" aria-label="访问脉冲操作提示">
+										<span>切换 7 / 30 / 90 天<br />鼠标划过可以看到每天的数据</span>
+									</aside>
+									<div class="analytics-range" role="group" aria-label="选择统计时间范围">
+										<button type="button" data-range="7" aria-pressed="false">7 天</button>
+										<button type="button" data-range="30" aria-pressed="true">30 天</button>
+										<button type="button" data-range="90" aria-pressed="false">90 天</button>
+									</div>
+								</div>
+								<button type="button" class="analytics-refresh" data-analytics-refresh aria-label="刷新统计数据">
+									<Icon is:inline name="material-symbols:refresh-rounded" aria-hidden="true" />
+								</button>
+							</div>
+						</header>
+
+						<div class="analytics-chart-wrap">
+							<div class="analytics-chart-labels" aria-hidden="true">
+								<span data-chart-y-label="max">—</span>
+								<span data-chart-y-label="mid">—</span>
+								<span data-chart-y-label="min">0</span>
+							</div>
+							<svg
+								class="analytics-chart"
+								data-traffic-chart
+								viewBox="0 0 960 300"
+								role="img"
+								aria-label="近期浏览量与访客趋势"
+							>
+								<defs>
+									<linearGradient id="analytics-area-gradient" x1="0" x2="0" y1="0" y2="1">
+										<stop offset="0%" stop-color="var(--analytics-blue)" stop-opacity="0.24"></stop>
+										<stop offset="100%" stop-color="var(--analytics-blue)" stop-opacity="0"></stop>
+									</linearGradient>
+								</defs>
+								<g class="analytics-chart__grid" aria-hidden="true">
+									<line x1="42" y1="38" x2="944" y2="38"></line>
+									<line x1="42" y1="134" x2="944" y2="134"></line>
+									<line x1="42" y1="230" x2="944" y2="230"></line>
+								</g>
+								<path class="analytics-chart__area" data-chart-area d="M 42 230 L 944 230 Z"></path>
+								<path class="analytics-chart__line analytics-chart__line--views" data-chart-line="views" d="M 42 230 L 944 230"></path>
+								<path class="analytics-chart__line analytics-chart__line--sessions" data-chart-line="sessions" d="M 42 230 L 944 230"></path>
+								<line class="analytics-chart__guide" data-chart-guide x1="42" y1="24" x2="42" y2="230" style="display:none"></line>
+								<g data-chart-points></g>
+								<g class="analytics-chart__endpoints" data-chart-endpoints aria-hidden="true"></g>
+							</svg>
+							<div class="analytics-chart__tooltip" data-chart-tooltip hidden>
+								<strong data-chart-tooltip-date>—</strong>
+								<span><i class="analytics-legend-dot analytics-legend-dot--blue"></i><b data-chart-tooltip-views>—</b> 浏览</span>
+								<span><i class="analytics-legend-dot analytics-legend-dot--gold"></i><b data-chart-tooltip-sessions>—</b> 访客</span>
+							</div>
+							<div class="analytics-chart__x-axis" aria-hidden="true">
+								<span data-chart-x-label="start">—</span>
+								<span data-chart-x-label="middle">—</span>
+								<span data-chart-x-label="end">今天</span>
+							</div>
+							<div class="analytics-chart-empty" data-chart-empty hidden>
+								<Icon is:inline name="material-symbols:query-stats-rounded" aria-hidden="true" />
+								<strong>这段时间还没有数据</strong>
+								<span>等有访客之后，这里就会长出曲线啦。</span>
+							</div>
+						</div>
+
+						<footer class="analytics-chart-footer">
+							<div class="analytics-chart-legend" aria-label="图表图例">
+								<span><i class="analytics-legend-dot analytics-legend-dot--blue"></i>浏览量</span>
+								<span><i class="analytics-legend-dot analytics-legend-dot--gold"></i>访客</span>
+							</div>
+						</footer>
+
+						<div class="analytics-traffic__details">
+							<section class="analytics-traffic__period analytics-snapshot" aria-labelledby="analytics-period-title">
+								<div class="analytics-traffic__period-heading">
+									<div class="analytics-snapshot__intro">
+										<div>
+											<strong id="analytics-period-title">本周期数据</strong>
+											<span data-period-range>近 30 天 · 北京时间</span>
+										</div>
+									</div>
+								</div>
+
+								<div class="analytics-snapshot__metrics" aria-label="本周期访问概览">
+									<div class="analytics-snapshot__metric analytics-snapshot__metric--blue">
+										<span class="analytics-snapshot__metric-icon analytics-snapshot__metric-icon--blue" aria-hidden="true"><Icon is:inline name="material-symbols:bar-chart-rounded" /></span>
+										<span class="analytics-snapshot__metric-copy"><span>浏览量</span><small data-period-change="pageviews">等待数据</small></span>
+										<strong data-period-stat="pageviews">—</strong>
+									</div>
+									<div class="analytics-snapshot__metric analytics-snapshot__metric--pink">
+										<span class="analytics-snapshot__metric-icon analytics-snapshot__metric-icon--pink" aria-hidden="true"><Icon is:inline name="material-symbols:group-rounded" /></span>
+										<span class="analytics-snapshot__metric-copy"><span>访客数</span><small data-period-change="visitors">等待数据</small></span>
+										<strong data-period-stat="visitors">—</strong>
+									</div>
+									<div class="analytics-snapshot__metric analytics-snapshot__metric--mint">
+										<span class="analytics-snapshot__metric-icon analytics-snapshot__metric-icon--mint" aria-hidden="true"><Icon is:inline name="material-symbols:calendar-month-rounded" /></span>
+										<span class="analytics-snapshot__metric-copy"><span>活跃天数</span><small>有访问记录的日期</small></span>
+										<strong data-period-stat="activeDays">—</strong>
+									</div>
+									<div class="analytics-snapshot__metric analytics-snapshot__metric--gold">
+										<span class="analytics-snapshot__metric-icon analytics-snapshot__metric-icon--gold" aria-hidden="true"><Icon is:inline name="material-symbols:trending-up-rounded" /></span>
+										<span class="analytics-snapshot__metric-copy"><span>单日峰值</span><small>最高浏览量</small></span>
+										<strong data-period-stat="peak">—</strong>
+									</div>
+								</div>
+							</section>
+
+							<section class="analytics-traffic__ranking analytics-ranking-panel" aria-labelledby="analytics-pages-title">
+								<header class="analytics-traffic__section-heading">
+									<strong id="analytics-pages-title">大家在看什么</strong>
+									<span data-ranking-range>近 30 天 · 浏览量</span>
+								</header>
+								<ol class="analytics-ranking" data-ranking-list></ol>
+							</section>
+						</div>
+					</section>
+
+					<!-- ======================== 24 小时访问时段 ======================== -->
+					<section class="analytics-panel analytics-activity card-base" aria-labelledby="analytics-hour-title">
+						<header class="analytics-panel__header analytics-activity__header">
+							<div class="analytics-activity__heading">
+								<p class="analytics-section-kicker">VISITOR / ACTIVITY</p>
+								<div class="analytics-activity__title-row">
+									<h2 id="analytics-hour-title">访客活跃时间</h2>
+									<span class="analytics-panel__badge analytics-activity__range" data-hour-range>近 30 天</span>
+								</div>
+								<p class="analytics-panel__description">看看大家通常在什么时候来这里</p>
+							</div>
+						</header>
+
+						<div class="analytics-activity__body">
+							<div class="analytics-activity__heatmap-wrap">
+								<div class="analytics-activity__heatmap analytics-embed__hours-heatmap">
+									<div class="analytics-activity__hours analytics-embed__hours-labels" aria-hidden="true"></div>
+									<div class="analytics-activity__grid analytics-embed__hours-grid" data-hour-grid role="grid" aria-label="近 30 天各小时的访问活跃度"></div>
+								</div>
+								<p class="analytics-activity__note" data-hour-note>正在读取近 30 天的小时级访问记录…</p>
+							</div>
+
+							<div class="analytics-activity__art" aria-hidden="true">
+								<div class="analytics-activity__art-orbit"></div>
+								<p>有你来，真好！ <span>♥</span></p>
+								<img src="/assets/images/analytics/visitor-activity-character.png" alt="" loading="lazy" decoding="async" />
+							</div>
+						</div>
+
+						<div class="analytics-activity__stats" aria-label="访客活跃时间摘要">
+							<div class="analytics-activity__stat analytics-activity__stat--blue">
+								<span class="analytics-activity__stat-icon" aria-hidden="true"><Icon is:inline name="material-symbols:schedule-rounded" /></span>
+								<span><small>最活跃时段</small><strong data-hour-stat="peakHour">—</strong></span>
+							</div>
+							<div class="analytics-activity__stat analytics-activity__stat--pink">
+								<span class="analytics-activity__stat-icon" aria-hidden="true"><Icon is:inline name="material-symbols:bar-chart-rounded" /></span>
+								<span><small>该时段浏览</small><strong data-hour-stat="peakViews">—</strong></span>
+							</div>
+							<div class="analytics-activity__stat analytics-activity__stat--mint">
+								<span class="analytics-activity__stat-icon" aria-hidden="true"><Icon is:inline name="material-symbols:groups-rounded" /></span>
+								<span><small>夜间访问占比</small><strong data-hour-stat="night">—</strong></span>
+							</div>
+							<div class="analytics-activity__stat analytics-activity__stat--gold">
+								<span class="analytics-activity__stat-icon" aria-hidden="true"><Icon is:inline name="material-symbols:trending-up-rounded" /></span>
+								<span><small>今日访客</small><strong data-hour-stat="today">—</strong></span>
+							</div>
+						</div>
+
+						<footer class="analytics-activity__footer">
+							<span>按北京时间聚合 · 数据只保留统计维度</span>
+							<span class="analytics-activity__legend" aria-label="访问活跃度图例"><span>少</span><i data-level="0"></i><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><i data-level="5"></i><span>多</span></span>
+						</footer>
+					</section>
+				</main>
+
+				<aside class="analytics-sidebar" aria-label="站点统计分布">
+					<!-- ======================== 设备与浏览器 ======================== -->
+					<section class="analytics-panel analytics-devices card-base" aria-labelledby="analytics-devices-title">
+						<div class="analytics-snapshot">
+							<header class="analytics-snapshot__header">
+								<div>
+									<p class="analytics-snapshot__kicker">VISITORS / DEVICES</p>
+									<h2 id="analytics-devices-title">设备与浏览器</h2>
+									<p>访客从哪里来</p>
+								</div>
+								<Icon is:inline name="material-symbols:devices-rounded" aria-hidden="true" />
+							</header>
+							<section class="analytics-snapshot__distribution">
+								<div class="analytics-snapshot__breakdown" data-breakdown="device" aria-label="设备分布">
+									<div class="analytics-snapshot__breakdown-title"><span>设备分布</span></div>
+									<div class="analytics-snapshot__breakdown-body">
+										<div class="analytics-snapshot__donut" data-breakdown-donut aria-hidden="true">
+											<svg class="analytics-snapshot__donut-svg" data-breakdown-svg viewBox="0 0 100 100" focusable="false"></svg>
+											<span><Icon is:inline name="material-symbols:desktop-windows-rounded" /></span>
+										</div>
+										<div class="analytics-snapshot__legend" data-breakdown-legend>
+											<div class="analytics-snapshot__skeleton"></div>
+											<div class="analytics-snapshot__skeleton"></div>
+											<div class="analytics-snapshot__skeleton"></div>
+										</div>
+									</div>
+								</div>
+
+								<div class="analytics-snapshot__breakdown" data-breakdown="browser" aria-label="浏览器分布">
+									<div class="analytics-snapshot__breakdown-title"><span>浏览器偏好</span></div>
+									<div class="analytics-snapshot__breakdown-body">
+										<div class="analytics-snapshot__donut" data-breakdown-donut aria-hidden="true">
+											<svg class="analytics-snapshot__donut-svg" data-breakdown-svg viewBox="0 0 100 100" focusable="false"></svg>
+											<span><Icon is:inline name="material-symbols:language" /></span>
+										</div>
+										<div class="analytics-snapshot__legend" data-breakdown-legend>
+											<div class="analytics-snapshot__skeleton"></div>
+											<div class="analytics-snapshot__skeleton"></div>
+											<div class="analytics-snapshot__skeleton"></div>
+										</div>
+									</div>
+								</div>
+							</section>
+						</div>
+					</section>
+
+					<!-- ======================== 访客地域 ======================== -->
+					<section class="analytics-panel analytics-sources card-base" aria-labelledby="analytics-region-title">
+						<header class="analytics-sources__header">
+							<h2 id="analytics-region-title">访客地域 <span>/ VISITORS / REGION</span></h2>
+							<span class="analytics-sources__range" data-region-range>近 30 天</span>
+						</header>
+						<div class="analytics-sources__body">
+							<div class="analytics-sources__donut" data-region-donut role="img" aria-label="访客地域分布">
+								<svg viewBox="0 0 100 100" focusable="false" aria-hidden="true"></svg>
+								<div class="analytics-sources__donut-label">
+									<strong data-region-total>—</strong>
+									<span>本周期访客</span>
+								</div>
+							</div>
+							<ol class="analytics-sources__list" data-region-list aria-label="访客地域排行"></ol>
+						</div>
+					</section>
+
+					<!-- ======================== 最近动态 ======================== -->
+					<section class="analytics-panel analytics-sources card-base" aria-labelledby="analytics-recent-title">
+						<header class="analytics-sources__header">
+							<h2 id="analytics-recent-title">最近动态 <span>/ RECENT / ACTIVITY</span></h2>
+							<span class="analytics-sources__range" data-recent-range>实时</span>
+						</header>
+						<ol class="analytics-sources__list analytics-embed__recent" data-recent-list aria-label="最近访问动态"></ol>
+					</section>
+				</aside>
+			</div>
+
+			<footer class="analytics-footer card-base">
+				<div>
+					<span class="analytics-footer__eyebrow">ADMIN ONLY · NOT PUBLIC</span>
+					<strong>数据仅供站主查看，前台访客看不到这些明细。</strong>
+				</div>
+				<a class="analytics-footer__link" href="/admin/">回到后台首页 <Icon is:inline name="material-symbols:arrow-outward-rounded" aria-hidden="true" /></a>
+			</footer>
+		</section>
+
+		<script is:inline>
+			(() => {
+				const root = document.querySelector("[data-analytics-embed]");
+				if (!root) return;
+
+				const q = (selector, scope = root) => scope.querySelector(selector);
+				const qa = (selector, scope = root) => [...scope.querySelectorAll(selector)];
+				const num = (value) => {
+					const n = Number(value);
+					return Number.isFinite(n) ? n : 0;
+				};
+				const fmt = (value) => new Intl.NumberFormat("zh-CN").format(Math.max(0, Math.round(num(value))));
+				const pad = (value) => String(value).padStart(2, "0");
+				const shortDate = (value) => {
+					const parts = String(value || "").split("-");
+					return parts.length === 3 ? `${parts[1]}-${parts[2]}` : String(value || "—");
+				};
+				const clockText = (ts) => {
+					const d = new Date(num(ts));
+					return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+				};
+				const setText = (selector, value, scope = root) => {
+					qa(selector, scope).forEach((el) => {
+						el.textContent = value;
+					});
+				};
+
+				// 画布坐标（与 SVG viewBox 0 0 960 300 对齐）
+				const CHART = { left: 42, right: 944, top: 38, bottom: 230 };
+				const PALETTE = {
+					device: ["#8ec5ff", "#9fe4c6", "#ffd18a", "#c7b0ff", "#ffb2c0"],
+					browser: ["#b89cff", "#ffd78a", "#8ddde2", "#ffb08f", "#f6a8d0"],
+					region: ["#8ec5ff", "#9fe4c6", "#ffd18a", "#c7b0ff", "#ffb2c0"],
+					recent: ["#2d7cff", "#e5a83c", "#1fae9a", "#866de8"],
+				};
+
+				let rangeDays = 30;
+				let stats = null;
+				let currentRows = [];
+				let hoverBound = false;
+
+				// ---------------------------------------------------------------
+				// 状态
+				// ---------------------------------------------------------------
+				function setStatus(state, text) {
+					const box = q("[data-analytics-status]");
+					if (box) box.dataset.state = state;
+					setText("[data-analytics-status-text]", text);
+				}
+
+				function setBusy(busy) {
+					root.classList.toggle("is-loading", busy);
+					const button = q("[data-analytics-refresh]");
+					if (button) button.disabled = busy;
+				}
+
+				// ---------------------------------------------------------------
+				// 数据获取
+				// ---------------------------------------------------------------
+				async function load() {
+					setBusy(true);
+					setStatus("loading", "读取中");
+					try {
+						// 多取一个周期用于计算环比
+						const days = Math.min(Math.max(rangeDays * 2, 7), 365);
+						const res = await fetch(`/api/admin/stats/?days=${days}`, {
+							credentials: "same-origin",
+							cache: "no-store",
+						});
+						const payload = await res.json();
+						if (!res.ok || payload.ok !== true) throw new Error(payload.error || "统计加载失败");
+						stats = payload.data;
+						render();
+						setStatus("online", "刚刚更新");
+						setText(
+							"[data-analytics-last-update]",
+							`更新于 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`,
+						);
+					} catch (error) {
+						setStatus("offline", "读取失败");
+						setText("[data-analytics-last-update]", "数据读取失败，点右上角刷新重试");
+						setText("[data-stat]", "—");
+						markChartEmpty(error instanceof Error ? error.message : "统计加载失败");
+					} finally {
+						setBusy(false);
+						reportHeight();
+					}
+				}
+
+				// ---------------------------------------------------------------
+				// 概览卡
+				// ---------------------------------------------------------------
+				function renderSummary() {
+					const source = {
+						cumulativeVisitors: stats?.cumulative?.uv,
+						cumulativePageviews: stats?.cumulative?.pv,
+						todayVisitors: stats?.today?.uv,
+						todayPageviews: stats?.today?.pv,
+					};
+					qa("[data-stat]").forEach((el) => {
+						el.textContent = fmt(source[el.dataset.stat]);
+					});
+				}
+
+				/** 近 5 分钟内有访问行为的访客数（近似「当前在线」） */
+				function countRealtimeVisitors() {
+					const rows = Array.isArray(stats?.behaviors) ? stats.behaviors : [];
+					const since = Date.now() - 5 * 60 * 1000;
+					const ids = new Set();
+					rows.forEach((row) => {
+						if (num(row?.ts) >= since) ids.add(row?.vid || row?.ip || String(row?.ts));
+					});
+					return ids.size;
+				}
+
+				// ---------------------------------------------------------------
+				// 趋势拆分（当前周期 / 上一周期）
+				// ---------------------------------------------------------------
+				function splitTrend() {
+					const all = Array.isArray(stats?.trend) ? stats.trend : [];
+					const current = all.slice(-rangeDays);
+					const previous = all.slice(0, Math.max(0, all.length - rangeDays));
+					return { current, previous };
+				}
+
+				const sumBy = (rows, key) => rows.reduce((total, row) => total + num(row?.[key]), 0);
+
+				// ---------------------------------------------------------------
+				// 访问脉冲折线图
+				// ---------------------------------------------------------------
+				function niceMax(value) {
+					if (value <= 5) return 5;
+					const magnitude = 10 ** Math.floor(Math.log10(value));
+					const steps = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+					for (const step of steps) {
+						const candidate = step * magnitude;
+						if (candidate >= value) return candidate;
+					}
+					return 10 * magnitude;
+				}
+
+				function markChartEmpty(message) {
+					const svg = q("[data-traffic-chart]");
+					if (svg) svg.classList.add("is-empty");
+					const empty = q("[data-chart-empty]");
+					if (empty) {
+						empty.hidden = false;
+						const span = empty.querySelector("span");
+						if (span && message) span.textContent = message;
+					}
+					setText('[data-chart-y-label="max"]', "—");
+					setText('[data-chart-y-label="mid"]', "—");
+					currentRows = [];
+				}
+
+				function renderChart(rows) {
+					const svg = q("[data-traffic-chart]");
+					const lineViews = q('[data-chart-line="views"]');
+					const lineSessions = q('[data-chart-line="sessions"]');
+					const area = q("[data-chart-area]");
+					const empty = q("[data-chart-empty]");
+					if (!svg || !lineViews || !lineSessions || !area) return;
+
+					const points = (Array.isArray(rows) ? rows : []).filter(Boolean);
+					const maxViews = points.reduce((max, row) => Math.max(max, num(row.pv)), 0);
+					const maxSessions = points.reduce((max, row) => Math.max(max, num(row.uv)), 0);
+
+					if (points.length < 2 || maxViews <= 0) {
+						markChartEmpty("等有访客之后，这里就会长出曲线啦。");
+						return;
+					}
+
+					if (empty) empty.hidden = true;
+					svg.classList.remove("is-empty");
+
+					const top = niceMax(Math.max(maxViews, maxSessions, 1));
+					const { left, right, top: chartTop, bottom } = CHART;
+					const stepX = (right - left) / (points.length - 1);
+					const xAt = (index) => left + stepX * index;
+					const yAt = (value) => bottom - (bottom - chartTop) * (num(value) / top);
+					const pathOf = (key) =>
+						points
+							.map((row, index) => `${index === 0 ? "M" : "L"} ${xAt(index).toFixed(2)} ${yAt(row[key]).toFixed(2)}`)
+							.join(" ");
+					const viewsPath = pathOf("pv");
+
+					lineViews.setAttribute("d", viewsPath);
+					lineSessions.setAttribute("d", pathOf("uv"));
+					area.setAttribute("d", `${viewsPath} L ${xAt(points.length - 1).toFixed(2)} ${bottom} L ${left} ${bottom} Z`);
+
+					const mid = Math.floor((points.length - 1) / 2);
+					setText('[data-chart-y-label="max"]', fmt(top));
+					setText('[data-chart-y-label="mid"]', fmt(top / 2));
+					setText('[data-chart-y-label="min"]', "0");
+					setText('[data-chart-x-label="start"]', shortDate(points[0].date));
+					setText('[data-chart-x-label="middle"]', shortDate(points[mid].date));
+					setText('[data-chart-x-label="end"]', "今天");
+
+					// 首尾端点
+					const endpoints = q("[data-chart-endpoints]");
+					if (endpoints) {
+						endpoints.replaceChildren();
+						[[0, "views", "pv"], [points.length - 1, "views", "pv"], [0, "sessions", "uv"], [points.length - 1, "sessions", "uv"]].forEach(
+							([index, kind, key]) => {
+								const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+								dot.setAttribute("class", `analytics-chart__endpoint analytics-chart__endpoint--${kind}`);
+								dot.setAttribute("cx", xAt(index).toFixed(2));
+								dot.setAttribute("cy", yAt(points[index][key]).toFixed(2));
+								dot.setAttribute("r", "4.5");
+								endpoints.append(dot);
+							},
+						);
+					}
+
+					// 悬停点
+					const dots = q("[data-chart-points]");
+					if (dots) {
+						dots.replaceChildren();
+						const fragment = document.createDocumentFragment();
+						points.forEach((row, index) => {
+							const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+							dot.setAttribute("class", "analytics-chart__point");
+							dot.setAttribute("data-chart-point", String(index));
+							dot.setAttribute("cx", xAt(index).toFixed(2));
+							dot.setAttribute("cy", yAt(row.pv).toFixed(2));
+							dot.setAttribute("r", "4");
+							fragment.append(dot);
+						});
+						dots.append(fragment);
+					}
+
+					currentRows = points;
+					bindHover();
+				}
+
+				function bindHover() {
+					if (hoverBound) return;
+					const wrap = q(".analytics-chart-wrap");
+					const svgEl = q("[data-traffic-chart]");
+					const guide = q("[data-chart-guide]");
+					const tooltip = q("[data-chart-tooltip]");
+					if (!wrap || !svgEl || !guide || !tooltip) return;
+					hoverBound = true;
+
+					const hide = () => {
+						guide.style.display = "none";
+						tooltip.hidden = true;
+						qa("[data-chart-point]").forEach((dot) => (dot.style.opacity = "0"));
+					};
+
+					wrap.addEventListener("pointermove", (event) => {
+						if (currentRows.length < 2) return;
+						// 用 SVG 自身的矩形换算到 viewBox 坐标，避开左右留白造成的偏移
+						const rect = svgEl.getBoundingClientRect();
+						const viewX = ((event.clientX - rect.left) / rect.width) * 960;
+						const { left, right } = CHART;
+						const stepX = (right - left) / (currentRows.length - 1);
+						const index = Math.min(
+							currentRows.length - 1,
+							Math.max(0, Math.round((viewX - left) / stepX)),
+						);
+						const row = currentRows[index];
+						const x = left + stepX * index;
+
+						guide.style.display = "";
+						guide.setAttribute("x1", x.toFixed(2));
+						guide.setAttribute("x2", x.toFixed(2));
+
+						qa("[data-chart-point]").forEach((dot) => {
+							dot.style.opacity = dot.dataset.chartPoint === String(index) ? "1" : "0";
+						});
+
+						tooltip.hidden = false;
+						tooltip.style.left = `${((x / 960) * 100).toFixed(2)}%`;
+						setText("[data-chart-tooltip-date]", String(row.date || "—"));
+						setText("[data-chart-tooltip-views]", fmt(row.pv));
+						setText("[data-chart-tooltip-sessions]", fmt(row.uv));
+					});
+					wrap.addEventListener("pointerleave", hide);
+				}
+
+				// ---------------------------------------------------------------
+				// 本周期数据
+				// ---------------------------------------------------------------
+				function renderChange(name, current, previous) {
+					const el = q(`[data-period-change="${name}"]`);
+					if (!el) return;
+					if (previous <= 0) {
+						el.textContent = current > 0 ? "本周期新增" : "暂无数据";
+						delete el.dataset.direction;
+						return;
+					}
+					const change = Math.round(((current - previous) / previous) * 100);
+					el.textContent = `${change >= 0 ? "↑" : "↓"} ${Math.abs(change)}% 较上周期`;
+					el.dataset.direction = change >= 0 ? "up" : "down";
+				}
+
+				function renderPeriod(current, previous) {
+					const pv = sumBy(current, "pv");
+					const uv = sumBy(current, "uv");
+					const activeDays = current.filter((row) => num(row.pv) > 0).length;
+					const peak = current.reduce((max, row) => Math.max(max, num(row.pv)), 0);
+
+					setText('[data-period-stat="pageviews"]', fmt(pv));
+					setText('[data-period-stat="visitors"]', fmt(uv));
+					setText('[data-period-stat="activeDays"]', `${activeDays}/${rangeDays}`);
+					setText('[data-period-stat="peak"]', fmt(peak));
+					renderChange("pageviews", pv, sumBy(previous, "pv"));
+					renderChange("visitors", uv, sumBy(previous, "uv"));
+					setText("[data-period-range]", `近 ${rangeDays} 天 · 北京时间`);
+				}
+
+				// ---------------------------------------------------------------
+				// 大家在看什么
+				// ---------------------------------------------------------------
+				function renderRanking() {
+					const list = q("[data-ranking-list]");
+					if (!list) return;
+					const rows = (Array.isArray(stats?.topPaths) ? stats.topPaths : []).slice(0, 6);
+					list.replaceChildren();
+					setText("[data-ranking-range]", `近 ${rangeDays} 天 · 浏览量`);
+
+					if (rows.length === 0) {
+						const empty = document.createElement("li");
+						empty.className = "analytics-sources__empty";
+						empty.textContent = "这段时间还没有页面访问记录。";
+						list.append(empty);
+						return;
+					}
+
+					const max = rows.reduce((value, row) => Math.max(value, num(row.pv)), 0) || 1;
+					const fragment = document.createDocumentFragment();
+					rows.forEach((row, index) => {
+						const item = document.createElement("li");
+						item.className = "analytics-ranking__item";
+
+						const link = document.createElement("a");
+						link.className = "analytics-ranking__link";
+						link.href = row.path || "#";
+						link.style.setProperty("--ranking-accent", PALETTE.recent[index % PALETTE.recent.length]);
+						link.style.setProperty("--ranking-scale", String(Math.max(0.04, num(row.pv) / max)));
+
+						const order = document.createElement("span");
+						order.className = "analytics-ranking__index";
+						order.textContent = pad(index + 1);
+
+						const copy = document.createElement("span");
+						copy.className = "analytics-ranking__copy";
+						const title = document.createElement("strong");
+						title.textContent = row.path || "/";
+						title.title = row.path || "/";
+						const meta = document.createElement("small");
+						meta.textContent = `${row.module || "页面"} · 访客 ${fmt(row.uv)}`;
+						copy.append(title, meta);
+
+						const value = document.createElement("strong");
+						value.textContent = fmt(row.pv);
+
+						link.append(order, copy, value);
+						item.append(link);
+						fragment.append(item);
+					});
+					list.append(fragment);
+				}
+
+				// ---------------------------------------------------------------
+				// 通用归一化 + 甜甜圈
+				// ---------------------------------------------------------------
+				function normalizeRows(rows, maxSlices) {
+					const list = (Array.isArray(rows) ? rows : [])
+						.map((row) => ({
+							label: String(row?.label ?? row?.x ?? "未知").trim() || "未知",
+							value: num(row?.value ?? row?.y),
+						}))
+						.filter((row) => row.value > 0)
+						.sort((a, b) => b.value - a.value);
+					const total = list.reduce((sum, row) => sum + row.value, 0) || 1;
+					const visible = list.slice(0, maxSlices);
+					const rest = list.slice(maxSlices).reduce((sum, row) => sum + row.value, 0);
+					if (rest > 0) visible.push({ label: "其他", value: rest });
+					return visible.map((row) => ({ ...row, ratio: row.value / total }));
+				}
+
+				const polar = (radius, angle) => {
+					const radians = ((angle - 90) * Math.PI) / 180;
+					return [50 + radius * Math.cos(radians), 50 + radius * Math.sin(radians)];
+				};
+
+				function slicePath(startAngle, endAngle, outerRadius, innerRadius) {
+					const [ox1, oy1] = polar(outerRadius, startAngle);
+					const [ox2, oy2] = polar(outerRadius, endAngle);
+					const [ix1, iy1] = polar(innerRadius, startAngle);
+					const [ix2, iy2] = polar(innerRadius, endAngle);
+					const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+					return [
+						`M ${ox1.toFixed(3)} ${oy1.toFixed(3)}`,
+						`A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${ox2.toFixed(3)} ${oy2.toFixed(3)}`,
+						`L ${ix2.toFixed(3)} ${iy2.toFixed(3)}`,
+						`A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${ix1.toFixed(3)} ${iy1.toFixed(3)}`,
+						"Z",
+					].join(" ");
+				}
+
+				function buildSlices(svg, rows, palette, options) {
+					const { outerRadius, innerRadius, segmentClass, progressVar } = options;
+					// 样式里靠 conic-gradient 遮罩做入场动画，这里直接放到满圈
+					if (progressVar) svg.style.setProperty(progressVar, "360deg");
+					svg.replaceChildren();
+					let angle = 0;
+					const fragment = document.createDocumentFragment();
+					rows.forEach((row, index) => {
+						const start = angle;
+						angle += row.ratio * 360;
+						if (row.ratio <= 0) return;
+						const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+						path.setAttribute("class", segmentClass);
+						path.setAttribute("d", slicePath(start, angle, outerRadius, innerRadius));
+						path.style.fill = palette[index % palette.length];
+						fragment.append(path);
+					});
+					if (rows.length === 0) {
+						const empty = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+						empty.setAttribute("cx", "50");
+						empty.setAttribute("cy", "50");
+						empty.setAttribute("r", String((outerRadius + innerRadius) / 2));
+						empty.setAttribute("fill", "none");
+						empty.setAttribute("stroke", "rgba(128,128,128,0.25)");
+						empty.setAttribute("stroke-width", "2");
+						fragment.append(empty);
+					}
+					svg.append(fragment);
+				}
+
+				function renderBreakdown(kind, rows) {
+					const box = q(`[data-breakdown="${kind}"]`);
+					if (!box) return;
+					const svg = q("[data-breakdown-svg]", box);
+					const legend = q("[data-breakdown-legend]", box);
+					const donut = q("[data-breakdown-donut]", box);
+					if (!svg || !legend || !donut) return;
+
+					const data = normalizeRows(rows, 4);
+					buildSlices(svg, data, PALETTE[kind] || PALETTE.device, {
+						outerRadius: 46,
+						innerRadius: 25,
+						segmentClass: "analytics-snapshot__donut-segment",
+						progressVar: "--snapshot-donut-progress",
+					});
+					donut.classList.toggle("is-empty", data.length === 0);
+
+					legend.replaceChildren();
+					if (data.length === 0) {
+						const empty = document.createElement("p");
+						empty.className = "analytics-snapshot__message";
+						empty.textContent = "这段时间还没有分布数据。";
+						legend.append(empty);
+						return;
+					}
+					const palette = PALETTE[kind] || PALETTE.device;
+					const fragment = document.createDocumentFragment();
+					data.forEach((row, index) => {
+						const item = document.createElement("div");
+						item.className = "analytics-snapshot__legend-item";
+						const dot = document.createElement("i");
+						dot.style.backgroundColor = palette[index % palette.length];
+						const label = document.createElement("span");
+						label.textContent = row.label;
+						label.title = row.label;
+						const value = document.createElement("strong");
+						value.textContent = `${Math.round(row.ratio * 100)}%`;
+						item.append(dot, label, value);
+						fragment.append(item);
+					});
+					legend.append(fragment);
+				}
+
+				// ---------------------------------------------------------------
+				// 访客地域
+				// ---------------------------------------------------------------
+				function renderRegion() {
+					const list = q("[data-region-list]");
+					const donut = q("[data-region-donut]");
+					const svg = donut ? donut.querySelector("svg") : null;
+					if (!list) return;
+
+					const rows = (Array.isArray(stats?.countries) ? stats.countries : []).filter((row) => num(row.value) > 0);
+					const total = rows.reduce((sum, row) => sum + num(row.value), 0);
+					setText("[data-region-total]", total > 0 ? fmt(total) : "—");
+					setText("[data-region-range]", `近 ${rangeDays} 天`);
+
+					const data = normalizeRows(rows, 4);
+					if (svg) {
+						svg.style.setProperty("--source-donut-progress", "360deg");
+						buildSlices(svg, data, PALETTE.region, 47, 30);
+					}
+					if (donut) donut.classList.toggle("is-empty", data.length === 0);
+
+					list.replaceChildren();
+					if (data.length === 0) {
+						const empty = document.createElement("li");
+						empty.className = "analytics-sources__empty";
+						empty.textContent = "还没有地域数据，等有访客后会自动出现。";
+						list.append(empty);
+						return;
+					}
+					const fragment = document.createDocumentFragment();
+					data.forEach((row, index) => {
+						const item = document.createElement("li");
+						item.className = "analytics-sources__item";
+						const swatch = document.createElement("span");
+						swatch.className = "analytics-sources__swatch";
+						swatch.style.background = PALETTE.region[index % PALETTE.region.length];
+						const label = document.createElement("span");
+						label.textContent = row.label;
+						label.title = row.label;
+						const value = document.createElement("b");
+						value.textContent = `${fmt(row.value)}`;
+						item.append(swatch, label, value);
+						fragment.append(item);
+					});
+					list.append(fragment);
+				}
+
+				// ---------------------------------------------------------------
+				// 24 小时活跃
+				// ---------------------------------------------------------------
+				function renderHourly() {
+					const grid = q("[data-hour-grid]");
+					const labels = q(".analytics-embed__hours-labels");
+					if (!grid) return;
+
+					const rows = Array.isArray(stats?.hourly) ? stats.hourly : [];
+					const max = rows.reduce((value, row) => Math.max(value, num(row.pv)), 0);
+					const sum = rows.reduce((value, row) => value + num(row.pv), 0);
+
+					if (labels) {
+						labels.replaceChildren();
+						const labelFragment = document.createDocumentFragment();
+						for (let hour = 0; hour < 24; hour += 2) {
+							const span = document.createElement("span");
+							span.textContent = `${pad(hour)}时`;
+							labelFragment.append(span);
+						}
+						labels.append(labelFragment);
+					}
+
+					grid.replaceChildren();
+					const fragment = document.createDocumentFragment();
+					rows.forEach((row) => {
+						const cell = document.createElement("button");
+						cell.type = "button";
+						cell.className = "analytics-activity__cell";
+						const level = max > 0 ? Math.min(5, Math.ceil((num(row.pv) / max) * 5)) : 0;
+						cell.dataset.level = String(level);
+						const hourLabel = `${pad(row.hour)}:00`;
+						cell.title = `${hourLabel} · 浏览 ${fmt(row.pv)} · 访客 ${fmt(row.uv)}`;
+						cell.setAttribute("aria-label", `${hourLabel}，浏览 ${fmt(row.pv)}，访客 ${fmt(row.uv)}`);
+						fragment.append(cell);
+					});
+					grid.append(fragment);
+
+					const top = rows.reduce((best, row) => (num(row.pv) > num(best?.pv) ? row : best), null);
+					const night = rows
+						.filter((row) => num(row.hour) >= 22 || num(row.hour) < 6)
+						.reduce((value, row) => value + num(row.pv), 0);
+					setText('[data-hour-stat="peakHour"]', top ? `${pad(top.hour)}:00` : "—");
+					setText('[data-hour-stat="peakViews"]', top ? fmt(top.pv) : "—");
+					setText('[data-hour-stat="night"]', sum > 0 ? `${Math.round((night / sum) * 100)}%` : "—");
+					setText('[data-hour-stat="today"]', fmt(stats?.today?.uv));
+					setText("[data-hour-range]", `近 ${rangeDays} 天`);
+					setText(
+						"[data-hour-note]",
+						max > 0
+							? `颜色越深表示这个时段越活跃，峰值出现在 ${pad(top.hour)}:00 · 共 ${fmt(top.pv)} 次浏览。`
+							: "这段时间还没有小时级访问记录。",
+					);
+				}
+
+				// ---------------------------------------------------------------
+				// 最近动态
+				// ---------------------------------------------------------------
+				function renderRecent() {
+					const list = q("[data-recent-list]");
+					if (!list) return;
+					const rows = (Array.isArray(stats?.behaviors) ? stats.behaviors : []).slice(0, 8);
+					list.replaceChildren();
+
+					if (rows.length === 0) {
+						const empty = document.createElement("li");
+						empty.className = "analytics-sources__empty";
+						empty.textContent = "还没有访问记录。";
+						list.append(empty);
+						return;
+					}
+
+					const fragment = document.createDocumentFragment();
+					rows.forEach((row, index) => {
+						const item = document.createElement("li");
+						item.className = "analytics-sources__item";
+						const swatch = document.createElement("span");
+						swatch.className = "analytics-sources__swatch";
+						swatch.style.background = PALETTE.recent[index % PALETTE.recent.length];
+						const label = document.createElement("span");
+						const country = row.country ? `${row.country} · ` : "";
+						label.textContent = `${country}${row.path || "/"}`;
+						label.title = label.textContent;
+						const value = document.createElement("b");
+						value.textContent = clockText(row.ts);
+						item.append(swatch, label, value);
+						fragment.append(item);
+					});
+					list.append(fragment);
+				}
+
+				// ---------------------------------------------------------------
+				// 汇总渲染
+				// ---------------------------------------------------------------
+				function render() {
+					if (!stats) return;
+					const { current, previous } = splitTrend();
+					renderSummary();
+					renderChart(current);
+					renderPeriod(current, previous);
+					renderRanking();
+					renderBreakdown("device", stats.devices);
+					renderBreakdown("browser", stats.browsers);
+					renderRegion();
+					renderHourly();
+					renderRecent();
+				}
+
+				// ---------------------------------------------------------------
+				// iframe 高度上报
+				// ---------------------------------------------------------------
+				let reportFrame = 0;
+				function reportHeight() {
+					cancelAnimationFrame(reportFrame);
+					reportFrame = requestAnimationFrame(() => {
+						const height = Math.max(
+							document.documentElement.scrollHeight,
+							document.body ? document.body.scrollHeight : 0,
+						);
+						window.parent?.postMessage({ type: "aemeath:analytics-embed-height", height }, "*");
+					});
+				}
+
+				// ---------------------------------------------------------------
+				// 事件绑定
+				// ---------------------------------------------------------------
+				qa("[data-range]").forEach((button) => {
+					button.addEventListener("click", () => {
+						const next = Number(button.dataset.range) || 30;
+						if (next === rangeDays) return;
+						rangeDays = next;
+						qa("[data-range]").forEach((item) => {
+							item.setAttribute("aria-pressed", item === button ? "true" : "false");
+						});
+						load();
+					});
+				});
+
+				const refresh = q("[data-analytics-refresh]");
+				if (refresh) refresh.addEventListener("click", load);
+
+				if ("ResizeObserver" in window) {
+					new ResizeObserver(() => reportHeight()).observe(document.body);
+				}
+				window.addEventListener("resize", reportHeight);
+
+				load();
+			})();
+		</script>
+
+		<style is:global>
+			/* 嵌入页基础：透明背景，融进后台卡片，不出现内部滚动条 */
+			html,
+			body.analytics-embed-body {
+				background: transparent !important;
+				margin: 0;
+				overflow-x: hidden;
+			}
+
+			body.analytics-embed-body {
+				/* 主站里由 FontSetup 注入，这里给一个稳妥的兜底字体 */
+				--font-active-sans: var(--font-lxgw-wenkai, "LXGW WenKai", ui-sans-serif, system-ui, sans-serif);
+				color: var(--text-color);
+			}
+
+			/* 24 小时活跃：把原本 7×24 的热力图压成单行 24 格 */
+			.analytics-embed__hours-heatmap {
+				grid-template-columns: minmax(0, 1fr);
+			}
+			.analytics-embed__hours-labels {
+				grid-column: 1;
+			}
+			.analytics-embed__hours-grid {
+				grid-column: 1;
+				grid-row: 2;
+				grid-template-rows: minmax(0, 1fr);
+			}
+
+			/* 最近动态列表贴紧表头 */
+			.analytics-embed__recent {
+				margin-top: 0.58rem;
+			}
+
+			/* 设备与浏览器：.analytics-panel 本身没有内边距，这里补上 */
+			.analytics-devices {
+				padding: 1.2rem 1.1rem 0.95rem;
+			}
+		</style>
+	</body>
+</html>

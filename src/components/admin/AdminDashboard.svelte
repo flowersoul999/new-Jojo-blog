@@ -164,7 +164,7 @@ interface StatsData {
 // 状态
 // ============================================================================
 
-type View = "overview" | "behavior" | "visitors" | "settings";
+type View = "analytics" | "overview" | "behavior" | "visitors" | "settings";
 
 let view = $state<View>("overview");
 let authState = $state<"loading" | "denied" | "ok">("loading");
@@ -173,6 +173,9 @@ let settings = $state<Settings | null>(null);
 let error = $state("");
 let loading = $state(false);
 let lastUpdated = $state(0);
+
+// 站点统计嵌入页的 iframe 高度，由子页面 postMessage 上报后自适应
+let analyticsHeight = $state(760);
 
 // IP 分页
 let ipPage = $state(1);
@@ -405,6 +408,19 @@ onMount(async () => {
 	} catch {
 		authState = "denied";
 	}
+});
+
+// 站点统计嵌入页会把自己的内容高度发过来，这里同步给 iframe
+onMount(() => {
+	const onEmbedMessage = (event: MessageEvent) => {
+		if (event.origin !== window.location.origin) return;
+		const payload = event.data as { type?: string; height?: number } | null;
+		if (!payload || payload.type !== "aemeath:analytics-embed-height") return;
+		const next = Number(payload.height);
+		if (Number.isFinite(next) && next > 240) analyticsHeight = Math.ceil(next);
+	};
+	window.addEventListener("message", onEmbedMessage);
+	return () => window.removeEventListener("message", onEmbedMessage);
 });
 
 async function toggleVisitor(vid: string) {
@@ -719,9 +735,20 @@ function maxModuleOf(data: StatsData | null): number {
 			{/each}
 		</nav>
 
-		{#if !stats && view !== "settings"}
+		{#if !stats && view !== "settings" && view !== "analytics"}
 			<div class="flex min-h-40 items-center justify-center text-sm text-(--content-meta)">
 				<span class="inline-block h-5 w-5 animate-spin rounded-full border-2 border-(--primary) border-t-transparent"></span>
+			</div>
+		{:else if view === "analytics"}
+			<!-- ======================== 站点统计 ======================== -->
+			<!-- 内嵌 /admin/analytics-embed/，数据同样来自 /api/admin/stats，主题与后台保持一致 -->
+			<div class="onload-animation">
+				<iframe
+					src="/admin/analytics-embed/"
+					title="站点统计"
+					class="block w-full border-0"
+					style="height:{analyticsHeight}px; background:transparent;"
+				></iframe>
 			</div>
 		{:else if view === "overview" && stats}
 			<!-- ======================== 访问统计 ======================== -->
