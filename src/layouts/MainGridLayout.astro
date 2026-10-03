@@ -224,17 +224,27 @@ const shouldAddLeftSidebar: boolean =
 
 const effectiveIsBothSidebars: boolean =
 	sidebarConfig.isBothSidebars || shouldShowBothSidebarsOnPostPage;
-// hideSidebars 时强制不渲染左右侧边栏（网格退化为单列）
+
+// 侧栏 DOM 是否渲染 —— 刻意不受 hideSidebars 影响。
+// #left-sidebar-wrapper / #right-sidebar-static / #mobile-bottom-sidebar 都在 swup
+// 替换容器之外，站内切页时不会被重建。如果 hideSidebars 页面（/skills/、/interview/* 等）
+// 干脆不渲染它们，跳到普通页面后侧栏 DOM 就永久缺失 ——
+// 表现就是「左右侧边栏偶尔消失，只有整页刷新才回来」。
+// 所以这里始终渲染，隐藏交给 #main-grid[data-sidebar-collapsed="true"] 的 CSS。
+const hasRightComponentsForDom: boolean =
+	sidebarConfig.hasRightComponents ||
+	(shouldAddRightSidebar &&
+		sidebarLayoutConfig.rightComponents.some((comp) => comp.enable));
+const hasLeftComponentsForDom: boolean =
+	sidebarConfig.hasLeftComponents ||
+	(shouldAddLeftSidebar &&
+		sidebarLayoutConfig.leftComponents.some((comp) => comp.enable));
+
+// hideSidebars 页面只在网格上退化为单列
 const effectiveHasRightComponents: boolean =
-	!hideSidebars &&
-	(sidebarConfig.hasRightComponents ||
-		(shouldAddRightSidebar &&
-			sidebarLayoutConfig.rightComponents.some((comp) => comp.enable)));
+	!hideSidebars && hasRightComponentsForDom;
 const effectiveHasLeftComponents: boolean =
-	!hideSidebars &&
-	(sidebarConfig.hasLeftComponents ||
-		(shouldAddLeftSidebar &&
-			sidebarLayoutConfig.leftComponents.some((comp) => comp.enable)));
+	!hideSidebars && hasLeftComponentsForDom;
 
 // 使用effective值重新生成网格类
 // 当position为right且文章页临时显示左侧栏时，tabletSidebar应为right（保持显示主侧栏）
@@ -242,32 +252,41 @@ const effectiveTabletSidebar = shouldAddLeftSidebar
 	? ("right" as const)
 	: sidebarConfig.tabletSidebar;
 
-const updatedGridConfig: ResponsiveSidebarConfig = {
+// 持久 DOM（侧栏容器 / 内容列 / 页脚）的类名必须与「来源页」无关，
+// 否则切页后残留的类名会和目标页的网格对不上。因此这些一律按未隐藏的配置生成。
+const domGridConfig: ResponsiveSidebarConfig = {
 	...sidebarConfig,
 	isBothSidebars: effectiveIsBothSidebars,
-	hasLeftComponents: effectiveHasLeftComponents,
-	hasRightComponents: effectiveHasRightComponents,
+	hasLeftComponents: hasLeftComponentsForDom,
+	hasRightComponents: hasRightComponentsForDom,
 	tabletSidebar: effectiveTabletSidebar,
 };
 
-const { gridCols } = generateGridClasses(updatedGridConfig);
-const sidebarClass = generateSidebarClasses(updatedGridConfig);
+// 网格列数才需要跟随 hideSidebars
+const layoutGridConfig: ResponsiveSidebarConfig = {
+	...domGridConfig,
+	hasLeftComponents: effectiveHasLeftComponents,
+	hasRightComponents: effectiveHasRightComponents,
+};
+
+const { gridCols } = generateGridClasses(layoutGridConfig);
+const sidebarClass = generateSidebarClasses(domGridConfig);
 const rightSidebarClass =
 	effectiveIsBothSidebars || sidebarLayoutConfig.position === "right"
-		? generateRightSidebarClasses(updatedGridConfig)
+		? generateRightSidebarClasses(domGridConfig)
 		: "";
-const mainContentClass = generateMainContentClasses(updatedGridConfig);
+const mainContentClass = generateMainContentClasses(domGridConfig);
 const staticBarClass = mainContentClass.replace("transition-main", "").trim();
 
 const footerClass = ["footer", "col-span-1", "onload-animation"];
 
 if (
-	updatedGridConfig.isBothSidebars &&
-	updatedGridConfig.hasLeftComponents &&
-	updatedGridConfig.hasRightComponents
+	domGridConfig.isBothSidebars &&
+	domGridConfig.hasLeftComponents &&
+	domGridConfig.hasRightComponents
 ) {
 	// 双侧栏：Footer 在平板与桌面都跟随内容列
-	if (updatedGridConfig.tabletSidebar === "right") {
+	if (domGridConfig.tabletSidebar === "right") {
 		footerClass.push(
 			"md:col-start-1 md:col-span-1 xl:col-start-2 xl:col-span-1",
 		);
@@ -277,20 +296,23 @@ if (
 		);
 	}
 } else if (
-	updatedGridConfig.hasLeftComponents &&
-	!updatedGridConfig.hasRightComponents
+	domGridConfig.hasLeftComponents &&
+	!domGridConfig.hasRightComponents
 ) {
 	// 仅左侧栏：内容列在第2列
 	footerClass.push("md:col-start-2 md:col-span-1 xl:col-start-2 xl:col-span-1");
 } else if (
-	!updatedGridConfig.hasLeftComponents &&
-	updatedGridConfig.hasRightComponents
+	!domGridConfig.hasLeftComponents &&
+	domGridConfig.hasRightComponents
 ) {
 	// 仅右侧栏：内容列在第1列
 	footerClass.push("md:col-start-1 md:col-span-1 xl:col-start-1 xl:col-span-1");
 } else {
 	footerClass.push("md:col-start-1 md:col-span-1 xl:col-start-1 xl:col-span-1");
 }
+
+// 侧栏总开关关闭或页面要求隐藏时，直接退化为单列（CSS 会隐藏侧栏容器并清掉列定位）
+const initialSidebarCollapsed = hideSidebars || !sidebarLayoutConfig.enable;
 
 const footerClassName = footerClass.join(" ");
 
@@ -921,11 +943,12 @@ const hasMultipleImages =
 <!-- Main content -->
 <div class={`absolute w-full z-30 pointer-events-none ${mobileNonHomeBannerClass ? 'mobile-main-no-banner' : ''} ${!(isBannerMode && isBackgroundEnabled) ? 'no-banner-layout' : ''} ${isPostDetailWallpaperMode ? 'post-detail-main' : ''}`} style={isFullscreenMode ? 'top: 0;' : `top: ${finalMainPanelTop}`}>
     <!-- The pointer-events-none here prevent blocking the click event of the TOC -->
-    <div class={`relative w-full ${fullWidth ? '' : 'xl:w-[92vw] max-w-(--page-width)'} mx-auto pointer-events-auto`}>
+    <div id="content-shell" data-full-width={fullWidth ? "true" : "false"} class="relative w-full mx-auto pointer-events-auto">
         <div id="main-grid"
           class={`transition duration-700 w-full left-0 right-0 grid ${gridCols} grid-rows-[auto_1fr_auto] lg:grid-rows-[auto] mx-auto gap-4 px-2 md:px-4 ${!sidebarConfig.mobileShowSidebar ? 'mobile-no-sidebar' : ''}`}
           data-sidebar-enable={sidebarLayoutConfig.enable ? "true" : "false"}
           data-hide-sidebars={hideSidebars ? "true" : "false"}
+          data-sidebar-collapsed={initialSidebarCollapsed ? "true" : "false"}
           data-grid-hide-sidebar-on-post={hideSidebarOnPostPage ? "true" : "false"}
           data-sidebar-position={sidebarLayoutConfig.position}
           data-tablet-sidebar={sidebarLayoutConfig.tabletSidebar ?? "left"}
@@ -942,7 +965,7 @@ const hasMultipleImages =
                 <>
                     {sidebarLayoutConfig.enable ? (
                         <div id="left-sidebar-wrapper" class="contents" data-hide-sidebar-on-post={hideSidebarOnPostPage ? "true" : "false"} style="contain: layout style paint;">
-                            {effectiveHasLeftComponents && (
+                            {hasLeftComponentsForDom && (
                                 <SideBar
                                     side={effectiveIsBothSidebars ? "left" : undefined}
                                     class={sidebarClass}
@@ -957,7 +980,7 @@ const hasMultipleImages =
                 </>
             ) : (
                 <div id="left-sidebar-dynamic" class="contents transition-swup-fade">
-                    {effectiveIsBothSidebars && effectiveHasLeftComponents && (
+                    {effectiveIsBothSidebars && hasLeftComponentsForDom && (
 						<SideBar side="left" class={sidebarClass} headings={headings}></SideBar>
                     )}
                 </div>
@@ -977,8 +1000,20 @@ const hasMultipleImages =
                     class="transition-main"
                     data-current-post-category={postCategory || ""}
                 >
-                {/* 携带网格布局类名，用于JS更新父容器 */}
-                <div id="grid-class-carrier" data-grid-class={gridCols} class="hidden"></div>
+                {/* 携带网格布局类名 + 页面级布局开关，用于 swup 切页后同步给持久存在的
+                    #main-grid / #content-shell（它们不在替换容器里，靠这里做「真相来源」） */}
+                <div
+                    id="grid-class-carrier"
+                    class="hidden"
+                    data-grid-class={gridCols}
+                    data-hide-sidebars={hideSidebars ? "true" : "false"}
+                    data-full-width={fullWidth ? "true" : "false"}
+                    data-sidebar-enable={sidebarLayoutConfig.enable ? "true" : "false"}
+                    data-grid-hide-sidebar-on-post={hideSidebarOnPostPage ? "true" : "false"}
+                    data-sidebar-position={sidebarLayoutConfig.position}
+                    data-tablet-sidebar={sidebarLayoutConfig.tabletSidebar ?? "left"}
+                    data-show-both-sidebars-on-post={sidebarLayoutConfig.showBothSidebarsOnPostPage ? "true" : "false"}
+                ></div>
                 {/* 为每个页面提供一个隐藏的h1标题，用于SEO和可访问性 */}
                 <h1 class="sr-only">{title}</h1>
                 <div id="content-wrapper" class="onload-animation transition-leaving">
@@ -998,7 +1033,7 @@ const hasMultipleImages =
                 <>
                     {sidebarLayoutConfig.enable ? (
                         <div id="right-sidebar-static" class="contents" data-hide-sidebar-on-post={hideSidebarOnPostPage ? "true" : "false"}>
-                            {(effectiveIsBothSidebars || sidebarLayoutConfig.position === "right") && effectiveHasRightComponents && (
+                            {(effectiveIsBothSidebars || sidebarLayoutConfig.position === "right") && hasRightComponentsForDom && (
 								<SideBar side="right" class={rightSidebarClass} headings={headings}></SideBar>
                             )}
                         </div>
@@ -1009,14 +1044,16 @@ const hasMultipleImages =
                 </>
             ) : (
                 <div id="right-sidebar-dynamic" class="contents transition-swup-fade">
-                    {effectiveIsBothSidebars && effectiveHasRightComponents && (
+                    {effectiveIsBothSidebars && hasRightComponentsForDom && (
 						<SideBar side="right" class={rightSidebarClass} headings={headings}></SideBar>
                     )}
                 </div>
             )}
 
-            {/* 移动端底部组件 - 768px及以下显示 */}
-            {!hideSidebars && enabledMobileBottomComponents.length > 0 && (
+            {/* 移动端底部组件 - 768px及以下显示。
+                同样始终渲染（见 hasLeft/RightComponentsForDom 的说明），
+                hideSidebars 页面由 #main-grid[data-sidebar-collapsed="true"] 隐藏。 */}
+            {enabledMobileBottomComponents.length > 0 && (
                 <div
                     id="mobile-bottom-sidebar"
                     class:list={[
@@ -1109,6 +1146,77 @@ const hasMultipleImages =
   #right-sidebar {
     transition: opacity 0.35s ease-in-out,
                 transform 0.35s ease-in-out;
+  }
+
+  /* 内容区宽度：普通页面对齐页宽，fullWidth 页面（/skills/、/cs/ 等）占满视口。
+     值由 #grid-class-carrier 在切页时同步（#content-shell 不在 swup 替换容器内）。 */
+  @media (min-width: 1280px) {
+    #content-shell[data-full-width="false"] {
+      width: 92vw;
+      max-width: var(--page-width);
+    }
+  }
+
+  /* ==================================================================
+     侧边栏显隐
+     ------------------------------------------------------------------
+     #left-sidebar-wrapper / #right-sidebar-static / #mobile-bottom-sidebar
+     位于 swup 替换容器之外，站内切页不会重建，所以：
+       · 侧栏 DOM 始终渲染（模板里的 hasLeft/RightComponentsForDom）
+       · 显隐与列运算全部由这里的 CSS 负责
+     这样从 hideSidebars 页面（/skills/、/interview/* 等）跳回普通页面时，
+     侧栏才能随之恢复，而不是「消失到下一次整页刷新」。
+     ================================================================== */
+
+  /* 1) 页面级隐藏：hideSidebars 页面、侧栏总开关关闭、文章页隐藏侧栏。
+        data-sidebar-collapsed 由 Layout 的 updateMainGridCols 在每次导航后重算。 */
+  #main-grid[data-sidebar-collapsed="true"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #main-grid[data-sidebar-collapsed="true"] > *,
+  #main-grid[data-sidebar-collapsed="true"] #left-sidebar,
+  #main-grid[data-sidebar-collapsed="true"] #right-sidebar {
+    grid-column: auto;
+  }
+
+  #main-grid[data-sidebar-collapsed="true"] #left-sidebar-wrapper,
+  #main-grid[data-sidebar-collapsed="true"] #right-sidebar-static,
+  #main-grid[data-sidebar-collapsed="true"] #mobile-bottom-sidebar {
+    display: none;
+  }
+
+  /* 2) 用户偏好：在调色板「外观」里关掉某一侧（仅平板及以上参与多列布局） */
+  @media (min-width: 768px) {
+    html[data-sidebar-left-visible="false"] #main-grid {
+      grid-template-columns: minmax(0, 1fr) 17.5rem;
+    }
+
+    html[data-sidebar-right-visible="false"] #main-grid {
+      grid-template-columns: 17.5rem minmax(0, 1fr);
+    }
+
+    html[data-sidebar-left-visible="false"][data-sidebar-right-visible="false"] #main-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* 列数变了，原来的列定位类必须让位给自动流 */
+    html[data-sidebar-left-visible="false"] #main-grid > *,
+    html[data-sidebar-left-visible="false"] #main-grid #right-sidebar,
+    html[data-sidebar-right-visible="false"] #main-grid > *,
+    html[data-sidebar-right-visible="false"] #main-grid #left-sidebar {
+      grid-column: auto;
+    }
+
+    /* 左侧栏关掉后，右侧栏需要在平板端也显示（它默认只在 1280px+ 出现） */
+    html[data-sidebar-left-visible="false"] #main-grid #right-sidebar {
+      display: block;
+    }
+  }
+
+  html[data-sidebar-left-visible="false"] #left-sidebar-wrapper,
+  html[data-sidebar-right-visible="false"] #right-sidebar-static {
+    display: none;
   }
 
   @keyframes swupFadeOut {

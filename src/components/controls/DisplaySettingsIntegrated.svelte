@@ -8,7 +8,9 @@ import {
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import { getBackgroundImages } from "@utils/layout-utils";
+import { getResponsiveSidebarConfig } from "@utils/responsive-utils";
 import {
+	applySidebarVisibilityToDocument,
 	clearSelectedWallpaper,
 	getDefaultBannerCarouselEnabled,
 	getDefaultBannerTitleEnabled,
@@ -28,6 +30,8 @@ import {
 	getStoredOverlayOpacity,
 	getStoredSakuraEnabled,
 	getStoredSelectedWallpaperIndex,
+	getStoredSidebarLeftVisible,
+	getStoredSidebarRightVisible,
 	getStoredWallpaperMode,
 	getStoredWavesEnabled,
 	setBannerCarouselEnabled,
@@ -39,12 +43,19 @@ import {
 	setOverlayOpacity,
 	setSakuraEnabled,
 	setSelectedWallpaperIndex,
+	setSidebarLeftVisible,
+	setSidebarRightVisible,
 	setWallpaperMode,
 	setWavesEnabled,
 } from "@utils/setting-utils";
 import { onMount } from "svelte";
 import Icon from "@/components/common/Icon.svelte";
-import { backgroundWallpaper, sakuraConfig, siteConfig } from "@/config";
+import {
+	backgroundWallpaper,
+	sakuraConfig,
+	sidebarLayoutConfig,
+	siteConfig,
+} from "@/config";
 import { homePortfolioIntroSettings } from "@/config/homePortfolioIntro";
 import type { WALLPAPER_MODE } from "@/types/config";
 
@@ -166,6 +177,18 @@ let effectiveDefaultLayout = $derived(
 	isMobileWidth ? mobileDefaultLayout : defaultLayout,
 );
 const showThemeColor = !siteConfig.themeColor.fixed;
+
+// 侧边栏开关：只在配置里确实存在该侧组件时才提供开关
+const responsiveSidebarConfig = getResponsiveSidebarConfig();
+const canToggleLeftSidebar = responsiveSidebarConfig.hasLeftComponents;
+const canToggleRightSidebar = responsiveSidebarConfig.hasRightComponents;
+const showSidebarVisibilitySection =
+	sidebarLayoutConfig.enable && (canToggleLeftSidebar || canToggleRightSidebar);
+let sidebarLeftVisible = $state(getStoredSidebarLeftVisible());
+let sidebarRightVisible = $state(getStoredSidebarRightVisible());
+let sidebarVisibilityIsDefault = $derived(
+	sidebarLeftVisible && sidebarRightVisible,
+);
 // 是否允许用户切换水波纹动画（只看 switchable 配置）
 const isWavesSwitchable =
 	backgroundWallpaper.common?.waves?.switchable ?? false;
@@ -238,6 +261,7 @@ const hasAnyContent =
 	hasBannerSettings ||
 	hasOverlaySettings ||
 	isSakuraSwitchable ||
+	showSidebarVisibilitySection ||
 	homePortfolioIntroSettings.characters.length > 0;
 
 const introSettingsIsDefault = $derived(
@@ -416,6 +440,23 @@ function toggleBannerCarouselEnabled() {
 function toggleSakuraEnabled() {
 	sakuraEnabled = !sakuraEnabled;
 	setSakuraEnabled(sakuraEnabled);
+}
+
+function toggleSidebarLeftVisible() {
+	sidebarLeftVisible = !sidebarLeftVisible;
+	setSidebarLeftVisible(sidebarLeftVisible);
+}
+
+function toggleSidebarRightVisible() {
+	sidebarRightVisible = !sidebarRightVisible;
+	setSidebarRightVisible(sidebarRightVisible);
+}
+
+function resetSidebarVisibility() {
+	sidebarLeftVisible = true;
+	sidebarRightVisible = true;
+	setSidebarLeftVisible(true);
+	setSidebarRightVisible(true);
 }
 
 function getStoredIntroEnabled() {
@@ -841,6 +882,12 @@ $effect(() => {
 			setOverlayCardOpacity(overlayCardOpacity);
 		}
 	}
+});
+
+// 与 <head> 里的内联初始化保持一致：面板挂载时再同步一次显隐属性，
+// 避免 localStorage 被其它标签页改过、或首屏脚本未执行时两边状态不一致
+onMount(() => {
+	applySidebarVisibilityToDocument();
 });
 </script>
 
@@ -1419,6 +1466,80 @@ $effect(() => {
                              class:left-5={sakuraEnabled}></div>
                     </div>
                 </button>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Sidebar Visibility Section -->
+    {#if showSidebarVisibilitySection}
+        <div
+            class="mt-2 mb-2 mobile-settings-section"
+            class:mobile-settings-section-hidden={mobileSettingsTab !== "appearance"}
+            class:section-collapsed={isSectionCollapsed("sidebarVisibility")}
+        >
+            <div class="section-head flex gap-2 font-bold text-lg text-neutral-900 dark:text-neutral-100 transition relative ml-3 mb-2
+                before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
+                before:absolute before:-left-3 before:top-1/2 before:-translate-y-1/2"
+            >
+                侧边栏
+                <button aria-label="恢复侧边栏默认显示" class="btn-regular w-7 h-7 rounded-md active:scale-90"
+                        class:opacity-0={sidebarVisibilityIsDefault} class:pointer-events-none={sidebarVisibilityIsDefault} onclick={resetSidebarVisibility}>
+                    <div class="text-(--btn-content)">
+                        <Icon icon="fa7-solid:arrow-rotate-left" class="text-[0.875rem]"></Icon>
+                    </div>
+                </button>
+                <button
+                    type="button"
+                    class="section-toggle"
+                    aria-expanded={!isSectionCollapsed("sidebarVisibility")}
+                    aria-label="收起或展开侧边栏分区"
+                    onclick={() => toggleSection("sidebarVisibility")}
+                >
+                    <Icon icon="material-symbols:keyboard-arrow-down-rounded" class="text-[1.15rem]" />
+                </button>
+            </div>
+            <div class="space-y-1">
+                {#if canToggleLeftSidebar}
+                <button
+                    type="button"
+                    aria-pressed={sidebarLeftVisible}
+                    class="w-full btn-regular rounded-md py-2 px-3 flex items-center gap-3 text-left active:scale-95 touch-manipulation transition-all relative overflow-hidden"
+                    class:bg-(--btn-regular-bg-hover)={sidebarLeftVisible}
+                    onclick={toggleSidebarLeftVisible}
+                >
+                    <Icon icon="material-symbols:dock-to-left" class="text-[1.25rem] shrink-0"></Icon>
+                    <span class="text-sm flex-1">左侧边栏</span>
+                    <div class="w-10 h-5 rounded-full transition-all duration-200 relative"
+                         class:bg-(--primary)={sidebarLeftVisible}
+                         class:bg-(--btn-regular-bg-active)={!sidebarLeftVisible}>
+                        <div class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200"
+                             class:left-0.5={!sidebarLeftVisible}
+                             class:left-5={sidebarLeftVisible}></div>
+                    </div>
+                </button>
+                {/if}
+                {#if canToggleRightSidebar}
+                <button
+                    type="button"
+                    aria-pressed={sidebarRightVisible}
+                    class="w-full btn-regular rounded-md py-2 px-3 flex items-center gap-3 text-left active:scale-95 touch-manipulation transition-all relative overflow-hidden"
+                    class:bg-(--btn-regular-bg-hover)={sidebarRightVisible}
+                    onclick={toggleSidebarRightVisible}
+                >
+                    <Icon icon="material-symbols:dock-to-right" class="text-[1.25rem] shrink-0"></Icon>
+                    <span class="text-sm flex-1">右侧边栏</span>
+                    <div class="w-10 h-5 rounded-full transition-all duration-200 relative"
+                         class:bg-(--primary)={sidebarRightVisible}
+                         class:bg-(--btn-regular-bg-active)={!sidebarRightVisible}>
+                        <div class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200"
+                             class:left-0.5={!sidebarRightVisible}
+                             class:left-5={sidebarRightVisible}></div>
+                    </div>
+                </button>
+                {/if}
+                <p class="px-1 pt-0.5 text-xs font-normal text-neutral-500 dark:text-neutral-400">
+                    平板与桌面端生效，移动端仍显示页面底部的组件；隐藏侧边栏后正文会自动占满整行
+                </p>
             </div>
         </div>
     {/if}

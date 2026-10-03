@@ -1502,3 +1502,71 @@ export function applyBannerCarouselEnabledToDocument(enabled: boolean): void {
 		String(enabled),
 	);
 }
+
+// ---------------------------------------------------------------------------
+// 左右侧边栏显隐（调色板「外观」里的开关）
+// 默认两侧都显示：只有被关掉时才在 <html> 上写 data-sidebar-*-visible="false"，
+// CSS 依据该属性隐藏对应侧栏并重算网格列数（见 MainGridLayout 的全局样式）。
+// ---------------------------------------------------------------------------
+
+const SIDEBAR_LEFT_VISIBLE_KEY = "sidebarLeftVisible";
+const SIDEBAR_RIGHT_VISIBLE_KEY = "sidebarRightVisible";
+
+function readStoredVisibility(key: string): boolean {
+	if (
+		typeof localStorage === "undefined" ||
+		typeof localStorage.getItem !== "function"
+	) {
+		return true;
+	}
+	// 未设置时默认显示，只有明确写入 "false" 才隐藏
+	return localStorage.getItem(key) !== "false";
+}
+
+function writeStoredVisibility(key: string, visible: boolean): void {
+	if (
+		typeof localStorage === "undefined" ||
+		typeof localStorage.setItem !== "function"
+	) {
+		return;
+	}
+	localStorage.setItem(key, String(visible));
+}
+
+export function getStoredSidebarLeftVisible(): boolean {
+	return readStoredVisibility(SIDEBAR_LEFT_VISIBLE_KEY);
+}
+
+export function getStoredSidebarRightVisible(): boolean {
+	return readStoredVisibility(SIDEBAR_RIGHT_VISIBLE_KEY);
+}
+
+export function setSidebarLeftVisible(visible: boolean): void {
+	writeStoredVisibility(SIDEBAR_LEFT_VISIBLE_KEY, visible);
+	applySidebarVisibilityToDocument();
+}
+
+export function setSidebarRightVisible(visible: boolean): void {
+	writeStoredVisibility(SIDEBAR_RIGHT_VISIBLE_KEY, visible);
+	applySidebarVisibilityToDocument();
+}
+
+/** 把显隐偏好同步到 <html> 属性；默认显示时移除属性，保持与 SSR 首屏一致 */
+export function applySidebarVisibilityToDocument(): void {
+	if (typeof document === "undefined") {
+		return;
+	}
+	const root = document.documentElement;
+	const sides: Array<[string, boolean]> = [
+		["left", getStoredSidebarLeftVisible()],
+		["right", getStoredSidebarRightVisible()],
+	];
+	for (const [side, visible] of sides) {
+		const attr = `data-sidebar-${side}-visible`;
+		if (visible) {
+			root.removeAttribute(attr);
+		} else {
+			root.setAttribute(attr, "false");
+		}
+	}
+}

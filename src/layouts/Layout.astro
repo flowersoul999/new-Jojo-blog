@@ -597,6 +597,24 @@ const canonicalUrl = new URL(
           document.documentElement.setAttribute("data-banner-title-enabled", bannerTitleEnabled);
         }
       })();
+
+      // 初始化左右侧边栏显隐偏好 - 在 html 元素上设置属性，CSS 会立即生效。
+      // 默认两侧显示，因此只有被用户关掉时才写入属性，避免污染默认状态。
+      (function applySidebarVisibility() {
+        try {
+          const root = document.documentElement;
+          ["left", "right"].forEach(function (side) {
+            const stored = localStorage.getItem("sidebar" + (side === "left" ? "Left" : "Right") + "Visible");
+            if (stored === "false") {
+              root.setAttribute("data-sidebar-" + side + "-visible", "false");
+            } else {
+              root.removeAttribute("data-sidebar-" + side + "-visible");
+            }
+          });
+        } catch (e) {
+          // localStorage may be unavailable in a privacy-restricted browser session.
+        }
+      })();
     </script>
     <style
       define:vars={{
@@ -2004,18 +2022,54 @@ function disableAnimation() {
     }
   }
 
-  // 设置单列布局：grid 设为 grid-cols-1，清除子元素的多列定位类
+  // 设置单列布局：grid 设为 grid-cols-1
+  // 注意：这里不再清除子元素的多列定位类。这些元素（#main-grid / 侧栏容器 / 内容列 / 页脚）
+  // 都不在 swup 替换容器里，类名需要长期有效才能在离开隐藏侧栏的页面后恢复；
+  // 单列时的定位冲突交给 CSS（#main-grid[data-sidebar-collapsed="true"]）用 grid-column:auto 中和。
   function applySingleColLayout(mainGrid: Element) {
     for (const cls of GRID_COL_CLASSES) mainGrid.classList.remove(cls);
     mainGrid.classList.add("grid-cols-1");
-    const swupContainer = document.getElementById("swup-container");
-    clearColPositioning(swupContainer, swupContainer?.parentElement, mainGrid.querySelector('.footer'));
+  }
+
+  // #main-grid / #content-shell 不在 swup 替换容器内，站内切页时不会被重建。
+  // 页面级布局开关（hideSidebars / fullWidth 等）由容器内的 #grid-class-carrier 携带，
+  // 必须在每次导航后同步过来，否则会残留来源页的布局 ——
+  // 典型症状：从 /skills/、/interview/* 跳回普通页面后左右侧边栏消失，只有整页刷新才恢复。
+  function syncLayoutStateFromCarrier() {
+    const carrier = document.getElementById("grid-class-carrier");
+    if (!carrier) return;
+
+    const mainGrid = document.getElementById("main-grid");
+    if (mainGrid) {
+      const stateAttrs = [
+        "data-sidebar-enable",
+        "data-hide-sidebars",
+        "data-grid-hide-sidebar-on-post",
+        "data-sidebar-position",
+        "data-tablet-sidebar",
+        "data-show-both-sidebars-on-post",
+      ];
+      for (const name of stateAttrs) {
+        const value = carrier.getAttribute(name);
+        if (value !== null && mainGrid.getAttribute(name) !== value) {
+          mainGrid.setAttribute(name, value);
+        }
+      }
+    }
+
+    const shell = document.getElementById("content-shell");
+    const fullWidth = carrier.getAttribute("data-full-width");
+    if (shell && fullWidth !== null && shell.getAttribute("data-full-width") !== fullWidth) {
+      shell.setAttribute("data-full-width", fullWidth);
+    }
   }
 
   // 更新主网格的网格列数
   function updateMainGridCols() {
     const mainGrid = document.getElementById("main-grid");
     if (!mainGrid) return;
+
+    syncLayoutStateFromCarrier();
 
     const sidebarEnabled = mainGrid.getAttribute("data-sidebar-enable") !== "false";
     const hideSideBars = mainGrid.getAttribute("data-hide-sidebars") === "true";
@@ -2025,8 +2079,12 @@ function disableAnimation() {
     const tabletSidebar = mainGrid.getAttribute("data-tablet-sidebar") || "left";
     const showBothSidebarsOnPostPage = mainGrid.getAttribute("data-show-both-sidebars-on-post") === "true";
 
+    const collapsed = !sidebarEnabled || hideSideBars || (isPostPage && sidebarHideOnPost);
+    // CSS 依据它隐藏侧栏容器、中和列定位；显隐状态与网格列数必须同步更新
+    mainGrid.setAttribute("data-sidebar-collapsed", collapsed ? "true" : "false");
+
     // 侧边栏禁用、页面强制隐藏侧边栏(hideSidebars) 或 文章详情页隐藏侧边栏时，保持单列布局
-    if (!sidebarEnabled || hideSideBars || (isPostPage && sidebarHideOnPost)) {
+    if (collapsed) {
       applySingleColLayout(mainGrid);
       return;
     }
