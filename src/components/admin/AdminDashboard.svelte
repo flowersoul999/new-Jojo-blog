@@ -1100,7 +1100,7 @@ function maxModuleOf(data: StatsData | null): number {
 											<p class="font-mono text-xs font-semibold text-(--deep-text)">{vidShort(row.vid)}</p>
 											<p class="mt-0.5 font-mono text-[11px] text-(--content-meta)">{row.ip || "未记录 IP"}</p>
 										</td>
-										<td class="py-2.5 pr-4 text-xs text-(--content-meta)">{row.country}</td>
+										<td class="py-2.5 pr-4 text-xs text-(--content-meta)">{row.region || row.country}</td>
 										<td class="py-2.5 pr-4 text-xs text-(--content-meta)">
 											<p>{row.dev} · {row.os}</p>
 											<p class="mt-0.5">{row.br}</p>
@@ -1122,7 +1122,7 @@ function maxModuleOf(data: StatsData | null): number {
 													<div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-(--content-meta)">
 														<span>IP：<b class="font-mono text-(--deep-text)">{detail.ips.join("、") || "未记录"}</b></span>
 														<span>环境：{detail.dev} · {detail.os} · {detail.br}</span>
-														<span>{detail.country}</span>
+														<span>{detail.region || detail.country}</span>
 													</div>
 													{#if detail.sessions.length === 0}
 														<p class="py-4 text-center text-xs text-(--content-meta)">该时间范围内没有会话明细</p>

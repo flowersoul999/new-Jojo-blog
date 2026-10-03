@@ -144,6 +144,8 @@ export interface VisitorRow {
 	ip: string;
 	ips: string[];
 	country: string;
+	/** 省/市/区拼接串（如「广东省广州市黄埔区」），无数据为空 */
+	region?: string;
 	dev: string;
 	os: string;
 	br: string;
@@ -183,6 +185,8 @@ export interface VisitorDetail {
 	ip: string;
 	ips: string[];
 	country: string;
+	/** 省/市/区拼接串（如「广东省广州市黄埔区」），无数据为空 */
+	region?: string;
 	dev: string;
 	os: string;
 	br: string;
@@ -684,9 +688,10 @@ function buildSessions(events: StoredEvent[]): SessionData[] {
 				start: e.ty === "p" && e.en ? e.en : e.t,
 				end: e.t,
 				pv: 0,
-				ips: [],
-				cc: e.cc || "",
-				os: e.os || "",
+			ips: [],
+			cc: e.cc || "",
+			rg: e.rg || "",
+			os: e.os || "",
 				br: e.br || "",
 				dev: e.dev || "",
 				pages: new Map(),
@@ -702,6 +707,7 @@ function buildSessions(events: StoredEvent[]): SessionData[] {
 		if (e.t > s.end) s.end = e.t;
 		if (e.ip) pushIp(s, e.ip);
 		if (e.cc) s.cc = e.cc;
+		if (e.rg) s.rg = e.rg;
 		if (e.os) s.os = e.os;
 		if (e.br) s.br = e.br;
 		if (e.dev) s.dev = e.dev;
@@ -770,6 +776,7 @@ function aggregateVisitors(
 		{
 			ips: string[];
 			cc: string;
+			rg: string;
 			os: string;
 			br: string;
 			dev: string;
@@ -788,6 +795,7 @@ function aggregateVisitors(
 			row = {
 				ips: [],
 				cc: "",
+				rg: "",
 				os: "",
 				br: "",
 				dev: "",
@@ -825,6 +833,7 @@ function aggregateVisitors(
 			ip: maskIpAddress(v.ips[0] || "", mask),
 			ips: v.ips.slice(0, 3).map((ip) => maskIpAddress(ip, mask)),
 			country: countryName(v.cc),
+			region: v.rg || "",
 			dev: v.dev || "未知",
 			os: v.os || "未知",
 			br: v.br || "未知",
