@@ -256,6 +256,8 @@ const levels = $derived.by(() => {
 function persist() {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(done));
+		// 广播给修仙面板 / 结界：修为变了，境界可能升（或解锁新图）
+		window.dispatchEvent(new CustomEvent("aemeath-cultivation-changed"));
 	} catch {
 		/* 隐私模式下写不进去也无所谓 */
 	}
