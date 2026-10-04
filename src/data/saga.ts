@@ -23,6 +23,7 @@ import type { RawVolume } from "@/data/saga/types";
 import { VOL1 } from "@/data/saga/vol1";
 import { VOL2 } from "@/data/saga/vol2";
 import { VOL3 } from "@/data/saga/vol3";
+import { VOL4 } from "@/data/saga/vol4";
 
 /** 话本的一回 */
 export interface SagaChapter {
@@ -40,7 +41,7 @@ export interface SagaChapter {
 /** 一卷 = 一组连续的回目 */
 export type SagaVolume = RawVolume;
 
-const VOLUMES: SagaVolume[] = [VOL1, VOL2, VOL3];
+const VOLUMES: SagaVolume[] = [VOL1, VOL2, VOL3, VOL4];
 
 /** 全卷按「先卷后回」展开成一维数组，下标即回目顺序 */
 const CHAPTERS: SagaChapter[] = [];
