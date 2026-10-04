@@ -88,6 +88,15 @@ let {
 	heading: HEADING = "前端技能图",
 	/** 角色称号阶梯：按总掌握度百分比给 */
 	titles: TITLES = FE_TITLES,
+	/**
+	 * 修行录开关：**不入门禁、不加修为、不发传书、不领话本签**。
+	 *
+	 * 用于英语 / 理财 / 睡眠 / 音乐这类图 —— 它们和四张修行路图没有先后关系，
+	 * 硬塞进境界链会出现「背完单词但没结丹所以英语图不让我进」的荒谬门禁。
+	 * 传 true 后：跳过 recordSlay / recordUnlearn / earnChapterForSkill / syncMaxedSkills，
+	 * 只保留属性点、勾选、音效、飘字与页面内的一切交互（属性点才是这类图的唯一进度）。
+	 */
+	noCultivation: NO_CULTIVATION = false,
 } = $props();
 
 /** 由 storageKey 反推这是哪张修行图（recordSlay 需要它来算修为/剧情） */
@@ -96,8 +105,19 @@ const KEY_TO_GRAPH: Record<string, GraphId> = {
 	"aemeath-skill-tree": "fe",
 	"aemeath-backend-tree": "be",
 	"aemeath-agent-tree": "ag",
+	"aemeath-music-tree": "mu",
 };
+/** 修行录图的图 id：只用来做存储键反查，不参与任何修为/境界计算 */
 const currentGraph: GraphId = KEY_TO_GRAPH[STORAGE_KEY] ?? "cs";
+
+/** 修行录图的飘字：没有修为可给，改成给属性点，动词也从修行路那套里借 */
+function attrPop(el: HTMLElement, skill: Skill) {
+	const id = GROUP_ATTR[skill.group] ?? "dex";
+	const lv = (done[skill.id] ?? []).length;
+	const gain = lv + (lv >= capOf(skill.id) ? 2 : 0);
+	const a = ATTR_MAP[id];
+	spawnXp(el, gain, a?.short ?? "点", skill.short, false);
+}
 
 /** 图标配色：把这张图自己的图标表与方向配色喂进去 */
 function iconColor(id: string, group: string, state: IconState, dark: boolean) {
@@ -276,7 +296,9 @@ function persist() {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(done));
 		// 广播给修仙面板 / 结界：修为变了，境界可能升（或解锁新图）
-		window.dispatchEvent(new CustomEvent("aemeath-cultivation-changed"));
+		// 修行录图不改修为，别去惊动境界面板。
+		if (!NO_CULTIVATION)
+			window.dispatchEvent(new CustomEvent("aemeath-cultivation-changed"));
 	} catch {
 		/* 隐私模式下写不进去也无所谓 */
 	}
@@ -703,7 +725,8 @@ function writeDone(id: string, list: number[]) {
 	done = { ...done, [id]: list };
 	persist();
 	// 「彻底点亮一个技能」= 勾满它自己的清单 → 挣得话本的下一回（幂等）
-	if (cap > 0 && list.length >= cap && before < cap)
+	// 修行录图不领签：话本共 240 回，软技能往里塞只会打乱主线回目的发放节奏。
+	if (!NO_CULTIVATION && cap > 0 && list.length >= cap && before < cap)
 		earnChapterForSkill(currentGraph, id);
 }
 
@@ -716,12 +739,27 @@ function toggle(s: Skill, i: number, el?: EventTarget | null) {
 			s.id,
 			cur.filter((x) => x !== i),
 		);
-		// 取消 = 道心小劫 / 心猿意马 等彩蛋判定
-		recordUnlearn(currentGraph, s.id);
+		// 取消 = 道心小劫 / 心猿意马 等彩蛋判定（修行录图不参与）
+		if (!NO_CULTIVATION) recordUnlearn(currentGraph, s.id);
+		return;
+	}
+	const label = checksOf(s.id)[i]?.[0] ?? s.short;
+	if (NO_CULTIVATION) {
+		// 修行录：没有修为可给，给的是这一项对应方向的属性点
+		writeDone(
+			s.id,
+			[...cur, i].sort((a, b) => a - b),
+		);
+		didSlay = true;
+		if (el instanceof HTMLElement) {
+			attrPop(el, s);
+			el.classList.add("sk-check-slain");
+			setTimeout(() => el.classList.remove("sk-check-slain"), 600);
+		}
+		playSlay();
 		return;
 	}
 	const beforeRealm = snapshot().realmIndex;
-	const label = checksOf(s.id)[i]?.[0] ?? s.short;
 	writeDone(
 		s.id,
 		[...cur, i].sort((a, b) => a - b),
@@ -774,8 +812,8 @@ function stepDown(s: Skill) {
 		s.id,
 		cur.filter((x) => x !== Math.max(...cur)),
 	);
-	// 退掉 = 道心 / 心猿意马 彩蛋判定
-	recordUnlearn(currentGraph, s.id);
+	// 退掉 = 道心 / 心猿意马 彩蛋判定（修行录图不参与）
+	if (!NO_CULTIVATION) recordUnlearn(currentGraph, s.id);
 }
 
 function resetToPreset() {
@@ -833,10 +871,13 @@ onMount(() => {
 
 	// 存量补课：进页面时已经满级的技能，把对应章节一次性记为「已挣得」
 	// （发放仍是一次一回，由 pumpSaga 保证顺序，不会灌屏）
-	const alreadyMaxed = SKILLS.filter(
-		(s) => (done[s.id] ?? []).length >= capOf(s.id) && capOf(s.id) > 0,
-	).map((s) => s.id);
-	if (alreadyMaxed.length) syncMaxedSkills(currentGraph, alreadyMaxed);
+	// 修行录图不领签也不发飞剑传书，压根不碰这套。
+	if (!NO_CULTIVATION) {
+		const alreadyMaxed = SKILLS.filter(
+			(s) => (done[s.id] ?? []).length >= capOf(s.id) && capOf(s.id) > 0,
+		).map((s) => s.id);
+		if (alreadyMaxed.length) syncMaxedSkills(currentGraph, alreadyMaxed);
+	}
 
 	const ro = new ResizeObserver(() => measure());
 	const el = canvasEl;
@@ -858,10 +899,10 @@ onMount(() => {
 	window.addEventListener("resize", onScroll);
 	document.fonts?.ready.then(() => measure()).catch(() => {});
 
-	// 入定彩蛋：单页停留满 5 分钟且有过修行 → 触发一次
+	// 入定彩蛋：单页停留满 5 分钟且有过修行 → 触发一次（修行录图不发飞剑传书）
 	const dwellTimer = setTimeout(
 		() => {
-			if (didSlay) unlockEgg(DWELL_STORY);
+			if (didSlay && !NO_CULTIVATION) unlockEgg(DWELL_STORY);
 		},
 		5 * 60 * 1000,
 	);

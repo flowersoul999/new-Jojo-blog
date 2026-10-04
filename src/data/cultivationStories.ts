@@ -26,16 +26,19 @@ export interface Story {
 	paragraphs: string[];
 }
 
-/** 一张图的中文名（对应 GRAPH_JOURNEY 的 name，但这里是静态副本，避免反向 import） */
-const GRAPH_NAME: Record<GraphId, string> = {
+/**
+ * 一张图的中文名（对应 GRAPH_JOURNEY 的 name，但这里是静态副本，避免反向 import）。
+ * **修行录（mu）不在这里**：它不进 recordSlay，也就没有心魔劫与破境剧情。
+ */
+const GRAPH_NAME: Partial<Record<GraphId, string>> = {
 	cs: "计算机基础",
 	fe: "前端",
 	be: "后端",
 	ag: "Agent 开发",
 };
 
-/** 四张图的方向分组（带中文名），用来批量生成「心魔劫」 */
-const GROUP_MAP: Record<GraphId, { id: string; name: string }[]> = {
+/** 四张修行路图的方向分组（带中文名），用来批量生成「心魔劫」 */
+const GROUP_MAP: Partial<Record<GraphId, { id: string; name: string }[]>> = {
 	cs: CS_GROUPS,
 	fe: FE_GROUPS,
 	be: BE_GROUPS,
@@ -232,8 +235,12 @@ export const MILESTONE_STORY: Record<number, string> = {
 	500: "ms-500",
 };
 
-/** 各图首次参悟：图 → 剧情 id */
-export const GRAPH_FIRST_STORY: Record<GraphId, string> = {
+/**
+ * 各图首次参悟：图 → 剧情 id。
+ * **修行录图（mu）没有这一项** —— 它传了 noCultivation，压根不进 recordSlay，
+ * 所以也拿不到「首悟」的传书。想给修行录发彩蛋得另开一条路。
+ */
+export const GRAPH_FIRST_STORY: Partial<Record<GraphId, string>> = {
 	cs: "first-cs",
 	fe: "first-fe",
 	be: "first-be",
@@ -589,9 +596,9 @@ for (const s of EGG_STORIES) STORIES[s.id] = s;
 export const FIRST_SLAY_STORY = "first-slay";
 
 /** 运行期把心魔劫补进注册表（放在最后，避免上面 import 的 GROUPS 还没就绪） */
-for (const graph of Object.keys(GROUP_MAP) as GraphId[]) {
-	for (const g of GROUP_MAP[graph]) {
-		STORIES[`grp-${graph}-${g.id}`] = groupStory(graph, g);
+for (const [graph, groups] of Object.entries(GROUP_MAP)) {
+	for (const g of groups ?? []) {
+		STORIES[`grp-${graph}-${g.id}`] = groupStory(graph as GraphId, g);
 	}
 }
 

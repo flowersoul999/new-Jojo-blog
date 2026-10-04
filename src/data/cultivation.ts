@@ -38,11 +38,20 @@ import {
 	UNLEARN_STORY,
 	VISIT_ALL_STORY,
 } from "@/data/cultivationStories";
+import { MU_CHECKS } from "@/data/musicChecks";
+import { MU_PRESET, MU_SKILLS } from "@/data/musicSkills";
 import { SKILL_CHECKS } from "@/data/skillChecks";
 import { SKILLS as FE_SKILLS, PRESET } from "@/data/skills";
 
-/** 站内四张技能图的统一标识（cs 是入道起点，fe/be/ag 按境界依次解锁） */
-export type GraphId = "cs" | "fe" | "be" | "ag";
+/**
+ * 站内技能图的统一标识。
+ *
+ * - cs / fe / be / ag 是**修行路**：进 GRAPH_JOURNEY，算修为、挂境界门禁、发飞剑传书。
+ * - mu 是**修行录**：进 GRAPH_JOURNEY 但 `realmIndex: -1` 表示永不受门禁，
+ *   且 SkillTree 传了 noCultivation，所以既不加修为也不进九境界的统计。
+ *   它的进度只看图内属性（音准 / 技法 / 作品），不进境界链也不领话本签。
+ */
+export type GraphId = "cs" | "fe" | "be" | "ag" | "mu";
 
 /** 一个境界：minPct 是达到该境界所需的全局修为占比 */
 export interface Realm {
@@ -132,6 +141,17 @@ const XP_WEIGHTS: Record<GraphId, Record<string, number>> = {
 		"ag-eval": 4,
 		"ag-app": 3,
 	},
+	// 音乐：只在修炼路成立时才会被读到（SkillTree 传 noCultivation 时整个修为层被跳过），
+	// 这里保留一份是为了数据自检时四组权重表结构一致。
+	mu: {
+		"mu-listen": 5,
+		"mu-theory": 3,
+		"mu-instrument": 4,
+		"mu-vocal": 3,
+		"mu-compose": 4,
+		"mu-produce": 3,
+		"mu-stage": 2,
+	},
 };
 
 /** 一张图在修行路上的元数据 */
@@ -196,13 +216,60 @@ export const GRAPH_JOURNEY: JourneyGraph[] = [
 	},
 ];
 
+/**
+ * 修行录：和修行路**没有先后关系**的图（音乐 / 英语 / 理财 / 睡眠 …）。
+ *
+ * 为什么不塞进 GRAPH_JOURNEY：那份表参与 computeCultivation 的总修为累加，
+ * 往里加图会稀释全站修为百分比，把已经升到元婴的访客按比例压回结丹。
+ * 软技能本来就该「随时能进」，所以单独一张表：
+ *   · 不算修为、不进九境界统计、不受门禁
+ *   · 不发飞剑传书、不领话本签（SkillTree 传 noCultivation 负责跳过那几处）
+ *   · 图内的属性（音准 / 技法 / 作品）就是它唯一的进度
+ */
+export interface RecordGraph extends Omit<JourneyGraph, "realmIndex"> {
+	/** 修行录的说明文案，替换掉「需 XX 期」那一套 */
+	gateLabel: string;
+}
+
+export const GRAPH_RECORD: RecordGraph[] = [
+	{
+		id: "mu",
+		name: "音乐",
+		href: "/music/",
+		gateLabel: "无门禁 · 随时可进",
+		storageKey: "aemeath-music-tree",
+		skills: MU_SKILLS,
+		checks: MU_CHECKS,
+		preset: MU_PRESET,
+	},
+];
+
 /** 按 id 找修行路上的图（找不到视为炼气期锁定态，防御性兜底） */
 export function journeyOf(id: GraphId): JourneyGraph {
 	return GRAPH_JOURNEY.find((g) => g.id === id) ?? GRAPH_JOURNEY[0];
 }
 
+/**
+ * 找一张图的元数据，**修行路和修行录一起找**。
+ * 修行录不在 GRAPH_JOURNEY 里（为了不稀释总修为），但读写存档、
+ * 查技能所属方向这些逻辑对两者一视同仁，所以走这一个入口。
+ */
+export function graphMetaOf(
+	id: GraphId,
+): (JourneyGraph | RecordGraph) | undefined {
+	return (
+		GRAPH_JOURNEY.find((g) => g.id === id) ??
+		GRAPH_RECORD.find((g) => g.id === id)
+	);
+}
+
+/** 是不是修行录图（修行录没有门禁，也没有 realmIndex） */
+export function isRecordGraph(id: GraphId): boolean {
+	return GRAPH_RECORD.some((g) => g.id === id);
+}
+
 /** SkillTree 的等级上限规则：有清单按条数，没清单退回 5 */
-function capOf(g: JourneyGraph, id: string): number {
+function capOf(g: JourneyGraph | RecordGraph, id: string): number {
 	return g.checks[id]?.length ?? 5;
 }
 
@@ -226,7 +293,9 @@ export interface CultivationState {
 }
 
 /** 读取一张图的掌握度：skillId → 已勾条数（兼容 SkillTree 的三代存档格式） */
-function readGraphLevels(g: JourneyGraph): Record<string, number> {
+function readGraphLevels(
+	g: JourneyGraph | RecordGraph,
+): Record<string, number> {
 	const levels: Record<string, number> = {};
 	let stored: unknown = null;
 	if (typeof localStorage !== "undefined") {
@@ -310,6 +379,8 @@ export function snapshot(): CultivationState {
 	const unlocked = {} as Record<GraphId, boolean>;
 	for (const g of GRAPH_JOURNEY)
 		unlocked[g.id] = bypassed || realmIndex >= g.realmIndex;
+	// 修行录永远开放：它不在境界链上，也不参与修为统计
+	for (const g of GRAPH_RECORD) unlocked[g.id] = true;
 
 	return {
 		xp,
@@ -393,10 +464,9 @@ export interface SlayResult {
 	isSecret: boolean;
 }
 
-/** 某技能所属方向（从修行路引的技能表里查） */
+/** 某技能所属方向（修行路与修行录的技能表一起查） */
 function groupOf(graph: GraphId, skillId: string): string | undefined {
-	const g = GRAPH_JOURNEY.find((x) => x.id === graph);
-	return g?.skills.find((s) => s.id === skillId)?.group;
+	return graphMetaOf(graph)?.skills.find((s) => s.id === skillId)?.group;
 }
 
 /** 勾一条清单得多少修为（方向权重） */
@@ -453,6 +523,16 @@ const ACTION_BY_GROUP: Record<GraphId, Record<string, string>> = {
 		"ag-memory": "记",
 		"ag-eval": "鉴",
 		"ag-app": "筑",
+	},
+	// 音乐：听觉靠「听」，演奏靠「抚」，创作靠「谱」，演出靠「演」
+	mu: {
+		"mu-listen": "听",
+		"mu-theory": "参悟",
+		"mu-instrument": "抚",
+		"mu-vocal": "咏",
+		"mu-compose": "谱",
+		"mu-produce": "调",
+		"mu-stage": "演",
 	},
 };
 
@@ -602,7 +682,7 @@ function unlockStories(ids: string[]): string[] {
 
 /* ---------------- 方向 / 整图 是否学满 ---------------- */
 function isGroupComplete(graph: GraphId, group: string): boolean {
-	const g = GRAPH_JOURNEY.find((x) => x.id === graph);
+	const g = graphMetaOf(graph);
 	if (!g) return false;
 	const levels = readGraphLevels(g);
 	let done = 0;
@@ -616,7 +696,7 @@ function isGroupComplete(graph: GraphId, group: string): boolean {
 }
 
 function isGraphComplete(graph: GraphId): boolean {
-	const g = GRAPH_JOURNEY.find((x) => x.id === graph);
+	const g = graphMetaOf(graph);
 	if (!g) return false;
 	const levels = readGraphLevels(g);
 	for (const s of g.skills) {
@@ -697,8 +777,8 @@ export function recordSlay(input: SlayInput): SlayResult {
 
 	const stories: string[] = [];
 	if (logLen === 1) stories.push(FIRST_SLAY_STORY);
-	if (beforeGraphCount === 0 && GRAPH_FIRST_STORY[input.graph])
-		stories.push(GRAPH_FIRST_STORY[input.graph]);
+	const firstStory = GRAPH_FIRST_STORY[input.graph];
+	if (beforeGraphCount === 0 && firstStory) stories.push(firstStory);
 	if (group && groupJustDone) {
 		stories.push(`grp-${input.graph}-${group}`);
 		// 一气呵成：方向刚学满且首悟到此刻 ≤ 60 秒

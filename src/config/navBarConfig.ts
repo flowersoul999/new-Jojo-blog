@@ -33,7 +33,7 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		],
 	});
 
-	// 技能（四张技能图合并为一个入口，点开第一个是计算机基础）
+	// 技能（修行路四张技能图 + 修行录，全部合并为一个入口，点开第一个是计算机基础）
 	links.push({
 		name: "技能",
 		url: "#",
@@ -50,6 +50,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 
 			// Agent 开发技能图（大模型应用：提示 / RAG / 工具编排 / 评测 / 上线）
 			LinkPresets.AgentSkills,
+
+			// 修行录：与修行路无先后关系，不计修为、无门禁
+			LinkPresets.MusicRecord,
 		],
 	});
 
@@ -194,6 +197,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		name: "Agent 开发",
 		url: "/agent/",
 		icon: "material-symbols:smart-toy",
+	},
+	MusicRecord: {
+		name: "音乐（修行录）",
+		url: "/music/",
+		icon: "material-symbols:music-note",
 	},
 	Interview: {
 		name: "面试",
