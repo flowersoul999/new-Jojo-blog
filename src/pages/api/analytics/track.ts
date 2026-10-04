@@ -6,6 +6,7 @@ import {
 	readSettings,
 	type StoredEvent,
 } from "@/utils/analytics-store";
+import { getClientIp } from "@/utils/client-ip";
 import { isLocalDev } from "@/utils/editor-auth";
 import { resolveGeo } from "@/utils/geoip";
 
@@ -95,14 +96,6 @@ function originAllowed(request: Request): boolean {
 // ============================================================================
 // 服务端信息附加
 // ============================================================================
-
-function getClientIp(request: Request): string {
-	const cf = request.headers.get("cf-connecting-ip");
-	if (cf) return cf;
-	const forwarded = request.headers.get("x-forwarded-for");
-	if (forwarded) return forwarded.split(",")[0].trim() || "unknown";
-	return request.headers.get("x-real-ip") || "unknown";
-}
 
 /** 解析 UA，产出设备/系统/浏览器三字段（弃原始 UA 以减小文件体积） */
 function parseUa(ua: string): { dev: string; os: string; br: string } {
