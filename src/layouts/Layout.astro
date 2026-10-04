@@ -15,6 +15,7 @@ import WalineManager from "@components/features/WalineManager.astro";
 import WelcomeToast from "@components/features/WelcomeToast.astro";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
 import BreakthroughRite from "@components/skills/BreakthroughRite.svelte";
+import SagaLibrary from "@components/skills/SagaLibrary.svelte";
 import StoryInbox from "@components/skills/StoryInbox.svelte";
 
 import {
@@ -678,9 +679,10 @@ const canonicalUrl = new URL(
     <!-- Tab 径向轮盘：按住 Tab 呼出快速导航 -->
     <TabRadialMenu client:load />
 
-    <!-- 修仙沉浸层：突破大典 + 飞剑传书收件箱（全站监听勾选事件） -->
+    <!-- 修仙沉浸层：突破大典 + 飞剑传书收件箱 + 话本楼（全站监听勾选事件） -->
     <BreakthroughRite client:load />
     <StoryInbox client:load />
+    <SagaLibrary client:load />
 
     <!-- Swup 内存缓存自动清理：部署更新后无需手动强制刷新。
          每次导航/预取都会把页面 HTML 缓存进内存，旧版内容会一直残留到重开页面。

@@ -30,6 +30,8 @@ export interface SagaChapter {
 	volume: string;
 	title: string;
 	paragraphs: string[];
+	/** 正文字数（去空白），书架里显示「约 x 字」用，构建时算一次 */
+	chars: number;
 }
 
 /** 一卷 = 一组连续的回目 */
@@ -50,6 +52,7 @@ for (const v of VOLUMES) {
 			volume: v.name,
 			title: c.title,
 			paragraphs: c.paragraphs,
+			chars: c.paragraphs.reduce((n, p) => n + p.replace(/\s/g, "").length, 0),
 		});
 	});
 }
@@ -106,6 +109,24 @@ export function getSagaStory(id: string): Story | null {
 /** 目前一共写了多少回 */
 export function sagaChapterCount(): number {
 	return CHAPTERS.length;
+}
+
+/** 全部回目（含尚未启封的），书架按这个顺序铺目录 */
+export function allSagaChapters(): readonly SagaChapter[] {
+	return CHAPTERS;
+}
+
+/** 全书正文总字数 */
+export function sagaTotalChars(): number {
+	return CHAPTERS.reduce((n, c) => n + c.chars, 0);
+}
+
+/**
+ * 已挣得的额度 = 彻底点亮过的技能数（封顶全书回数）。
+ * 书架用它算「再点亮几个技能能开下一回」。
+ */
+export function sagaEarnedQuota(): number {
+	return Math.min(readMaxed().size, CHAPTERS.length);
 }
 
 /**
