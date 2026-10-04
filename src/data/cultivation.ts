@@ -625,6 +625,16 @@ function isGraphComplete(graph: GraphId): boolean {
 	return true;
 }
 
+/** 当前已解锁的所有剧情 id（话本引擎用它判断某一回发过没有） */
+export function unlockedStoryIds(): Set<string> {
+	return readUnlockedStories();
+}
+
+/** 解锁一批剧情，返回其中「本次新解锁」的 id 并广播 STORY_EVENT（话本引擎走的就是这条路） */
+export function unlockStoryIds(ids: string[]): string[] {
+	return unlockStories(ids);
+}
+
 /**
  * 修行主入口：SkillTree 在「勾上一条清单」后调用。
  * 负责给修为、写日志、连悟计数、判断跨境界与各类隐藏彩蛋触发。

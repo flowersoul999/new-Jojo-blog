@@ -29,6 +29,7 @@ import {
 	unlockEgg,
 } from "@/data/cultivation";
 import { DWELL_STORY } from "@/data/cultivationStories";
+import { earnChapterForSkill, syncMaxedSkills } from "@/data/saga";
 import { SKILL_CHECKS as FE_CHECKS } from "@/data/skillChecks";
 import {
 	ATTR_MAP as FE_ATTR_MAP,
@@ -697,8 +698,13 @@ function blocked(s: Skill): boolean {
 }
 
 function writeDone(id: string, list: number[]) {
+	const cap = capOf(id);
+	const before = Math.min(cap, (done[id] ?? []).length);
 	done = { ...done, [id]: list };
 	persist();
+	// 「彻底点亮一个技能」= 勾满它自己的清单 → 挣得话本的下一回（幂等）
+	if (cap > 0 && list.length >= cap && before < cap)
+		earnChapterForSkill(currentGraph, id);
 }
 
 /** 勾上 / 取消某一项 —— 弹窗里逐项点的就是这个 */
@@ -824,6 +830,13 @@ onMount(() => {
 
 	readStored();
 	scheduleMeasure();
+
+	// 存量补课：进页面时已经满级的技能，把对应章节一次性记为「已挣得」
+	// （发放仍是一次一回，由 pumpSaga 保证顺序，不会灌屏）
+	const alreadyMaxed = SKILLS.filter(
+		(s) => (done[s.id] ?? []).length >= capOf(s.id) && capOf(s.id) > 0,
+	).map((s) => s.id);
+	if (alreadyMaxed.length) syncMaxedSkills(currentGraph, alreadyMaxed);
 
 	const ro = new ResizeObserver(() => measure());
 	const el = canvasEl;

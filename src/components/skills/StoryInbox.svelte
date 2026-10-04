@@ -10,8 +10,9 @@ import { STORY_EVENT, unlockEgg } from "@/data/cultivation";
 import {
 	ENVELOPE_SPAM_STORY,
 	getStory,
-	STORIES,
+	type Story,
 } from "@/data/cultivationStories";
+import { getSagaChapter, getSagaStory, isSagaId, pumpSaga } from "@/data/saga";
 import { playStory } from "@/lib/sfx";
 
 const UNLOCKED_KEY = "aemeath-stories-unlocked";
@@ -47,9 +48,29 @@ let readerId = $state<string | null>(null);
 let mailboxOpen = $state(false);
 let envelopeSpam = 0;
 
+/** 收件箱里有两种信：既有的彩蛋小笺，和按卷连载的话本 */
+function storyOf(id: string): Story | null {
+	return getStory(id) ?? getSagaStory(id);
+}
+
+/** 话本按章序正序在前（方便顺着读），小笺按最新在前 */
+const inboxList = $derived.by(() => {
+	const chapters: { id: string; no: number }[] = [];
+	const others: string[] = [];
+	for (const id of unlockedIds) {
+		const c = getSagaChapter(id);
+		if (c) chapters.push({ id, no: c.no });
+		else others.push(id);
+	}
+	chapters.sort((a, b) => a.no - b.no);
+	return [...chapters.map((x) => x.id), ...others.reverse()];
+});
+
 const unread = $derived(unlockedIds.filter((id) => !readIds.has(id)).length);
 
-const readerStory = $derived(readerId ? getStory(readerId) : null);
+const readerStory = $derived(readerId ? storyOf(readerId) : null);
+/** 话本章节的卷信息（小笺为 null） */
+const readerChapter = $derived(readerId ? getSagaChapter(readerId) : null);
 
 function openReader(id: string) {
 	readerId = id;
@@ -67,15 +88,19 @@ function markRead(id: string) {
 
 function closeReader() {
 	if (readerId) {
+		const wasSaga = isSagaId(readerId);
 		markRead(readerId);
 		readerId = null;
+		// 读完这一回，下一回（前提是已经挣得）自动到手——连载的节奏靠这里驱动
+		if (wasSaga) pumpSaga();
 	}
 }
 
 function stepReader(dir: 1 | -1) {
 	if (!readerId) return;
-	const idx = unlockedIds.indexOf(readerId);
-	const target = unlockedIds[idx + dir];
+	// 按信箱里的排的顺序走：话本按回目连着翻，读到边界就收起来
+	const idx = inboxList.indexOf(readerId);
+	const target = inboxList[idx + dir];
 	if (target) openReader(target);
 	else closeReader();
 }
@@ -86,7 +111,7 @@ $effect(() => {
 		const set = new Set(unlockedIds);
 		let changed = false;
 		for (const id of ids)
-			if (STORIES[id] && !set.has(id)) {
+			if (storyOf(id) && !set.has(id)) {
 				set.add(id);
 				changed = true;
 			}
@@ -144,8 +169,8 @@ $effect(() => {
 			>
 		</header>
 		<ul class="sib-mb-list">
-			{#each [...unlockedIds].reverse() as id (id)}
-				{@const s = getStory(id)}
+			{#each inboxList as id (id)}
+				{@const s = storyOf(id)}
 				{#if s}
 					<li class:is-unread={!readIds.has(id)}>
 						<button type="button" class="sib-mb-item" onclick={() => openReader(id)}>
@@ -172,7 +197,14 @@ $effect(() => {
 			<span class="sib-r-from">{readerStory.from}</span>
 			<button type="button" class="sib-r-close" onclick={closeReader}>封缄</button>
 		</header>
-		<h3 class="sib-r-title">{readerStory.title}</h3>
+		<h3 class="sib-r-title" class:is-saga={!!readerChapter}>{readerStory.title}</h3>
+		{#if readerChapter}
+			<p class="sib-r-badge">
+				{readerChapter.volume}
+				<span>·</span>
+				{readerChapter.no === 0 ? "楔子" : `第 ${readerChapter.no} 回`}
+			</p>
+		{/if}
 		<div class="sib-r-body">
 			{#each readerStory.paragraphs as p, i (i)}
 				<p>{p}</p>
@@ -366,6 +398,27 @@ $effect(() => {
 		padding: 0.6rem 1rem 0.4rem;
 		font-size: 1.02rem;
 		font-weight: 800;
+	}
+	.sib-r-title.is-saga {
+		padding-bottom: 0.15rem;
+		font-size: 1.12rem;
+	}
+	/* 话本章节：卷名 + 回目，一眼区分「连载」和「小笺」 */
+	.sib-r-badge {
+		margin: 0;
+		padding: 0 1rem 0.5rem;
+		font-size: 0.66rem;
+		letter-spacing: 0.12em;
+		color: #a08a52;
+		display: flex;
+		gap: 0.35rem;
+		align-items: center;
+	}
+	.sib-r-badge span {
+		opacity: 0.5;
+	}
+	:global(html.dark) .sib-r-badge {
+		color: #c8ab6a;
 	}
 	.sib-r-body {
 		padding: 0 1.1rem;
