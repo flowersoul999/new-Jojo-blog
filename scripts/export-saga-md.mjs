@@ -1,5 +1,5 @@
 /**
- * 把话本正文从 src/data/saga/vol*.ts 导出成一份 Markdown：docs/小说-穷巷有龙.md
+ * 把话本正文从 src/data/saga/vol*.ts 导出成一份 Markdown：docs/小说-佚名.md
  *
  * 为什么要脚本而不是手抄：站内正文（读者看到的）和仓库里的 md（能被检索、能被 diff）
  * 必须是同一份东西。自动导出保证它们永远同步。
@@ -10,7 +10,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const SAGA_DIR = "src/data/saga";
-const OUT = "docs/小说-穷巷有龙.md";
+const OUT = "docs/小说-佚名.md";
 const RE = /\{\s*title: "([^"]*)",\s*paragraphs: \[([\s\S]*?)\n\t{3}\],/g;
 
 const files = readdirSync(SAGA_DIR)
@@ -58,7 +58,7 @@ for (const f of files) {
 writeFileSync(
 	OUT,
 	[
-		"# 穷巷有龙",
+		"# 佚名",
 		"",
 		`> 连载中 · 已更 ${count} 回 · 约 ${totalChars} 字`,
 		"",

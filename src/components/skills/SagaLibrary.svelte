@@ -169,7 +169,7 @@ $effect(() => {
 <dialog class="slb-shelf" bind:this={shelfEl} onclose={closeShelf}>
 	<header class="slb-head">
 		<div class="slb-head-main">
-			<span class="slb-book">穷巷有龙</span>
+			<span class="slb-book">佚名</span>
 			<span class="slb-vol">{chapters[0]?.volume ?? ""}</span>
 		</div>
 		<button type="button" class="slb-close" onclick={closeShelf}>合上</button>

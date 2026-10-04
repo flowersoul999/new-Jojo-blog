@@ -87,7 +87,7 @@ function openInbox() {
 /** 「下一回已挣得、读完当前这封才到手」的提示文案 */
 const shelfHint = $derived.by(() => {
 	if (openedCount === 0)
-		return `穷巷有龙 · 共 ${chapters.length} 回 · 约 ${totalChars} 字`;
+		return `佚名 · 共 ${chapters.length} 回 · 约 ${totalChars} 字`;
 	const next = chapters[openedCount];
 	if (!next) return "全书已启封完";
 	return `已启封 ${openedCount} / ${chapters.length} 回 · 下一回${next.no === 0 ? "楔子" : `第 ${next.no} 回`}待启封`;
@@ -126,7 +126,7 @@ const inboxHint = $derived(
 		<span class="cd-body">
 			<span class="cd-name">
 				话本楼
-				<span class="cd-sub">穷巷有龙</span>
+				<span class="cd-sub">佚名</span>
 			</span>
 			<span class="cd-hint">{shelfHint}</span>
 		</span>
