@@ -107,6 +107,7 @@ const KEY_TO_GRAPH: Record<string, GraphId> = {
 	"aemeath-agent-tree": "ag",
 	"aemeath-music-tree": "mu",
 	"aemeath-english-tree": "en",
+	"aemeath-finance-tree": "fn",
 };
 /** 修行录图的图 id：只用来做存储键反查，不参与任何修为/境界计算 */
 const currentGraph: GraphId = KEY_TO_GRAPH[STORAGE_KEY] ?? "cs";

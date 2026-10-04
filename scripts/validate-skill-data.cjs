@@ -65,6 +65,7 @@ const GRAPHS = [
 	["Agent", "src/data/agentSkills.ts", "src/data/agentChecks.ts"],
 	["音乐", "src/data/musicSkills.ts", "src/data/musicChecks.ts"],
 	["英语", "src/data/englishSkills.ts", "src/data/englishChecks.ts"],
+	["理财", "src/data/financeSkills.ts", "src/data/financeChecks.ts"],
 ];
 
 let fail = 0;

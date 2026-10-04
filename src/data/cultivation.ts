@@ -40,6 +40,8 @@ import {
 } from "@/data/cultivationStories";
 import { EN_CHECKS } from "@/data/englishChecks";
 import { EN_PRESET, EN_SKILLS } from "@/data/englishSkills";
+import { FN_CHECKS } from "@/data/financeChecks";
+import { FN_PRESET, FN_SKILLS } from "@/data/financeSkills";
 import { MU_CHECKS } from "@/data/musicChecks";
 import { MU_PRESET, MU_SKILLS } from "@/data/musicSkills";
 import { SKILL_CHECKS } from "@/data/skillChecks";
@@ -49,11 +51,11 @@ import { SKILLS as FE_SKILLS, PRESET } from "@/data/skills";
  * 站内技能图的统一标识。
  *
  * - cs / fe / be / ag 是**修行路**：进 GRAPH_JOURNEY，算修为、挂境界门禁、发飞剑传书。
- * - mu / en 是**修行录**：进 GRAPH_RECORD 但没有任何门禁，且 SkillTree 传了
+ * - mu / en / fn 是**修行录**：进 GRAPH_RECORD 但没有任何门禁，且 SkillTree 传了
  *   noCultivation，所以既不加修为也不进九境界的统计、不发传书、不领话本签。
  *   它们的进度只看图内属性（音准 / 语音 / 词汇 …），不进境界链。
  */
-export type GraphId = "cs" | "fe" | "be" | "ag" | "mu" | "en";
+export type GraphId = "cs" | "fe" | "be" | "ag" | "mu" | "en" | "fn";
 
 /** 一个境界：minPct 是达到该境界所需的全局修为占比 */
 export interface Realm {
@@ -165,6 +167,17 @@ const XP_WEIGHTS: Record<GraphId, Record<string, number>> = {
 		"en-write": 3,
 		"en-academic": 2,
 	},
+	// 理财：同样只为结构一致而存在
+	fn: {
+		"fn-track": 5,
+		"fn-budget": 4,
+		"fn-buffer": 5,
+		"fn-consume": 3,
+		"fn-debt": 4,
+		"fn-protect": 4,
+		"fn-invest": 3,
+		"fn-plan": 2,
+	},
 };
 
 /** 一张图在修行路上的元数据 */
@@ -264,6 +277,16 @@ export const GRAPH_RECORD: RecordGraph[] = [
 		skills: EN_SKILLS,
 		checks: EN_CHECKS,
 		preset: EN_PRESET,
+	},
+	{
+		id: "fn",
+		name: "理财",
+		href: "/finance/",
+		gateLabel: "无门禁 · 随时可进",
+		storageKey: "aemeath-finance-tree",
+		skills: FN_SKILLS,
+		checks: FN_CHECKS,
+		preset: FN_PRESET,
 	},
 ];
 
@@ -567,6 +590,17 @@ const ACTION_BY_GROUP: Record<GraphId, Record<string, string>> = {
 		"en-read": "读",
 		"en-write": "写",
 		"en-academic": "论",
+	},
+	// 理财：账靠「明」，守靠「持」，钱靠「殖」，长远靠「筹」
+	fn: {
+		"fn-track": "明",
+		"fn-budget": "节",
+		"fn-buffer": "持",
+		"fn-consume": "省",
+		"fn-debt": "偿",
+		"fn-protect": "护",
+		"fn-invest": "殖",
+		"fn-plan": "筹",
 	},
 };
 
