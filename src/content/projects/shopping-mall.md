@@ -26,7 +26,7 @@ metrics:
 links:
   - label: 源码
     href: https://github.com/flowersoul999/shopping-mall
-    icon: material-symbols:code-braces
+    icon: material-symbols:developer-mode
 repo: https://github.com/flowersoul999/shopping-mall
 license: ""
 featured: false

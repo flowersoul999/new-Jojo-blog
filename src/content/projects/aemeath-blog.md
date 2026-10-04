@@ -29,7 +29,7 @@ links:
     icon: material-symbols:language
   - label: 源码
     href: https://github.com/flowersoul999/new-Jojo-blog
-    icon: material-symbols:code-braces
+    icon: material-symbols:developer-mode
 repo: https://github.com/flowersoul999/new-Jojo-blog
 license: MIT
 featured: true

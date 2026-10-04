@@ -26,7 +26,7 @@ metrics:
 links:
   - label: 源码
     href: https://github.com/flowersoul999/AI-travel
-    icon: material-symbols:code-braces
+    icon: material-symbols:developer-mode
 repo: https://github.com/flowersoul999/AI-travel
 license: ISC
 featured: false

@@ -24,7 +24,7 @@ metrics:
 links:
   - label: 源码
     href: https://github.com/flowersoul999/super-resume
-    icon: material-symbols:code-braces
+    icon: material-symbols:developer-mode
 repo: https://github.com/flowersoul999/super-resume
 license: ""
 featured: true

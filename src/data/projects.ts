@@ -65,7 +65,7 @@ export const projectLinks: ProjectLink[] = [
 	{
 		label: "GitHub 主页",
 		href: "https://github.com/flowersoul999",
-		icon: "material-symbols:code-braces",
+		icon: "material-symbols:developer-mode",
 		external: true,
 	},
 	{

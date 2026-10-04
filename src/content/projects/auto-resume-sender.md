@@ -22,7 +22,7 @@ metrics:
 links:
   - label: 源码
     href: https://github.com/flowersoul999/auto-resume-sender
-    icon: material-symbols:code-braces
+    icon: material-symbols:developer-mode
 repo: https://github.com/flowersoul999/auto-resume-sender
 license: ""
 featured: false

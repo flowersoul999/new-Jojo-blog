@@ -27,7 +27,7 @@ metrics:
 links:
   - label: 源码
     href: https://github.com/flowersoul999/mental-health-main
-    icon: material-symbols:code-braces
+    icon: material-symbols:developer-mode
 repo: https://github.com/flowersoul999/mental-health-main
 license: ""
 featured: false
