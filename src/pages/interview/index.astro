@@ -55,26 +55,52 @@ const editableFiles = [
 		label: "模块切换条配置",
 		hint: "四个模块的名称、图标、简介",
 	},
-	...experiences.map((e) => ({
-		path: e.filePath,
-		label: `${e.data.company} · ${e.data.stage}`,
-		hint: e.data.position,
-	})),
-	...questions.map((q) => ({
-		path: q.filePath,
-		label: `八股：${q.data.question}`,
-		hint: `${q.data.category} · ${q.data.level}`,
-	})),
-	...problems.map((p) => ({
-		path: p.filePath,
-		label: `No.${p.data.no} ${p.data.title}`,
-		hint: `${p.data.difficulty} · ${p.data.category}`,
-	})),
-	...handcrafts.map((h) => ({
-		path: h.filePath,
-		label: h.data.title,
-		hint: `${h.data.kind} · ${h.data.difficulty}`,
-	})),
+	// filePath 在类型上是 string | undefined（内容集合条目未必有源文件），
+	// 这里滤掉没有 filePath 的条目，免得把 undefined 塞进 PageEditor 的清单
+	...experiences.flatMap((e) =>
+		e.filePath
+			? [
+					{
+						path: e.filePath,
+						label: `${e.data.company} · ${e.data.stage}`,
+						hint: e.data.position,
+					},
+				]
+			: [],
+	),
+	...questions.flatMap((q) =>
+		q.filePath
+			? [
+					{
+						path: q.filePath,
+						label: `八股：${q.data.question}`,
+						hint: `${q.data.category} · ${q.data.level}`,
+					},
+				]
+			: [],
+	),
+	...problems.flatMap((p) =>
+		p.filePath
+			? [
+					{
+						path: p.filePath,
+						label: `No.${p.data.no} ${p.data.title}`,
+						hint: `${p.data.difficulty} · ${p.data.category}`,
+					},
+				]
+			: [],
+	),
+	...handcrafts.flatMap((h) =>
+		h.filePath
+			? [
+					{
+						path: h.filePath,
+						label: h.data.title,
+						hint: `${h.data.kind} · ${h.data.difficulty}`,
+					},
+				]
+			: [],
+	),
 ];
 ---
 
