@@ -43,20 +43,6 @@ type MemoriesData = {
 
 type MemoriesCollection = CollectionConfig<z.ZodType<MemoriesData>>;
 
-/** 实习经历阶段：一张卡片 = 一段成长弧（做了什么 / 学到了什么 / 用到的技术） */
-type InternshipData = {
-	order: number;
-	period: string;
-	title: string;
-	summary: string;
-	did: string[];
-	learned: string[];
-	stack: string[];
-	draft: boolean;
-};
-
-type InternshipCollection = CollectionConfig<z.ZodType<InternshipData>>;
-
 /** 面经：一次面试 = 一篇记录（公司 / 轮次 / 结果 / 被问到的题） */
 type InterviewData = {
 	company: string;
@@ -195,22 +181,6 @@ const memoriesCollection: MemoriesCollection = defineCollection({
 	}),
 });
 
-const internshipCollection: InternshipCollection = defineCollection({
-	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/internship" }),
-	schema: z.object({
-		// 展示顺序，数字越小越靠前（一般按时间正序，从最早的阶段开始）
-		order: z.number().optional().default(0),
-		// 卡片上的时间段胶囊，例如 "2026.06 – 2026.07"
-		period: z.string(),
-		title: z.string(),
-		summary: z.string().optional().default(""),
-		did: z.array(z.string()).optional().default([]),
-		learned: z.array(z.string()).optional().default([]),
-		stack: z.array(z.string()).optional().default([]),
-		draft: z.boolean().optional().default(false),
-	}),
-});
-
 const interviewCollection: InterviewCollection = defineCollection({
 	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/interviews" }),
 	schema: z.object({
@@ -328,7 +298,6 @@ export const collections: {
 	posts: typeof postsCollection;
 	spec: typeof specCollection;
 	memories: typeof memoriesCollection;
-	internship: typeof internshipCollection;
 	interviews: typeof interviewCollection;
 	questions: typeof questionCollection;
 	hot100: typeof hot100Collection;
@@ -338,7 +307,6 @@ export const collections: {
 	posts: postsCollection,
 	spec: specCollection,
 	memories: memoriesCollection,
-	internship: internshipCollection,
 	interviews: interviewCollection,
 	questions: questionCollection,
 	hot100: hot100Collection,

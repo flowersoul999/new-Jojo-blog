@@ -1,7 +1,6 @@
 ---
 // 面试板块首页：只做入口和概览，不放具体内容
 import { getCollection } from "astro:content";
-import PageEditor from "@/components/edit/PageEditor.svelte";
 import InterviewShell from "@/components/interview/InterviewShell.astro";
 import ModuleGrid from "@/components/interview/ModuleGrid.astro";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
@@ -38,70 +37,6 @@ const stats = [
 const title = "面试";
 const description =
 	"面完不写下来就等于白面了一场。这里存着每一次的真题、按领域归档的八股、力扣 Hot100 的刷题进度，以及白板上手写过的那些题。";
-
-/**
- * 登录后「编辑此页」按钮的清单。
- * md 路径直接取集合条目的 filePath（真实路径，不用手写拼），
- * 只有源码文件需要手工列，因为它们不在内容集合里。
- */
-const editableFiles = [
-	{
-		path: "src/pages/interview/index.astro",
-		label: "页面文案与统计",
-		hint: "首页的描述、统计条和「怎么用这个板块」那段",
-	},
-	{
-		path: "src/data/interview.ts",
-		label: "模块切换条配置",
-		hint: "四个模块的名称、图标、简介",
-	},
-	// filePath 在类型上是 string | undefined（内容集合条目未必有源文件），
-	// 这里滤掉没有 filePath 的条目，免得把 undefined 塞进 PageEditor 的清单
-	...experiences.flatMap((e) =>
-		e.filePath
-			? [
-					{
-						path: e.filePath,
-						label: `${e.data.company} · ${e.data.stage}`,
-						hint: e.data.position,
-					},
-				]
-			: [],
-	),
-	...questions.flatMap((q) =>
-		q.filePath
-			? [
-					{
-						path: q.filePath,
-						label: `八股：${q.data.question}`,
-						hint: `${q.data.category} · ${q.data.level}`,
-					},
-				]
-			: [],
-	),
-	...problems.flatMap((p) =>
-		p.filePath
-			? [
-					{
-						path: p.filePath,
-						label: `No.${p.data.no} ${p.data.title}`,
-						hint: `${p.data.difficulty} · ${p.data.category}`,
-					},
-				]
-			: [],
-	),
-	...handcrafts.flatMap((h) =>
-		h.filePath
-			? [
-					{
-						path: h.filePath,
-						label: h.data.title,
-						hint: `${h.data.kind} · ${h.data.difficulty}`,
-					},
-				]
-			: [],
-	),
-];
 ---
 
 <MainGridLayout title={title} description={description} hideSidebars>
@@ -111,12 +46,6 @@ const editableFiles = [
 		desc="面完不写下来，就等于白面了一场。这里存着每一次的真题目、按领域归档的八股、Hot100 的刷题进度，还有白板上手写过的那些题。"
 		stats={stats}
 	>
-		<PageEditor
-			slot="actions"
-			title="编辑面试页"
-			files={editableFiles}
-			client:load
-		/>
 		<ModuleGrid counts={counts} />
 
 		{

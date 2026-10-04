@@ -1,22 +1,25 @@
 ---
 // Golden Experience · 阶段时间线：一张卡 = 一段成长弧
-// 数据来自 src/content/internship/*.md，正文收在 <details> 里按需展开
-import { type CollectionEntry, render } from "astro:content";
+// 数据来自 src/data/internship.data.json 的 phases 数组，正文是 Markdown，
+// 用项目内的 rehype 管线渲染（与文章正文同一套）。
 import { Icon } from "astro-icon/components";
+import type { InternshipPhase } from "@/data/internship";
+import { renderMarkdown } from "@/utils/markdown";
 
 interface Props {
-	items: CollectionEntry<"internship">[];
+	items: InternshipPhase[];
 }
 
 const { items } = Astro.props;
 
 const phases = await Promise.all(
-	items.map(async (entry) => ({
-		entry,
-		// glob loader 会把 Markdown 正文挂在 entry.body 上；没有正文就不渲染展开区
-		hasBody: ((entry as { body?: string }).body ?? "").trim().length > 0,
-		Content: (await render(entry)).Content,
-	})),
+	items
+		.slice()
+		.sort((a, b) => a.order - b.order)
+		.map(async (item) => ({
+			item,
+			html: await renderMarkdown(item.body ?? ""),
+		})),
 );
 ---
 
@@ -35,7 +38,7 @@ const phases = await Promise.all(
 
 	<div class="gi-timeline">
 		{
-			phases.map(({ entry, hasBody, Content }, index) => (
+			phases.map(({ item, html }, index) => (
 				<article class="gi-phase" data-gi-reveal>
 					<div class="gi-phase__node" aria-hidden="true">
 						{index + 1}
@@ -43,35 +46,35 @@ const phases = await Promise.all(
 
 					<div class="gi-phase__card">
 						<div class="gi-phase__top">
-							<span class="gi-period">{entry.data.period}</span>
-							<h3 class="gi-phase__title">{entry.data.title}</h3>
+							<span class="gi-period">{item.period}</span>
+							<h3 class="gi-phase__title">{item.title}</h3>
 						</div>
 
-						{entry.data.summary && <p class="gi-phase__summary">{entry.data.summary}</p>}
+						{item.summary && <p class="gi-phase__summary">{item.summary}</p>}
 
 						<div class="gi-phase__grid">
-							{entry.data.did.length > 0 && (
+							{item.did.length > 0 && (
 								<div class="gi-block">
 									<h4 class="gi-block__title">
 										<Icon is:inline name="material-symbols:build-outline" class="text-base" />
 										做了什么
 									</h4>
 									<ul class="gi-list">
-										{entry.data.did.map((row) => (
+										{item.did.map((row) => (
 											<li>{row}</li>
 										))}
 									</ul>
 								</div>
 							)}
 
-							{entry.data.learned.length > 0 && (
+							{item.learned.length > 0 && (
 								<div class="gi-block">
 									<h4 class="gi-block__title">
 										<Icon is:inline name="material-symbols:lightbulb-rounded" class="text-base" />
 										学到了什么
 									</h4>
 									<ul class="gi-list gi-list--learned">
-										{entry.data.learned.map((row) => (
+										{item.learned.map((row) => (
 											<li>{row}</li>
 										))}
 									</ul>
@@ -79,15 +82,15 @@ const phases = await Promise.all(
 							)}
 						</div>
 
-						{entry.data.stack.length > 0 && (
+						{item.stack.length > 0 && (
 							<ul class="gi-tags">
-								{entry.data.stack.map((tag) => (
+								{item.stack.map((tag) => (
 									<li class="gi-tag">{tag}</li>
 								))}
 							</ul>
 						)}
 
-						{hasBody && (
+						{html && (
 							<details class="gi-more">
 								<summary class="gi-more__toggle">
 									<span>展开完整记录</span>
@@ -97,9 +100,7 @@ const phases = await Promise.all(
 										class="text-[1.15rem] gi-more__chevron"
 									/>
 								</summary>
-								<div class="gi-more__body custom-md">
-									<Content />
-								</div>
+								<div class="gi-more__body custom-md" set:html={html} />
 							</details>
 						)}
 					</div>

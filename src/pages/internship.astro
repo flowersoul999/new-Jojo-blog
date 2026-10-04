@@ -2,12 +2,12 @@
 // Golden Experience · 实习经历页
 // ----------------------------------------------------------------------------
 // 页面只负责「怎么摆」，内容全在别处：
-//   阶段时间线 → src/content/internship/*.md
-//   其余板块   → src/data/internship.ts
-// 所以以后更新实习经历，不需要动这个文件。
-import { getCollection } from "astro:content";
+//   全部内容     → src/data/internship.data.json
+//   类型与读出   → src/data/internship.ts
+// 所以以后更新实习经历，不需要动这个文件；
+// 站内「编辑此页」也是直接改那份 JSON。
 import { Icon } from "astro-icon/components";
-import PageEditor from "@/components/edit/PageEditor.svelte";
+import InternshipEditor from "@/components/edit/InternshipEditor.svelte";
 import InternshipHero from "@/components/internship/InternshipHero.astro";
 import InternshipHighlights from "@/components/internship/InternshipHighlights.astro";
 import InternshipRetrospective from "@/components/internship/InternshipRetrospective.astro";
@@ -16,6 +16,8 @@ import InternshipTakeaways from "@/components/internship/InternshipTakeaways.ast
 import InternshipTimeline from "@/components/internship/InternshipTimeline.astro";
 import { siteConfig } from "@/config";
 import {
+	INTERNSHIP_DATA_PATH,
+	internshipData,
 	internshipHighlights,
 	internshipMeta,
 	internshipProfile,
@@ -30,9 +32,7 @@ if (!siteConfig.pages.internship) {
 	return Astro.redirect("/404/");
 }
 
-const phases = (await getCollection("internship"))
-	.filter((entry) => !entry.data.draft)
-	.sort((a, b) => a.data.order - b.data.order);
+const phases = [...internshipData.phases].sort((a, b) => a.order - b.order);
 
 /** 吸顶锚点导航的条目，id 要和各组件里的 section id 对上 */
 const anchors = [
@@ -53,28 +53,6 @@ const anchors = [
 		icon: "material-symbols:local-fire-department-rounded",
 	},
 	{ id: "retro", label: "复盘", icon: "material-symbols:signpost" },
-];
-
-/**
- * 登录后「编辑此页」按钮的清单。
- * 页面里 md 走 getCollection 动态读，编辑按钮这边按仓库路径列出来，两边要手工保持一致。
- */
-const editableFiles = [
-	{
-		path: "src/data/internship.ts",
-		label: "页面数据（页头 / 指标 / 技能 / 收获 / 高光 / 复盘）",
-		hint: "实习经历的固定几块都在这个文件里",
-	},
-	...phases.map((phase) => ({
-		path: `src/content/internship/${phase.id}.md`,
-		label: `阶段：${phase.data.title}`,
-		hint: "时间线上的一个阶段",
-	})),
-	{
-		path: "src/pages/internship.astro",
-		label: "页面骨架",
-		hint: "一般不用改，改动会影响整页布局",
-	},
 ];
 ---
 
@@ -97,10 +75,9 @@ const editableFiles = [
 				title={internshipProfile.title}
 				tagline={internshipProfile.tagline}
 			>
-				<PageEditor
+				<InternshipEditor
 					slot="actions"
-					title="编辑实习经历页"
-					files={editableFiles}
+					initial={internshipData}
 					client:load
 				/>
 			</InternshipHero>
