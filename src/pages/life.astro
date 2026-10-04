@@ -467,10 +467,22 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 			// 私密日记密码（与画布页/详情页一致）
 			var DIARY_PASSWORD = "2299";
 			var UNLOCK_KEY = "aemeath-diary-unlocked";
-			var unlocked = false;
+var unlocked = false;
 			try {
 				unlocked = sessionStorage.getItem(UNLOCK_KEY) === "1";
 			} catch (e) {}
+
+			// 私密日记解锁：走全站共用的居中弹窗（Layout 里的 DiaryUnlockDialog）
+			function askDiaryPassword() {
+				if (typeof window.__diaryUnlock !== "function") {
+					return Promise.resolve(window.prompt("这是一篇私密日记，请输入密码：") === DIARY_PASSWORD);
+				}
+				return window.__diaryUnlock({
+					verify: function (pwd) {
+						return pwd === DIARY_PASSWORD;
+					},
+				});
+			}
 
 			// 走站内平滑跳转（与画布页一致）
 			function gotoDiary(slug) {
@@ -513,16 +525,14 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 						return;
 					}
 					e.preventDefault();
-					var pwd = prompt("这是一篇私密日记，请输入密码：");
-					if (pwd === DIARY_PASSWORD) {
+					askDiaryPassword().then(function (ok) {
+						if (!ok) return;
 						try {
 							sessionStorage.setItem(UNLOCK_KEY, "1");
 						} catch (err) {}
 						unlocked = true;
 						gotoDiary(el.dataset.slug);
-					} else if (pwd !== null) {
-						alert("密码错误");
-					}
+					});
 				});
 			});
 		})();

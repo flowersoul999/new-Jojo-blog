@@ -373,6 +373,18 @@ const pageTitle = entry.title || "日记";
 			unlocked = sessionStorage.getItem(UNLOCK_KEY) === "1";
 		} catch (e) {}
 
+		/* 私密日记解锁：走全站共用的居中弹窗（Layout 里的 DiaryUnlockDialog） */
+		function askDiaryPassword() {
+			if (typeof window.__diaryUnlock !== "function") {
+				return Promise.resolve(window.prompt("这是一篇私密日记，请输入密码：") === DIARY_PASSWORD);
+			}
+			return window.__diaryUnlock({
+				verify: function (pwd) {
+					return pwd === DIARY_PASSWORD;
+				},
+			});
+		}
+
 		function formatDate(dateStr) {
 			var d = new Date(dateStr);
 			if (isNaN(d.getTime())) return dateStr;
@@ -469,15 +481,13 @@ const pageTitle = entry.title || "日记";
 			loadAndRender();
 		} else if (btn) {
 			btn.addEventListener("click", function () {
-				var pwd = prompt("这是一篇私密日记，请输入密码：");
-				if (pwd === DIARY_PASSWORD) {
+				askDiaryPassword().then(function (ok) {
+					if (!ok) return;
 					try {
 						sessionStorage.setItem(UNLOCK_KEY, "1");
 					} catch (e) {}
 					loadAndRender();
-				} else if (pwd !== null) {
-					alert("密码错误");
-				}
+				});
 			});
 		}
 	})();

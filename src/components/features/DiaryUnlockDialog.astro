@@ -1,0 +1,389 @@
+---
+// 私密日记解锁弹窗：替代浏览器原生 prompt()，从屏幕正中心弹出。
+// 全站只挂一个实例（Layout.astro），页面里调用：
+//   const ok = await window.__diaryUnlock({ verify: (pwd) => pwd === PWD });
+// verify 通过 → resolve(true)；取消 / Esc / 点遮罩 → resolve(false)。
+import { Icon } from "astro-icon/components";
+---
+
+<dialog id="diary-unlock-dialog" class="diary-unlock" aria-labelledby="diary-unlock-title">
+	<div class="diary-unlock-card">
+		<div class="diary-unlock-badge">
+			<Icon is:inline name="material-symbols:lock" class="text-[1.55rem]" />
+		</div>
+		<h3 id="diary-unlock-title" class="diary-unlock-title">解锁私密日记</h3>
+		<p class="diary-unlock-desc">这篇日记上了锁，输对密码才能看到内容</p>
+
+		<form class="diary-unlock-form" novalidate>
+			<div class="diary-unlock-field">
+				<Icon is:inline name="material-symbols:key" class="diary-unlock-field-icon" />
+				<input
+					id="diary-unlock-input"
+					type="password"
+					placeholder="请输入密码"
+					autocomplete="off"
+					spellcheck="false"
+					aria-label="密码"
+				/>
+				<button
+					type="button"
+					id="diary-unlock-toggle"
+					class="diary-unlock-eye"
+					aria-label="显示密码"
+					aria-pressed="false"
+				>
+					<Icon is:inline name="material-symbols:visibility" class="text-[1.1rem]" />
+				</button>
+			</div>
+			<p id="diary-unlock-error" class="diary-unlock-error" role="alert" hidden></p>
+
+<div class="diary-unlock-actions">
+					<button type="button" id="diary-unlock-cancel" class="diary-unlock-btn">取消</button>
+					<button type="submit" class="diary-unlock-btn is-primary">解锁</button>
+				</div>
+		</form>
+	</div>
+</dialog>
+
+<style is:global>
+	/* 居中：全站 reset 会把 UA 的 dialog inset/margin 归零，这里显式写回来。
+	   top layer 里 fixed 的包含块就是视口，不受祖先 transform 影响。 */
+	.diary-unlock {
+		position: fixed;
+		inset: 0;
+		margin: auto;
+		width: min(24rem, calc(100vw - 2rem));
+		max-width: none;
+		height: fit-content;
+		max-height: calc(100vh - 2rem);
+		padding: 0;
+		border: none;
+		background: transparent;
+		color: var(--text-color);
+		overflow: visible;
+	}
+	.diary-unlock::backdrop {
+		background: rgb(0 0 0 / 0.42);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
+		animation: diary-unlock-fade 0.22s ease;
+	}
+	.diary-unlock[open] .diary-unlock-card {
+		animation: diary-unlock-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+	.diary-unlock-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 1.6rem 1.5rem 1.25rem;
+		border-radius: 1.25rem;
+		border: 1px solid var(--line-divider);
+		background: var(--card-bg);
+		box-shadow:
+			0 30px 70px rgb(0 0 0 / 0.32),
+			0 6px 20px rgb(0 0 0 / 0.14);
+	}
+	.diary-unlock-badge {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 3rem;
+		height: 3rem;
+		margin-bottom: 0.45rem;
+		border-radius: 999px;
+		color: var(--primary);
+		background: color-mix(in srgb, var(--primary) 14%, transparent);
+	}
+	.diary-unlock-title {
+		margin: 0;
+		font-size: 1.05rem;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		color: var(--text-color);
+	}
+	.diary-unlock-desc {
+		margin: 0 0 0.9rem;
+		font-size: 0.8125rem;
+		line-height: 1.6;
+		text-align: center;
+		color: color-mix(in srgb, var(--text-color) 58%, transparent);
+	}
+	.diary-unlock-form {
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+	}
+	.diary-unlock-field {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0 0.7rem;
+		border-radius: 0.7rem;
+		border: 1px solid var(--line-divider);
+		background: color-mix(in srgb, var(--text-color) 4%, transparent);
+		transition:
+			border-color 200ms ease,
+			box-shadow 200ms ease;
+	}
+	.diary-unlock-field:focus-within {
+		border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+	}
+	.diary-unlock-field-icon {
+		flex: none;
+		font-size: 1.05rem;
+		color: color-mix(in srgb, var(--text-color) 42%, transparent);
+	}
+	.diary-unlock-field input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.6rem 0;
+		border: none;
+		background: none;
+		outline: none;
+		font-size: 0.9rem;
+		letter-spacing: 0.06em;
+		color: var(--text-color);
+	}
+	.diary-unlock-field input::placeholder {
+		letter-spacing: normal;
+		color: color-mix(in srgb, var(--text-color) 38%, transparent);
+	}
+	.diary-unlock-eye {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.15rem;
+		border: none;
+		border-radius: 0.4rem;
+		cursor: pointer;
+		background: none;
+		color: color-mix(in srgb, var(--text-color) 45%, transparent);
+		transition:
+			color 180ms ease,
+			background 180ms ease;
+	}
+	.diary-unlock-eye:hover {
+		color: var(--primary);
+		background: color-mix(in srgb, var(--primary) 12%, transparent);
+	}
+	.diary-unlock-error {
+		margin: 0;
+		font-size: 0.78rem;
+		text-align: center;
+		color: oklch(0.62 0.19 25);
+	}
+	:root.dark .diary-unlock-error {
+		color: oklch(0.72 0.16 25);
+	}
+	.diary-unlock-actions {
+		display: flex;
+		gap: 0.55rem;
+		margin-top: 0.15rem;
+	}
+	.diary-unlock-btn {
+		flex: 1;
+		padding: 0.55rem 0.9rem;
+		border: none;
+		border-radius: 0.7rem;
+		cursor: pointer;
+		font-size: 0.875rem;
+		font-weight: 600;
+		background: var(--btn-regular-bg);
+		color: var(--btn-content);
+		transition:
+			background 180ms ease,
+			opacity 180ms ease,
+			transform 120ms ease;
+	}
+	.diary-unlock-btn:hover {
+		background: var(--btn-regular-bg-hover);
+	}
+	.diary-unlock-btn:active {
+		transform: scale(0.98);
+	}
+	.diary-unlock-btn.is-primary {
+		background: var(--primary);
+		color: white;
+	}
+	:root.dark .diary-unlock-btn.is-primary {
+		color: oklch(0.18 0.02 var(--hue));
+	}
+	.diary-unlock-btn.is-primary:hover {
+		opacity: 0.9;
+		background: var(--primary);
+	}
+	/* 密码错误：卡片左右抖一下，比再弹一个系统alert 顺眼 */
+	.diary-unlock.is-wrong .diary-unlock-card {
+		animation: diary-unlock-shake 0.36s ease;
+	}
+	@keyframes diary-unlock-pop {
+		from {
+			opacity: 0;
+			transform: translateY(0.75rem) scale(0.96);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+	@keyframes diary-unlock-fade {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+	@keyframes diary-unlock-shake {
+		0%,
+		100% {
+			transform: translateX(0);
+		}
+		20% {
+			transform: translateX(-7px);
+		}
+		40% {
+			transform: translateX(6px);
+		}
+		60% {
+			transform: translateX(-4px);
+		}
+		80% {
+			transform: translateX(2px);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.diary-unlock[open] .diary-unlock-card,
+		.diary-unlock.is-wrong .diary-unlock-card,
+		.diary-unlock::backdrop {
+			animation: none;
+		}
+	}
+</style>
+
+<script is:inline>
+	(() => {
+		if (window.__diaryUnlock) return;
+
+		const dialog = document.getElementById("diary-unlock-dialog");
+		if (!dialog) return;
+
+		const input = document.getElementById("diary-unlock-input");
+		const errorEl = document.getElementById("diary-unlock-error");
+		const cancelBtn = document.getElementById("diary-unlock-cancel");
+		const toggleBtn = document.getElementById("diary-unlock-toggle");
+		const form = dialog.querySelector(".diary-unlock-form");
+		const titleEl = document.getElementById("diary-unlock-title");
+		const descEl = dialog.querySelector(".diary-unlock-desc");
+		const eyeOpen = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="1em" height="1em" fill="currentColor"><path d="M480-120q-150 0-258-72.5T108-440q0-65 44-125t116-93q16-8 32.5-14t33.5-7q-1-7-1-14.5v-29q0-16 12.5-28t28.5-12h29q16 0 28.5 12t12.5 28v29q0 7-1 14.5 17 3 33.5 7t32.5 14q72 33 116 93t44 125q0 76-66 137.5T630-168q-68 48-150 48Zm0-80q83 0 141.5-58.5T680-440q0-82-58.5-140.5T480-640q-83 0-141.5 58.5T280-440q0 82 58.5 140.5T480-200Zm0-80q-33 0-56.5-23.5T400-360q0-33 23.5-56.5T480-440q33 0 56.5 23.5T560-360q0 33-23.5 56.5T480-280Z"/></svg>`;
+		const eyeOff = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="1em" height="1em" fill="currentColor"><path d="m106-734 52 52q-45 27-79 63.5T40-520q0 65 44 125t116 93q-18 12-36.5 20.5T120-268q-72-33-116-93t-44-125q0-65 44-125t116-93Zm374 234q0 26-18.5 44.5T418 216q-26 0-44.5-18.5T355 153q0-26 18.5-44.5T418 90q26 0 44.5 18.5T480 153Zm168-34q39 45 62 97-47 129-137 191.5T380 480q-41 0-79.5-8.5T232 445l56 56 20-20-76-76-20 20-98-98 20-20 76 76 76-76-20-20 97-97q51 51 111 73.5T482 334q0 24-4 46l58 58q41-32 71-75t30-91q0-14-2-27.5t-5-26.5l55 55Zm-327-193 49-49q52 6 100 20.5T406 204l-54 54q-9-55-5-100.5T261-134ZM480-80q-150 0-258-72.5T108-440q0-15 2-28.5t6-27.5l57 57q5 13 12 25.5t15 23.5q18 30 47 55.5t62 41.5q48 24 104 34.5T480-260Zm0-80q-40 0-77-5t-68-15l63-63q42 9 82 9 66 0 121.5-23.5T700-486q0-46-29-86t-80-69l58-58q65 39 105 100t40 143q0 76-66 137.5T630-248q-68 48-150 48Z"/></svg>`;
+
+		let resolver = null;
+		let verify = () => true;
+
+		function hideError() {
+			errorEl.hidden = true;
+			errorEl.textContent = "";
+			dialog.classList.remove("is-wrong");
+		}
+
+		function showError(text) {
+			errorEl.textContent = text;
+			errorEl.hidden = false;
+			dialog.classList.remove("is-wrong");
+			// 强制重排，让连续输错时抖动动画能重新播放
+			void dialog.offsetWidth;
+			dialog.classList.add("is-wrong");
+			input.select();
+		}
+
+		function close() {
+			if (dialog.open) dialog.close();
+		}
+
+		function settle(result) {
+			const done = resolver;
+			resolver = null;
+			hideError();
+			input.value = "";
+			input.type = "password";
+			toggleBtn.setAttribute("aria-pressed", "false");
+			toggleBtn.setAttribute("aria-label", "显示密码");
+			toggleBtn.innerHTML = eyeOpen;
+			if (done) done(result);
+		}
+
+		form.addEventListener("submit", (e) => {
+			e.preventDefault();
+			const pwd = input.value;
+			let ok = true;
+			try {
+				ok = verify(pwd);
+			} catch (_) {
+				ok = true;
+			}
+			if (ok) {
+				settle(true);
+				close();
+			} else {
+				showError("密码不对，再试一次");
+			}
+		});
+
+		cancelBtn.addEventListener("click", () => {
+			settle(false);
+			close();
+		});
+
+		toggleBtn.addEventListener("click", () => {
+			const shown = input.type === "text";
+			input.type = shown ? "password" : "text";
+			toggleBtn.innerHTML = shown ? eyeOpen : eyeOff;
+			toggleBtn.setAttribute("aria-pressed", String(!shown));
+			toggleBtn.setAttribute("aria-label", shown ? "显示密码" : "隐藏密码");
+			input.focus();
+		});
+
+		// Esc / 点击遮罩关闭时也要把Promise 收掉，否则调用方永远挂着
+		dialog.addEventListener("cancel", (e) => {
+			e.preventDefault();
+			settle(false);
+			close();
+		});
+		dialog.addEventListener("click", (e) => {
+			if (e.target === dialog) {
+				settle(false);
+				close();
+			}
+		});
+
+		/**
+		 * 打开解锁弹窗。
+		 * @param {{ verify?: (pwd: string) => boolean, title?: string, desc?: string }} options
+		 * @returns {Promise<boolean>} 密码正确 resolve(true)，取消 resolve(false)
+		 */
+		window.__diaryUnlock = (options) => {
+			const opts = options || {};
+			if (opts.title) titleEl.textContent = opts.title;
+			if (opts.desc) descEl.textContent = opts.desc;
+			verify = typeof opts.verify === "function" ? opts.verify : () => true;
+
+			if (resolver) settle(false);
+			hideError();
+			input.value = "";
+			dialog.showModal();
+			// showModal 之后焦点才落在弹窗内，这里补一次并全选，方便直接覆盖输入
+			requestAnimationFrame(() => {
+				input.focus();
+				input.select();
+			});
+			return new Promise((resolve) => {
+				resolver = resolve;
+			});
+		};
+	})();
+</script>

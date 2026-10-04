@@ -5,6 +5,7 @@ import MicrosoftClarity from "@components/analytics/MicrosoftClarity.astro";
 import SelfAnalytics from "@components/analytics/SelfAnalytics.astro";
 import UmamiAnalytics from "@components/analytics/UmamiAnalytics.astro";
 import UmamiMetrics from "@components/analytics/UmamiMetrics.astro";
+import DiaryUnlockDialog from "@components/features/DiaryUnlockDialog.astro";
 import FancyboxManager from "@components/features/FancyboxManager.astro";
 import FontSetup from "@components/features/FontSetup.astro";
 import MusicFloat from "@components/features/MusicFloat.astro";
@@ -675,6 +676,9 @@ const canonicalUrl = new URL(
     <!-- Fancybox Manager -->
     <FancyboxManager />
     <WalineManager />
+
+    <!-- 私密日记解锁弹窗：替换原生 prompt()，挂在 swup 容器外所以切页不重复初始化 -->
+    <DiaryUnlockDialog />
 
     <!-- Tab 径向轮盘：按住 Tab 呼出快速导航 -->
     <TabRadialMenu client:load />

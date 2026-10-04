@@ -67,6 +67,15 @@ declare global {
 			/** 读取 bands 段归一化频谱（0~1）；未开启或失败时返回 null */
 			getSpectrum: (bands: number) => number[] | null;
 		};
+		/**
+		 * 私密日记解锁弹窗（见 components/features/DiaryUnlockDialog.astro）
+		 * verify 通过 → resolve(true)；取消 / Esc / 点遮罩 → resolve(false)
+		 */
+		__diaryUnlock?: (options?: {
+			verify?: (pwd: string) => boolean;
+			title?: string;
+			desc?: string;
+		}) => Promise<boolean>;
 	}
 
 	interface MediaQueryList {
