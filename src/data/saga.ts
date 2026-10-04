@@ -1,87 +1,69 @@
 /**
- * 话本引擎：把「彻底点亮一个技能」变成连载小说的一章。
+ * 话本引擎：把「彻底点亮一个技能」变成连载小说的一回。
  *
- * 与既有「飞剑传书彩蛋」的区别：
- *   - 彩蛋是零星的小纸条，解锁即出现；
- *   - 话本是连载：章节有固定顺序，**挣得**和**发放**分开。
+ * 关键设计：**正文不和技能一一对应。**
+ * 技能只是「领签」——点亮任意一个技能就多得一回可看的额度；
+ * 小说本身按自己的节奏写（四卷 × 六十回），加技能、换技能都不会打乱剧情。
  *
- * 两条保证连续性的规则：
- *   1. 挣得（earned）：点亮哪个技能，就挣得它对应的那一章；顺序随你。
- *   2. 发放（pump）：永远按章序发。第 N 回还没到，第 N+1 回绝不会弹出来，
- *      哪怕你已经点亮了很后面的技能——这样读到的永远是连着的下一段。
- *   3. 每次只发一回：存量补课时不会一次性灌几十回。
+ * 三条规则保证读到的永远是连着的下一回：
+ *   1. 已掌握的技能记在 aemeath-saga-maxed（同一个技能反复点亮不会重复领签）。
+ *   2. 可看额度 = 已掌握的技能总数。额度没到第 N 回，就绝不发放第 N 回。
+ *   3. 每次只发一回，且读完一封才发下一封（节奏由 StoryInbox 驱动），不会灌屏。
  *
- * 读完一封时由 StoryInbox 调 pumpSaga()，于是「读→下一回自动到手」形成节奏。
+ * 技能不够时，后面的回目暂时锁着——不报错、不重复弹，以后加技能自然追上。
  */
 import {
 	type GraphId,
+	pruneStoryIds,
 	unlockedStoryIds,
 	unlockStoryIds,
 } from "@/data/cultivation";
 import type { Story } from "@/data/cultivationStories";
-import { type SagaRaw, VOL1_CHAPTERS } from "@/data/saga/vol1";
+import { VOL1 } from "@/data/saga/vol1";
 
-/** 话本的一回（比 Story 多了卷、序号、归属技能） */
+/** 话本的一回 */
 export interface SagaChapter {
 	id: string;
-	graph: GraphId;
-	/** 对应的技能 id；null = 楔子，不绑定技能 */
-	skillId: string | null;
-	/** 卷内序号，0 = 楔子，1 = 第一回 */
+	/** 回目序号，0 = 序章 */
 	no: number;
-	/** 卷名，如「第一卷·演算天梯」 */
+	/** 卷名，如「卷一·穷巷」 */
 	volume: string;
 	title: string;
 	paragraphs: string[];
 }
 
-/** 一卷的配置：一张图 = 一卷 */
-interface Volume {
-	graph: GraphId;
+/** 一卷 = 一组连续的回目 */
+export interface SagaVolume {
 	name: string;
-	prefix: string;
-	raw: SagaRaw[];
+	chapters: { title: string; paragraphs: string[] }[];
 }
 
-const VOLUMES: Volume[] = [
-	{
-		graph: "cs",
-		name: "第一卷·演算天梯",
-		prefix: "saga-cs",
-		raw: VOL1_CHAPTERS,
-	},
-];
+const VOLUMES: SagaVolume[] = [VOL1];
 
-/** 全卷按「先卷后章」展开成一维数组，顺序即章序 */
+/** 全卷按「先卷后回」展开成一维数组，下标即回目顺序 */
 const CHAPTERS: SagaChapter[] = [];
 for (const v of VOLUMES) {
-	v.raw.forEach((r, i) => {
+	v.chapters.forEach((c) => {
 		CHAPTERS.push({
-			id: `${v.prefix}-${String(i).padStart(3, "0")}`,
-			graph: v.graph,
-			skillId: r.skillId,
-			no: i,
+			id: `saga-${String(CHAPTERS.length + 1).padStart(3, "0")}`,
+			no: CHAPTERS.length,
 			volume: v.name,
-			title: r.title,
-			paragraphs: r.paragraphs,
+			title: c.title,
+			paragraphs: c.paragraphs,
 		});
 	});
 }
 
 const BY_ID: Record<string, SagaChapter> = {};
-const BY_KEY: Record<string, SagaChapter> = {};
-for (const c of CHAPTERS) {
-	BY_ID[c.id] = c;
-	if (c.skillId) BY_KEY[`${c.graph}:${c.skillId}`] = c;
-}
+for (const c of CHAPTERS) BY_ID[c.id] = c;
 
-/** 已挣得的章节 id（持久）：挣得 ≠ 发放，发放还要看章序 */
-const EARNED_KEY = "aemeath-saga-earned";
+/** 已经彻底掌握过的技能（graph:skillId → 领过签的不再重复领） */
+const MAXED_KEY = "aemeath-saga-maxed";
 
-function readEarned(): Set<string> {
+function readMaxed(): Set<string> {
 	if (typeof localStorage === "undefined") return new Set();
 	try {
-		const raw = localStorage.getItem(EARNED_KEY);
+		const raw = localStorage.getItem(MAXED_KEY);
 		if (!raw) return new Set();
 		const v = JSON.parse(raw);
 		return new Set(Array.isArray(v) ? (v as string[]) : []);
@@ -90,101 +72,95 @@ function readEarned(): Set<string> {
 	}
 }
 
-function writeEarned(set: Set<string>): void {
+function writeMaxed(set: Set<string>): void {
 	if (typeof localStorage === "undefined") return;
 	try {
-		localStorage.setItem(EARNED_KEY, JSON.stringify([...set]));
+		localStorage.setItem(MAXED_KEY, JSON.stringify([...set]));
 	} catch {
 		/* 隐私模式忽略 */
 	}
 }
 
-/** id 是不是话本章节（飞剑传书收件箱用它区分两种信） */
+/** id 是不是话本回目（收件箱用它区分两种信） */
 export function isSagaId(id: string): boolean {
 	return id.startsWith("saga-");
 }
 
-/** 按 id 取章节（不是话本 id 返回 null） */
+/** 按 id 取回目（不是话本 id 返回 null） */
 export function getSagaChapter(id: string): SagaChapter | null {
 	return BY_ID[id] ?? null;
 }
 
-/** 把章节包装成「飞剑传书」能显示的一封信 */
+/** 把回目包装成「飞剑传书」能显示的一封信 */
 export function getSagaStory(id: string): Story | null {
 	const c = BY_ID[id];
 	if (!c) return null;
 	return {
 		id: c.id,
-		title: c.no === 0 ? `楔子 · ${c.title}` : `第 ${c.no} 回 · ${c.title}`,
+		title: c.no === 0 ? `序章 · ${c.title}` : `第 ${c.no} 回 · ${c.title}`,
 		from: c.volume,
 		paragraphs: c.paragraphs,
 	};
 }
 
-/** 全站共有几回（含楔子），给排错用 */
+/** 目前一共写了多少回 */
 export function sagaChapterCount(): number {
 	return CHAPTERS.length;
 }
 
 /**
- * 发放：找出「章序最靠前的一封已挣得、但还没发放」的章节发出去。
- * 前面还有没挣得的章节时直接停下——这是连续性的关键：不跳章、不剧透。
- * 每次只发一封。
+ * 改版迁移：旧版回目 id 是 saga-cs-000 这种（按技能图编号），新版统一成 saga-001。
+ * 旧 id 在新注册表里查不到，留着只会让红点数着几封打不开的信，这里一次性清掉。
+ */
+export function pruneLegacyChapters(): void {
+	if (typeof localStorage === "undefined") return;
+	pruneStoryIds((id) => id.startsWith("saga-") && !BY_ID[id]);
+}
+
+// 模块载入时清一次旧版回目：幂等，没有旧数据就什么都不做
+pruneLegacyChapters();
+
+/**
+ * 发放：找出「回目最靠前、额度已到、但还没发过」的那一回发出去。
+ * 额度没到就停下——不跳回、不剧透。每次只发一回。
  */
 export function pumpSaga(): string[] {
-	const earned = readEarned();
+	const quota = Math.min(readMaxed().size, CHAPTERS.length);
 	const unlocked = unlockedStoryIds();
-	for (const c of CHAPTERS) {
-		if (!earned.has(c.id)) break;
+	for (let i = 0; i < quota; i++) {
+		const c = CHAPTERS[i];
 		if (unlocked.has(c.id)) continue;
 		return unlockStoryIds([c.id]);
 	}
 	return [];
 }
 
-/** 卷首的楔子（第一次点亮任何技能时顺手挣得） */
-function earnPrologue(graph: GraphId, set: Set<string>): boolean {
-	let changed = false;
-	for (const c of CHAPTERS) {
-		if (c.graph !== graph || c.skillId !== null) continue;
-		if (set.has(c.id)) continue;
-		set.add(c.id);
-		changed = true;
-	}
-	return changed;
+/** 领签：把技能记进「已掌握」，返回本次是否为新领签 */
+function grant(graph: GraphId, skillId: string, set: Set<string>): boolean {
+	const key = `${graph}:${skillId}`;
+	if (set.has(key)) return false;
+	set.add(key);
+	return true;
 }
 
 /**
- * 点亮了一个技能：挣得它那一回，然后尝试发放。
- * 幂等 —— 反复点亮同一个技能不会重复挣得。
+ * 点亮了一个技能（勾满它自己的清单）→ 领一枚签，然后尝试发放。
+ * 幂等：同一个技能来回勾了又取消，不会重复给回目。
  */
 export function earnChapterForSkill(graph: GraphId, skillId: string): string[] {
-	const set = readEarned();
-	let changed = earnPrologue(graph, set);
-	const ch = BY_KEY[`${graph}:${skillId}`];
-	if (ch && !set.has(ch.id)) {
-		set.add(ch.id);
-		changed = true;
-	}
-	if (changed) writeEarned(set);
+	const set = readMaxed();
+	if (grant(graph, skillId, set)) writeMaxed(set);
 	return pumpSaga();
 }
 
 /**
- * 存量补课：一次性把「当前已经满级的技能」的章节都记为挣得，
- * 但发放仍然走 pumpSaga() 一次一封，不会把人淹没。
+ * 存量补课：进页面时把已经满级的技能一次性记上。
+ * 发放仍然一次一回，不会因为存量大就灌屏。
  */
 export function syncMaxedSkills(graph: GraphId, skillIds: string[]): string[] {
-	const set = readEarned();
+	const set = readMaxed();
 	let changed = false;
-	for (const id of skillIds) {
-		const ch = BY_KEY[`${graph}:${id}`];
-		if (ch && !set.has(ch.id)) {
-			set.add(ch.id);
-			changed = true;
-		}
-	}
-	if (changed) changed = earnPrologue(graph, set) || changed;
-	if (changed) writeEarned(set);
+	for (const id of skillIds) changed = grant(graph, id, set) || changed;
+	if (changed) writeMaxed(set);
 	return pumpSaga();
 }

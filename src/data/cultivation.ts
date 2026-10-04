@@ -636,6 +636,29 @@ export function unlockStoryIds(ids: string[]): string[] {
 }
 
 /**
+ * 从已解锁集合里删掉失效的 id（话本改版回目换新时用）。
+ * 不删的话，红点会把已经不存在的旧回目也算成未读，点进去又什么都打不开。
+ */
+export function pruneStoryIds(shouldDrop: (id: string) => boolean): number {
+	const set = readUnlockedStories();
+	let dropped = 0;
+	const next = new Set<string>();
+	for (const id of set) {
+		if (shouldDrop(id)) dropped++;
+		else next.add(id);
+	}
+	if (dropped === 0) return 0;
+	if (typeof localStorage !== "undefined") {
+		try {
+			localStorage.setItem(STORIES_KEY, JSON.stringify([...next]));
+		} catch {
+			/* 隐私模式忽略 */
+		}
+	}
+	return dropped;
+}
+
+/**
  * 修行主入口：SkillTree 在「勾上一条清单」后调用。
  * 负责给修为、写日志、连悟计数、判断跨境界与各类隐藏彩蛋触发。
  */
