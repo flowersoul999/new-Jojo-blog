@@ -1,0 +1,361 @@
+---
+// 项目墙 · 筛选栏：分类 / 状态 / 搜索 / 排序
+// 全部状态写进 URL query，刷新和分享链接都能还原，并和localStorage 一起记忆。
+import { Icon } from "astro-icon/components";
+import { PROJECT_CATEGORIES, PROJECT_STATUSES } from "@/data/projects";
+
+interface Props {
+	/** 当前所有项目出现过的技术栈，去重后由页面算好 */
+	allStack: string[];
+}
+
+const { allStack } = Astro.props;
+---
+
+<div class="pj-filter" data-pj-reveal>
+	<div class="pj-search">
+		<Icon is:inline name="material-symbols:search" class="pj-search__icon" />
+		<input
+			class="pj-search__input"
+			type="search"
+			placeholder="搜项目名、技术栈、一句话…"
+			autocomplete="off"
+			aria-label="搜索项目"
+			data-pj-search
+		/>
+		<button class="pj-search__clear" type="button" data-pj-clear hidden aria-label="清空搜索">
+			<Icon is:inline name="material-symbols:close" />
+		</button>
+	</div>
+
+	<div class="pj-filter__group" role="group" aria-label="按分类筛选">
+		<button class="pj-chip is-on" type="button" data-pj-cat="" data-pj-chip>
+			<Icon is:inline name="material-symbols:apps" />
+			<span>全部</span>
+			<span class="pj-chip__count" data-pj-count>0</span>
+		</button>
+		{
+			PROJECT_CATEGORIES.map((cat) => (
+				<button class="pj-chip" type="button" data-pj-cat={cat.key} data-pj-chip>
+					<Icon is:inline name={cat.icon} />
+					<span>{cat.label}</span>
+					<span class="pj-chip__count" data-pj-count>0</span>
+				</button>
+			))
+		}
+	</div>
+
+	<div class="pj-filter__group" role="group" aria-label="按状态筛选">
+		{
+			PROJECT_STATUSES.map((status) => (
+				<button class="pj-chip" type="button" data-pj-status={status.key} data-pj-chip>
+					<span class:list={["pj-dot", `pj-dot--${status.tone}`]} aria-hidden="true" />
+					<span>{status.label}</span>
+				</button>
+			))
+		}
+	</div>
+
+	<details class="pj-stack-filter">
+		<summary class="pj-stack-filter__summary">
+			<Icon is:inline name="material-symbols:terminal" />
+			<span>技术栈</span>
+			<span class="pj-stack-filter__badge" data-pj-stack-count hidden>0</span>
+		</summary>
+		<div class="pj-stack-filter__body">
+			{
+				allStack.map((tech) => (
+					<button class="pj-tag" type="button" data-pj-stack={tech} data-pj-chip>
+						{tech}
+					</button>
+				))
+			}
+			{allStack.length === 0 && <span class="pj-stack-filter__empty">还没有技术栈数据</span>}
+		</div>
+	</details>
+
+	<div class="pj-sort">
+		<label class="pj-sort__label" for="pj-sort">排序</label>
+		<select class="pj-sort__select" id="pj-sort" data-pj-sort>
+			<option value="order">推荐顺序</option>
+			<option value="recent">最近更新</option>
+			<option value="start">起始时间</option>
+			<option value="title">标题</option>
+		</select>
+	</div>
+</div>
+
+<div class="pj-filterbar" data-pj-filterbar hidden>
+	<span class="pj-filterbar__text" data-pj-summary></span>
+	<button class="pj-filterbar__reset" type="button" data-pj-reset>
+		<Icon is:inline name="material-symbols:restart-alt" />
+		清空筛选
+	</button>
+</div>
+
+<style>
+	/* ===================== 搜索 ===================== */
+	.pj-search {
+		position: relative;
+		display: flex;
+		align-items: center;
+	}
+	.pj-search__icon {
+		position: absolute;
+		left: 0.75rem;
+		font-size: 1.1rem;
+		color: var(--pj-muted);
+		pointer-events: none;
+	}
+	.pj-search__input {
+		width: 100%;
+		padding: 0.6rem 2.2rem 0.6rem 2.2rem;
+		border-radius: 999px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-sunken);
+		font-size: 0.84rem;
+		color: var(--pj-title);
+		transition: border-color 180ms ease;
+	}
+	.pj-search__input::placeholder {
+		color: var(--pj-faint);
+	}
+	.pj-search__input:focus {
+		outline: none;
+		border-color: color-mix(in srgb, var(--pj-accent) 55%, transparent);
+	}
+	.pj-search__clear {
+		position: absolute;
+		right: 0.45rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.5rem;
+		height: 1.5rem;
+		border: none;
+		border-radius: 999px;
+		background: var(--pj-line);
+		color: var(--pj-body);
+		cursor: pointer;
+		font-size: 0.95rem;
+	}
+	.pj-search__clear:hover {
+		background: color-mix(in srgb, var(--pj-accent) 25%, transparent);
+		color: var(--pj-accent);
+	}
+
+	/* ===================== 胶囊组 ===================== */
+	.pj-filter {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 1.2rem;
+	}
+	.pj-filter__group {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+	.pj-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.32rem;
+		padding: 0.36rem 0.75rem;
+		border-radius: 999px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-sunken);
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--pj-muted);
+		cursor: pointer;
+		transition:
+			background 180ms ease,
+			color 180ms ease,
+			border-color 180ms ease;
+	}
+	.pj-chip:hover {
+		color: var(--pj-accent);
+		border-color: color-mix(in srgb, var(--pj-accent) 40%, transparent);
+	}
+	.pj-chip.is-on {
+		background: var(--pj-soft);
+		color: var(--pj-accent);
+		border-color: color-mix(in srgb, var(--pj-accent) 40%, transparent);
+	}
+	.pj-chip__count {
+		font-size: 0.68rem;
+		color: var(--pj-faint);
+		font-variant-numeric: tabular-nums;
+	}
+	.pj-chip.is-on .pj-chip__count {
+		color: color-mix(in srgb, var(--pj-accent) 70%, transparent);
+	}
+
+	.pj-dot {
+		width: 0.42rem;
+		height: 0.42rem;
+		border-radius: 999px;
+		flex: none;
+	}
+	.pj-dot--green {
+		background: #1d9e75;
+	}
+	.pj-dot--blue {
+		background: #378add;
+	}
+	.pj-dot--gray {
+		background: #888780;
+	}
+
+	/* ===================== 技术栈折叠 ===================== */
+	.pj-stack-filter {
+		order: 10;
+	}
+	.pj-stack-filter__summary {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.32rem;
+		padding: 0.36rem 0.75rem;
+		border-radius: 999px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-sunken);
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--pj-muted);
+		cursor: pointer;
+		list-style: none;
+		user-select: none;
+	}
+	.pj-stack-filter__summary::-webkit-details-marker {
+		display: none;
+	}
+	.pj-stack-filter[open] .pj-stack-filter__summary {
+		color: var(--pj-accent);
+		border-color: color-mix(in srgb, var(--pj-accent) 40%, transparent);
+	}
+	.pj-stack-filter__badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 1.05rem;
+		height: 1.05rem;
+		padding: 0 0.28rem;
+		border-radius: 999px;
+		background: var(--pj-accent);
+		color: var(--pj-on-accent);
+		font-size: 0.64rem;
+		font-weight: 700;
+	}
+	.pj-stack-filter__body {
+		position: absolute;
+		z-index: 40;
+		margin-top: 0.4rem;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem;
+		width: min(22rem, 78vw);
+		padding: 0.7rem;
+		border-radius: 14px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-surface);
+		box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.28);
+	}
+	.pj-stack-filter__empty {
+		font-size: 0.76rem;
+		color: var(--pj-faint);
+	}
+	.pj-tag {
+		padding: 0.28rem 0.6rem;
+		border-radius: 999px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-sunken);
+		font-size: 0.74rem;
+		color: var(--pj-muted);
+		cursor: pointer;
+		transition:
+			background 180ms ease,
+			color 180ms ease;
+	}
+	.pj-tag:hover {
+		color: var(--pj-accent);
+	}
+	.pj-tag.is-on {
+		background: var(--pj-accent);
+		border-color: var(--pj-accent);
+		color: var(--pj-on-accent);
+	}
+
+	/* ===================== 排序 ===================== */
+	.pj-sort {
+		order: 20;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-left: auto;
+	}
+	.pj-sort__label {
+		font-size: 0.75rem;
+		color: var(--pj-faint);
+	}
+	.pj-sort__select {
+		padding: 0.34rem 0.6rem;
+		border-radius: 10px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-sunken);
+		font-size: 0.78rem;
+		color: var(--pj-title);
+		cursor: pointer;
+	}
+	.pj-sort__select:focus {
+		outline: none;
+		border-color: color-mix(in srgb, var(--pj-accent) 55%, transparent);
+	}
+
+	/* ===================== 生效提示 ===================== */
+	.pj-filterbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+		margin-top: 0.9rem;
+		padding: 0.55rem 0.85rem;
+		border-radius: 12px;
+		border: 1px dashed color-mix(in srgb, var(--pj-accent) 40%, transparent);
+		background: var(--pj-soft);
+	}
+	.pj-filterbar[hidden] {
+		display: none;
+	}
+	.pj-filterbar__text {
+		font-size: 0.78rem;
+		color: var(--pj-body);
+	}
+	.pj-filterbar__reset {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.25rem 0.6rem;
+		border-radius: 999px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-surface);
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--pj-accent);
+		cursor: pointer;
+	}
+	.pj-filterbar__reset:hover {
+		background: color-mix(in srgb, var(--pj-accent) 15%, transparent);
+	}
+
+	@media (max-width: 639px) {
+		.pj-sort {
+			margin-left: 0;
+			width: 100%;
+		}
+		.pj-sort__select {
+			flex: 1;
+		}
+	}
+</style>

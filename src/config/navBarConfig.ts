@@ -77,6 +77,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 			// 实习经历（Golden Experience）
 			LinkPresets.Internship,
 
+			// 做过的项目
+			LinkPresets.Projects,
+
 			// 相册
 			LinkPresets.Gallery,
 
@@ -235,6 +238,13 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		url: "/internship/",
 		icon: "material-symbols:auto-awesome-rounded",
 		pageKey: "internship",
+	},
+	Projects: {
+		name: "项目",
+		url: "/projects/",
+		icon: "material-symbols:widgets-rounded",
+		pageKey: "projects",
+		activePaths: ["/projects/"],
 	},
 	BlogChangelog: {
 		name: "博客日志",

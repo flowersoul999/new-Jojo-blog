@@ -1,0 +1,206 @@
+---
+// 项目墙 · 技术栈区块：技术出现频次 Top N + 分类占比
+import { Icon } from "astro-icon/components";
+
+export interface StackStat {
+	name: string;
+	count: number;
+	languages: boolean;
+}
+
+export interface StackGroup {
+	label: string;
+	items: string[];
+}
+
+interface Props {
+	stats: StackStat[];
+	groups: StackGroup[];
+	/** 技术总数 */
+	total: number;
+	/** 用到这些技术的项目数 */
+	projectCount: number;
+}
+
+const { stats, groups, total, projectCount } = Astro.props;
+const top = stats.slice(0, 10);
+const max = top[0]?.count ?? 1;
+---
+
+<section class="pj-stack" id="stack" data-pj-reveal>
+	<div class="pj-stack__head">
+		<h2 class="pj-stack__title">
+			<Icon is:inline name="material-symbols:layers-rounded" />
+			技术栈
+		</h2>
+		<span class="pj-stack__count">
+			{total} 项技术 · {projectCount} 个项目
+		</span>
+	</div>
+
+	<div class="pj-stack__body">
+		<div class="pj-stack__bars">
+			{
+				top.map((item) => (
+					<div class="pj-bar">
+						<span class="pj-bar__name" title={item.name}>
+							{item.name}
+						</span>
+						<span class="pj-bar__track">
+							<span
+								class:list={["pj-bar__fill", { "is-lang": item.languages }]}
+								data-pj-w={`${Math.round((item.count / max) * 100)}%`}
+							/>
+						</span>
+						<span class="pj-bar__value">{item.count}</span>
+					</div>
+				))
+			}
+		</div>
+
+		<div class="pj-stack__groups">
+			{
+				groups.map((group) => (
+					<div class="pj-stack__group">
+						<div class="pj-stack__group-head">
+							<span class="pj-stack__group-label">{group.label}</span>
+							<span class="pj-stack__group-count">{group.items.length}</span>
+						</div>
+						<ul class="pj-stack__group-items">
+							{group.items.map((tech) => (
+								<li class="pj-stacktag">{tech}</li>
+							))}
+						</ul>
+					</div>
+				))
+			}
+		</div>
+	</div>
+</section>
+
+<style>
+	.pj-stack {
+		margin-top: 2.4rem;
+	}
+	.pj-stack__head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-bottom: 0.9rem;
+	}
+	.pj-stack__title {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin: 0;
+		font-size: 1.02rem;
+		font-weight: 800;
+		color: var(--pj-title);
+	}
+	.pj-stack__title svg {
+		color: var(--pj-accent);
+	}
+	.pj-stack__count {
+		font-size: 0.74rem;
+		color: var(--pj-faint);
+	}
+
+	.pj-stack__body {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1.1rem;
+		padding: 1.1rem 1.15rem;
+		border-radius: 18px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-surface);
+	}
+	@media (min-width: 900px) {
+		.pj-stack__body {
+			grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+		}
+	}
+
+	/* ===================== 频次条 ===================== */
+	.pj-stack__bars {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	.pj-bar {
+		display: grid;
+		grid-template-columns: 5.5rem minmax(0, 1fr) 1.5rem;
+		align-items: center;
+		gap: 0.55rem;
+	}
+	.pj-bar__name {
+		font-size: 0.76rem;
+		color: var(--pj-body);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.pj-bar__track {
+		height: 0.55rem;
+		border-radius: 999px;
+		background: var(--pj-sunken);
+		overflow: hidden;
+	}
+	.pj-bar__fill {
+		display: block;
+		height: 100%;
+		width: 0;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--pj-accent) 45%, transparent);
+		transition: width 720ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	}
+	.pj-bar__fill.is-lang {
+		background: var(--pj-accent);
+	}
+	.pj-bar__value {
+		font-size: 0.72rem;
+		color: var(--pj-faint);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+
+	/* ===================== 分类 ===================== */
+	.pj-stack__groups {
+		display: flex;
+		flex-direction: column;
+		gap: 0.8rem;
+	}
+	.pj-stack__group-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin-bottom: 0.4rem;
+	}
+	.pj-stack__group-label {
+		font-size: 0.78rem;
+		font-weight: 700;
+		color: var(--pj-title);
+	}
+	.pj-stack__group-count {
+		font-size: 0.68rem;
+		color: var(--pj-faint);
+	}
+	.pj-stack__group-items {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.28rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.pj-stacktag {
+		padding: 0.2rem 0.55rem;
+		border-radius: 999px;
+		background: var(--pj-sunken);
+		border: 1px solid var(--pj-line);
+		font-size: 0.7rem;
+		color: var(--pj-muted);
+	}
+</style>

@@ -1,0 +1,927 @@
+---
+// 项目墙：筛选 + 卡片网格 + 技术栈统计
+// ----------------------------------------------------------------------------
+// 页面只负责「怎么摆」和筛选交互，项目内容全在 src/content/projects/*.md，
+// 页头和统计口径在 src/data/projects.ts。以后加项目不用动这个文件。
+import { getCollection } from "astro:content";
+import { Icon } from "astro-icon/components";
+import PageEditor from "@/components/edit/PageEditor.svelte";
+import ProjectCard, {
+	type ProjectCardData,
+} from "@/components/projects/ProjectCard.astro";
+import ProjectFilter from "@/components/projects/ProjectFilter.astro";
+import ProjectStack, {
+	type StackGroup,
+	type StackStat,
+} from "@/components/projects/ProjectStack.astro";
+import ProjectsHero from "@/components/projects/ProjectsHero.astro";
+import { siteConfig } from "@/config";
+import {
+	PROJECT_ANCHORS,
+	projectLinks,
+	projectMeta,
+	projectProfile,
+} from "@/data/projects";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+if (!siteConfig.pages.projects) {
+	return Astro.redirect("/404/");
+}
+
+const entries = (
+	await getCollection("projects", ({ data }) => !data.draft)
+).sort((a, b) => a.data.order - b.data.order);
+
+function formatPeriod(start: Date, end?: Date) {
+	const fmt = (d: Date) =>
+		`${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+	return end ? `${fmt(start)} – ${fmt(end)}` : `${fmt(start)} – 至今`;
+}
+
+const projects: ProjectCardData[] = entries.map((entry) => ({
+	id: entry.id,
+	title: entry.data.title,
+	summary: entry.data.summary,
+	role: entry.data.role,
+	period: formatPeriod(entry.data.start, entry.data.end),
+	status: entry.data.status,
+	category: entry.data.category,
+	stack: entry.data.stack,
+	metrics: entry.data.metrics,
+	featured: entry.data.featured,
+	icon: entry.data.icon,
+	repo: entry.data.repo,
+	links: entry.data.links,
+}));
+
+const featured = projects.filter((p) => p.featured);
+const rest = projects.filter((p) => !p.featured);
+
+/* ===================== 统计口径 ===================== */
+const allStack = [
+	...new Set(entries.flatMap((e) => [...e.data.stack, ...e.data.languages])),
+].sort((a, b) => a.localeCompare(b, "zh-CN"));
+
+const stackCount = new Map<string, number>();
+for (const entry of entries) {
+	for (const tech of new Set([...entry.data.stack, ...entry.data.languages])) {
+		stackCount.set(tech, (stackCount.get(tech) ?? 0) + 1);
+	}
+}
+const langSet = new Set(entries.flatMap((e) => e.data.languages));
+
+const stackStats: StackStat[] = [...stackCount.entries()]
+	.map(([name, count]) => ({ name, count, languages: langSet.has(name) }))
+	.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-CN"));
+
+/** 技术按方向分四组，只在项目里出现过的才列出来 */
+const STACK_GROUPS: { label: string; match: RegExp }[] = [
+	{
+		label: "前端",
+		match:
+			/vue|svelte|astro|react|next|tailwind|vite|element|vant|pinia|router|axios|typescript|javascript|jsx|tsx|html|css|less|stylus|postcss|framer|lucide|wang|echarts|swup|pagefind/i,
+	},
+	{
+		label: "后端",
+		match:
+			/java|servlet|express|fastapi|node|nest|flask|django|nginx|api|rest|graphql/i,
+	},
+	{
+		label: "数据与 AI",
+		match:
+			/mysql|postgres|milvus|redis|rag|llm|langchain|agent|ai|向量|embedding|deepseek|openai|silicon|glm|qwen|prompt|mcp|skill/i,
+	},
+	{
+		label: "工程与运维",
+		match:
+			/pnpm|monorepo|git|docker|vercel|cloudflare|ci|cd|linux|vben|tomcat|test|esbuild|changelog/i,
+	},
+];
+
+const stackGroups: StackGroup[] = STACK_GROUPS.map((group) => ({
+	label: group.label,
+	items: allStack.filter((tech) => group.match.test(tech)),
+})).filter((group) => group.items.length > 0);
+
+const metrics = [
+	{ label: "项目总数", value: `${projects.length}`, icon: "widgets" },
+	{ label: "技术栈", value: `${allStack.length}`, icon: "layers" },
+	{ label: "精选项目", value: `${featured.length}`, icon: "star" },
+	{
+		label: "在研",
+		value: `${projects.filter((p) => p.status === "在研").length}`,
+		icon: "local-fire-department-rounded",
+	},
+];
+
+const editableFiles = [
+	...entries.map((entry) => ({
+		path: `src/content/projects/${entry.id}.md`,
+		label: `项目：${entry.data.title}`,
+		hint: `${entry.data.category} · ${entry.data.status}`,
+	})),
+	{
+		path: "src/data/projects.ts",
+		label: "页面数据（页头 / 统计口径 / 分类定义）",
+		hint: "项目的固定几块在这个文件里",
+	},
+	{
+		path: "src/pages/projects/index.astro",
+		label: "页面骨架",
+		hint: "一般不用改，改动会影响整页布局",
+	},
+];
+---
+
+<MainGridLayout
+	title={projectMeta.title}
+	description={projectMeta.description}
+	hideSidebars
+	fullWidth
+>
+	<div class="pj card-base relative z-10 w-full" data-pj-root>
+		<div class="pj-shell mx-auto w-full max-w-[78rem] px-4 sm:px-6 md:px-8 py-6 sm:py-8">
+			<div class="pj-mobile-title lg:hidden">
+				<span class="pj-mobile-title__kicker">{projectProfile.kicker}</span>
+				<span class="pj-mobile-title__text">{projectProfile.title}</span>
+			</div>
+
+			<ProjectsHero profile={projectProfile} links={projectLinks} metrics={metrics}>
+				<PageEditor
+					slot="actions"
+					title="编辑项目页"
+					files={editableFiles}
+					client:load
+				/>
+			</ProjectsHero>
+
+			<nav class="pj-anchors" aria-label="页面内导航">
+				<ul class="pj-anchors__list">
+					{
+						PROJECT_ANCHORS.map((anchor) => (
+							<li>
+								<a
+									class="pj-anchor"
+									href={`#${anchor.id}`}
+									data-pj-anchor-link={anchor.id}
+								>
+									<Icon is:inline name={anchor.icon} class="text-base" />
+									<span>{anchor.label}</span>
+								</a>
+							</li>
+						))
+					}
+				</ul>
+			</nav>
+
+			<ProjectFilter allStack={allStack} />
+
+			{projects.length === 0 ? (
+				<div class="pj-empty">
+					<p>还没有任何项目，去 <code>src/content/projects/</code> 加一篇 md 吧。</p>
+				</div>
+			) : (
+				<>
+					{featured.length > 0 && (
+						<section class="pj-block" id="wall">
+							<div class="pj-block__head">
+								<h2 class="pj-block__title">
+									<Icon is:inline name="material-symbols:star" />
+									代表作
+								</h2>
+								<span class="pj-block__count">{featured.length} 个</span>
+							</div>
+							<div class="pj-grid" data-pj-grid="featured">
+								{featured.map((project) => (
+									<ProjectCard project={project} />
+								))}
+							</div>
+						</section>
+					)}
+
+					{rest.length > 0 && (
+						<section class="pj-block" id="wall-rest">
+							<div class="pj-block__head">
+								<h2 class="pj-block__title">
+									<Icon is:inline name="material-symbols:grid-view-rounded" />
+									其他项目
+								</h2>
+								<span class="pj-block__count">{rest.length} 个</span>
+							</div>
+							<div class="pj-grid" data-pj-grid="rest">
+								{rest.map((project) => (
+									<ProjectCard project={project} />
+								))}
+							</div>
+						</section>
+					)}
+
+					<div class="pj-noresult" data-pj-empty hidden>
+						<Icon is:inline name="material-symbols:search-off" class="text-[1.8rem]" />
+						<p>没有符合当前筛选条件的项目。</p>
+						<button class="pj-noresult__btn" type="button" data-pj-reset>
+							清空筛选
+						</button>
+					</div>
+				</>
+			)}
+
+			<ProjectStack
+				stats={stackStats}
+				groups={stackGroups}
+				total={allStack.length}
+				projectCount={projects.length}
+			/>
+
+			<div class="pj-foot">
+				<a class="pj-foot__link" href="/projects/timeline/">
+					<Icon is:inline name="material-symbols:timeline" />
+					按时间线看
+				</a>
+				<a class="pj-foot__link" href="/internship/">
+					<Icon is:inline name="material-symbols:workspace-premium-rounded" />
+					看实习经历
+				</a>
+			</div>
+		</div>
+	</div>
+
+	<style is:global>
+		/* ============================================================================
+		   项目板块设计令牌
+		   全部基于主题变量推导，浅色 / 深色自动跟着走。
+		   安全文字色一律 var(--text-color)，不要换成 --deep-text（深色下不会变浅）。
+		   ============================================================================ */
+		.pj {
+			--pj-accent: var(--primary);
+			--pj-on-accent: #ffffff;
+			--pj-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+			--pj-title: var(--text-color);
+			--pj-body: color-mix(in srgb, var(--text-color) 76%, transparent);
+			--pj-muted: color-mix(in srgb, var(--text-color) 58%, transparent);
+			--pj-faint: color-mix(in srgb, var(--text-color) 44%, transparent);
+			--pj-line: var(--line-divider);
+			--pj-surface: var(--card-bg);
+			--pj-sunken: color-mix(in srgb, var(--text-color) 6%, transparent);
+		}
+		html.dark .pj {
+			--pj-on-accent: rgb(0 0 0 / 0.8);
+		}
+		.pj-shell {
+			min-width: 0;
+		}
+
+		/* ===================== 移动端补的标题 ===================== */
+		.pj-mobile-title {
+			display: flex;
+			flex-direction: column;
+			gap: 0.1rem;
+			margin-bottom: 1.3rem;
+		}
+		.pj-mobile-title__kicker {
+			font-size: 0.62rem;
+			font-weight: 700;
+			letter-spacing: 0.24em;
+			color: var(--pj-accent);
+		}
+		.pj-mobile-title__text {
+			font-size: clamp(1.6rem, 8vw, 2.1rem);
+			font-weight: 800;
+			line-height: 1.12;
+			color: var(--pj-title);
+		}
+
+		/* ===================== 吸顶锚点导航 ===================== */
+		.pj-anchors {
+			position: sticky;
+			top: 4.5rem;
+			z-index: 30;
+			margin: 1.4rem 0 0;
+			padding: 0.4rem 0.5rem;
+			border: 1px solid var(--pj-line);
+			border-radius: 999px;
+			background: color-mix(in srgb, var(--pj-surface) 88%, transparent);
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+		}
+		.pj-anchors__list {
+			display: flex;
+			gap: 0.25rem;
+			margin: 0;
+			padding: 0;
+			list-style: none;
+			overflow-x: auto;
+			scrollbar-width: none;
+			-ms-overflow-style: none;
+		}
+		.pj-anchors__list::-webkit-scrollbar {
+			display: none;
+		}
+		.pj-anchor {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+			flex: none;
+			padding: 0.4rem 0.85rem;
+			border-radius: 999px;
+			font-size: 0.8rem;
+			font-weight: 600;
+			white-space: nowrap;
+			text-decoration: none;
+			color: var(--pj-muted);
+			transition:
+				background 180ms ease,
+				color 180ms ease;
+		}
+		.pj-anchor:hover {
+			background: var(--pj-sunken);
+			color: var(--pj-accent);
+		}
+		.pj-anchor.is-active {
+			background: var(--pj-soft);
+			color: var(--pj-accent);
+			font-weight: 700;
+		}
+		@media (max-width: 639px) {
+			.pj-anchors {
+				border-radius: 16px;
+			}
+			.pj-anchor {
+				gap: 0;
+				padding: 0.36rem 0.55rem;
+				font-size: 0.72rem;
+			}
+			.pj-anchor svg {
+				display: none;
+			}
+		}
+
+		/* ===================== 区块 ===================== */
+		.pj-block {
+			margin-top: 2rem;
+			scroll-margin-top: 9rem;
+		}
+		.pj-block__head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.5rem;
+			margin-bottom: 0.85rem;
+		}
+		.pj-block__title {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.38rem;
+			margin: 0;
+			font-size: 1rem;
+			font-weight: 800;
+			color: var(--pj-title);
+		}
+		.pj-block__title svg {
+			color: var(--pj-accent);
+		}
+		.pj-block__count {
+			font-size: 0.74rem;
+			color: var(--pj-faint);
+		}
+
+		.pj-grid {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr);
+			gap: 0.8rem;
+		}
+		@media (min-width: 720px) {
+			.pj-grid {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+		@media (min-width: 1100px) {
+			.pj-grid {
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+			}
+		}
+
+		/* ===================== 空状态 ===================== */
+		.pj-empty {
+			margin-top: 2.6rem;
+			padding: 2.5rem 1rem;
+			border: 1px dashed var(--pj-line);
+			border-radius: 18px;
+			text-align: center;
+			font-size: 0.85rem;
+			color: var(--pj-muted);
+		}
+		.pj-empty code {
+			padding: 0.1rem 0.35rem;
+			border-radius: 6px;
+			background: var(--pj-sunken);
+			font-family: var(--font-mono, monospace);
+			font-size: 0.8rem;
+			color: var(--pj-accent);
+		}
+
+		.pj-noresult {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 0.55rem;
+			margin-top: 1.6rem;
+			padding: 2.2rem 1rem;
+			border: 1px dashed var(--pj-line);
+			border-radius: 18px;
+			text-align: center;
+			color: var(--pj-muted);
+		}
+		.pj-noresult[hidden] {
+			display: none;
+		}
+		.pj-noresult svg {
+			color: var(--pj-faint);
+		}
+		.pj-noresult p {
+			margin: 0;
+			font-size: 0.85rem;
+		}
+		.pj-noresult__btn {
+			padding: 0.35rem 0.85rem;
+			border-radius: 999px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-surface);
+			font-size: 0.78rem;
+			font-weight: 600;
+			color: var(--pj-accent);
+			cursor: pointer;
+		}
+		.pj-noresult__btn:hover {
+			background: var(--pj-soft);
+		}
+
+		/* ===================== 底部跳转 ===================== */
+		.pj-foot {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.6rem;
+			margin-top: 2.4rem;
+			padding-top: 1.1rem;
+			border-top: 1px dashed var(--pj-line);
+		}
+		.pj-foot__link {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.32rem;
+			padding: 0.35rem 0.8rem;
+			border-radius: 999px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-sunken);
+			font-size: 0.78rem;
+			font-weight: 600;
+			color: var(--pj-muted);
+			text-decoration: none;
+			transition:
+				color 180ms ease,
+				border-color 180ms ease;
+		}
+		.pj-foot__link:hover {
+			color: var(--pj-accent);
+			border-color: color-mix(in srgb, var(--pj-accent) 40%, transparent);
+		}
+
+		/* ===================== 滚动渐显 ===================== */
+		.pj [data-pj-reveal] {
+			opacity: 0;
+			transform: translateY(14px);
+			transition:
+				opacity 620ms ease,
+				transform 620ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		}
+		.pj [data-pj-reveal].is-visible {
+			opacity: 1;
+			transform: none;
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.pj [data-pj-reveal] {
+				opacity: 1;
+				transform: none;
+				transition: none;
+			}
+		}
+	</style>
+
+	<script>
+		type PjWindow = Window & { __pjObservers?: Array<{ disconnect: () => void }> };
+
+		const STORAGE_KEY = "aemeath-project-filter";
+
+		type FilterState = {
+			cat: string;
+			status: string;
+			stack: string[];
+			q: string;
+			sort: string;
+		};
+
+		function readState(): FilterState {
+			return {
+				cat: "",
+				status: "",
+				stack: [],
+				q: "",
+				sort: "order",
+			};
+		}
+
+		function writeState(state: FilterState) {
+			try {
+				const params = new URLSearchParams();
+				if (state.cat) params.set("cat", state.cat);
+				if (state.status) params.set("status", state.status);
+				for (const tech of state.stack) params.append("stack", tech);
+				if (state.q) params.set("q", state.q);
+				if (state.sort && state.sort !== "order") params.set("sort", state.sort);
+				const query = params.toString();
+				const url = query
+					? `${window.location.pathname}?${query}`
+					: window.location.pathname;
+				history.replaceState(null, "", url);
+				localStorage.setItem(STORAGE_KEY, query);
+			} catch {
+				// 隐私模式下 history / localStorage 可能被限制，忽略即可
+			}
+		}
+
+		/** 先看 URL，再退回上次记忆，最后才是默认值 */
+		function loadState(): FilterState {
+			const params = new URLSearchParams(window.location.search);
+			if ([...params.keys()].length > 0) {
+				return {
+					cat: params.get("cat") ?? "",
+					status: params.get("status") ?? "",
+					stack: params.getAll("stack"),
+					q: params.get("q") ?? "",
+					sort: params.get("sort") ?? "order",
+				};
+			}
+			try {
+				const saved = new URLSearchParams(localStorage.getItem(STORAGE_KEY) ?? "");
+				if ([...saved.keys()].length > 0) {
+					return {
+						cat: saved.get("cat") ?? "",
+						status: saved.get("status") ?? "",
+						stack: saved.getAll("stack"),
+						q: saved.get("q") ?? "",
+						sort: saved.get("sort") ?? "order",
+					};
+				}
+			} catch {
+				// 读不到就用默认值
+			}
+			return readState();
+		}
+
+		function initProjectsPage() {
+			const root = document.querySelector<HTMLElement>("[data-pj-root]");
+			if (!root) return;
+			const pjWindow = window as PjWindow;
+			const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+			// 重新进入页面时先拆掉上一次的观察器，避免重复回调
+			for (const observer of pjWindow.__pjObservers ?? []) observer.disconnect();
+			pjWindow.__pjObservers = [];
+
+			/* ===================== 滚动渐显 ===================== */
+			const growBars = (scope: HTMLElement) => {
+				for (const bar of scope.querySelectorAll<HTMLElement>("[data-pj-w]")) {
+					const target = bar.dataset.pjW;
+					if (!target) continue;
+					bar.style.setProperty("--pj-w", "0%");
+					bar.style.width = "0%";
+					requestAnimationFrame(() => {
+						requestAnimationFrame(() => {
+							bar.style.width = target;
+						});
+					});
+				}
+			};
+
+			const revealNodes = Array.from(
+				root.querySelectorAll<HTMLElement>("[data-pj-reveal]:not(.is-visible)"),
+			);
+			const showAll = () => {
+				for (const node of revealNodes) {
+					node.classList.add("is-visible");
+					growBars(node);
+				}
+			};
+			if (reduceMotion || !("IntersectionObserver" in window)) {
+				showAll();
+			} else {
+				const revealObserver = new IntersectionObserver(
+					(entries, observer) => {
+						for (const entry of entries) {
+							if (!entry.isIntersecting) continue;
+							const node = entry.target as HTMLElement;
+							node.classList.add("is-visible");
+							growBars(node);
+							observer.unobserve(node);
+						}
+					},
+					{ threshold: 0.08, rootMargin: "0px 0px -5% 0px" },
+				);
+				for (const node of revealNodes) revealObserver.observe(node);
+				pjWindow.__pjObservers?.push(revealObserver);
+			}
+
+			/* ===================== 锚点导航 ===================== */
+			const links = Array.from(
+				root.querySelectorAll<HTMLAnchorElement>("[data-pj-anchor-link]"),
+			);
+			const sections = Array.from(root.querySelectorAll<HTMLElement>("[data-pj-anchor]"));
+			if (links.length > 0 && sections.length > 0) {
+				for (const link of links) {
+					if (link.dataset.pjBound === "1") continue;
+					link.dataset.pjBound = "1";
+					link.addEventListener("click", (event) => {
+						event.preventDefault();
+						const id = link.dataset.pjAnchorLink;
+						const target = id ? document.getElementById(id) : null;
+						if (!target) return;
+						const top =
+							target.getBoundingClientRect().top +
+							window.scrollY -
+							(window.innerWidth < 1024 ? 128 : 150);
+						window.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+						try {
+							history.replaceState(null, "", `#${id}`);
+						} catch {
+							// 忽略隐私模式限制
+						}
+					});
+				}
+
+				let ticking = false;
+				const syncActive = () => {
+					ticking = false;
+					const line = (window.innerWidth < 1024 ? 128 : 150) + 8;
+					let current = sections[0]?.id ?? "";
+					for (const section of sections) {
+						if (section.getBoundingClientRect().top <= line) current = section.id;
+					}
+					const atBottom =
+						window.innerHeight + window.scrollY >= document.body.scrollHeight - 4;
+					if (atBottom) current = sections[sections.length - 1]?.id ?? current;
+					for (const link of links) {
+						link.classList.toggle("is-active", link.dataset.pjAnchorLink === current);
+					}
+				};
+				const onScroll = () => {
+					if (ticking) return;
+					ticking = true;
+					requestAnimationFrame(syncActive);
+				};
+				if (root.dataset.pjScrollBound !== "1") {
+					root.dataset.pjScrollBound = "1";
+					window.addEventListener("scroll", onScroll, { passive: true });
+					window.addEventListener("resize", onScroll, { passive: true });
+				}
+				syncActive();
+			}
+
+			/* ===================== 筛选 ===================== */
+			const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-pj-card]"));
+			const searchInput = root.querySelector<HTMLInputElement>("[data-pj-search]");
+			const clearBtn = root.querySelector<HTMLButtonElement>("[data-pj-clear]");
+			const sortSelect = root.querySelector<HTMLSelectElement>("[data-pj-sort]");
+			const filterbar = root.querySelector<HTMLElement>("[data-pj-filterbar]");
+			const summary = root.querySelector<HTMLElement>("[data-pj-summary]");
+			const emptyBox = root.querySelector<HTMLElement>("[data-pj-empty]");
+			const catChips = Array.from(
+				root.querySelectorAll<HTMLButtonElement>("[data-pj-cat]"),
+			);
+			const statusChips = Array.from(
+				root.querySelectorAll<HTMLButtonElement>("[data-pj-status]"),
+			);
+			const stackChips = Array.from(
+				root.querySelectorAll<HTMLButtonElement>("[data-pj-stack]"),
+			);
+			const stackBadge = root.querySelector<HTMLElement>("[data-pj-stack-count]");
+			const stackTags = Array.from(
+				root.querySelectorAll<HTMLElement>("[data-pj-stacktag]"),
+			);
+
+			if (cards.length === 0 || !searchInput || !sortSelect) return;
+
+			let state = loadState();
+
+			const cardText = (card: HTMLElement) =>
+				[
+					card.dataset.title,
+					card.dataset.summary,
+					card.dataset.role,
+					card.dataset.category,
+					card.dataset.status,
+					card.dataset.stack,
+				]
+					.filter(Boolean)
+					.join(" ")
+					.toLowerCase();
+
+			const matchCount = (predicate: (card: HTMLElement) => boolean) =>
+				cards.filter(predicate).length;
+
+			// 分类胶囊上的数字：跟着「除该分类外的其他条件」走，这样数字有意义
+			const updateCatCounts = () => {
+				const q = state.q.trim().toLowerCase();
+				const base = (card: HTMLElement) => {
+					const stack = (card.dataset.stack ?? "").split("|");
+					if (state.stack.length > 0 && !state.stack.every((t) => stack.includes(t)))
+						return false;
+					if (state.status && card.dataset.status !== state.status) return false;
+					if (q && !cardText(card).includes(q)) return false;
+					return true;
+				};
+				for (const chip of catChips) {
+					const key = chip.dataset.pjCat ?? "";
+					const count = chip.querySelector<HTMLElement>("[data-pj-count]");
+					if (!count) continue;
+					const value = key
+						? matchCount((card) => base(card) && card.dataset.category === key)
+						: matchCount(base);
+					count.textContent = String(value);
+				}
+			};
+
+			const apply = () => {
+				const q = state.q.trim().toLowerCase();
+				const chosen = new Set(state.stack);
+				let visible = 0;
+
+				for (const card of cards) {
+					const stack = (card.dataset.stack ?? "").split("|");
+					let show = true;
+					if (state.cat && card.dataset.category !== state.cat) show = false;
+					if (state.status && card.dataset.status !== state.status) show = false;
+					if (state.stack.length > 0 && !state.stack.every((t) => stack.includes(t)))
+						show = false;
+					if (q && !cardText(card).includes(q)) show = false;
+					card.hidden = !show;
+					if (show) visible += 1;
+				}
+
+				// 胶囊高亮
+				for (const chip of catChips) {
+					chip.classList.toggle("is-on", (chip.dataset.pjCat ?? "") === state.cat);
+				}
+				for (const chip of statusChips) {
+					chip.classList.toggle(
+						"is-on",
+						state.status !== "" && chip.dataset.pjStatus === state.status,
+					);
+				}
+				for (const chip of stackChips) {
+					chip.classList.toggle("is-on", chosen.has(chip.dataset.pjStack ?? ""));
+				}
+				// 卡片里的技术标签，被选中的也点亮
+				for (const tag of stackTags) {
+					tag.classList.toggle("is-on", chosen.has(tag.dataset.pjStacktag ?? ""));
+				}
+
+				if (stackBadge) {
+					stackBadge.textContent = String(state.stack.length);
+					stackBadge.hidden = state.stack.length === 0;
+				}
+
+				// 筛选生效提示
+				const active =
+					state.cat || state.status || state.stack.length > 0 || state.q.trim() !== "";
+				if (filterbar) {
+					filterbar.hidden = !active;
+					if (active && summary) {
+						const parts: string[] = [];
+						if (state.cat) parts.push(`分类「${state.cat}」`);
+						if (state.status) parts.push(`状态「${state.status}」`);
+						if (state.stack.length > 0) parts.push(`技术栈 ${state.stack.join(" + ")}`);
+						if (state.q.trim()) parts.push(`关键词「${state.q.trim()}」`);
+						summary.textContent = `${parts.join("，")} —— 命中 ${visible} / ${cards.length} 个项目`;
+					}
+				}
+				if (emptyBox) emptyBox.hidden = visible !== 0;
+				if (clearBtn) clearBtn.hidden = state.q === "";
+
+				updateCatCounts();
+				writeState(state);
+			};
+
+			const sortCards = () => {
+				const grids = Array.from(root.querySelectorAll<HTMLElement>("[data-pj-grid]"));
+				for (const grid of grids) {
+					const sorted = [...cards].sort((a, b) => {
+						if (state.sort === "title") {
+							return (a.dataset.title ?? "").localeCompare(
+								b.dataset.title ?? "",
+								"zh-CN",
+							);
+						}
+						if (state.sort === "start") {
+							// data-date 形如「2026.04 – 2026.04」，取起始段做字典序比较即可
+							const left = (a.dataset.date ?? "").split("|")[0].split("–")[0];
+							const right = (b.dataset.date ?? "").split("|")[0].split("–")[0];
+							return left.localeCompare(right);
+						}
+						if (state.sort === "recent") {
+							// 倒序：把升序结果反过来
+							const left = (a.dataset.date ?? "").split("|")[0];
+							const right = (b.dataset.date ?? "").split("|")[0];
+							return right.localeCompare(left);
+						}
+						// 默认按 order，也就是 DOM 里的初始顺序
+						return 0;
+					});
+					// grid 里每张卡的顺序按排好序的数组重排
+					const visibleOrder = new Map(sorted.map((card, index) => [card, index]));
+					const current = [...grid.querySelectorAll<HTMLElement>("[data-pj-card]")];
+					current.sort(
+						(x, y) =>
+							(visibleOrder.get(x) ?? 0) - (visibleOrder.get(y) ?? 0),
+					);
+					for (const card of current) grid.append(card);
+				}
+			};
+
+			// ===================== 事件绑定 =====================
+			// 所有 handler 都用标记位防重复绑定，swup 切页回来时不会叠加
+			if (root.dataset.pjFilterBound !== "1") {
+				root.dataset.pjFilterBound = "1";
+
+				for (const chip of catChips) {
+					chip.addEventListener("click", () => {
+						const key = chip.dataset.pjCat ?? "";
+						state.cat = state.cat === key ? "" : key;
+						apply();
+					});
+				}
+				for (const chip of statusChips) {
+					chip.addEventListener("click", () => {
+						const key = chip.dataset.pjStatus ?? "";
+						state.status = state.status === key ? "" : key;
+						apply();
+					});
+				}
+				for (const chip of stackChips) {
+					chip.addEventListener("click", () => {
+						const key = chip.dataset.pjStack ?? "";
+						const index = state.stack.indexOf(key);
+						if (index >= 0) state.stack.splice(index, 1);
+						else state.stack.push(key);
+						apply();
+					});
+				}
+				for (const tag of stackTags) {
+					tag.addEventListener("click", () => {
+						const key = tag.dataset.pjStacktag ?? "";
+						const index = state.stack.indexOf(key);
+						if (index >= 0) state.stack.splice(index, 1);
+						else state.stack.push(key);
+						apply();
+					});
+				}
+				searchInput.addEventListener("input", () => {
+					state.q = searchInput.value;
+					apply();
+				});
+				clearBtn?.addEventListener("click", () => {
+					state.q = "";
+					searchInput.value = "";
+					apply();
+				});
+				sortSelect.addEventListener("change", () => {
+					state.sort = sortSelect.value;
+					sortCards();
+					apply();
+				});
+				for (const btn of root.querySelectorAll<HTMLButtonElement>("[data-pj-reset]")) {
+					btn.addEventListener("click", () => {
+						state = readState();
+						searchInput.value = "";
+						sortSelect.value = "order";
+						apply();
+					});
+				}
+				// 卡片里点技术标签时，别连带跳详情
+				for (const tag of stackTags) {
+					tag.addEventListener("click", (event) => event.preventDefault());
+				}
+			}
+
+			// 把 state 回填到控件上，再跑一次
+			searchInput.value = state.q;
+			sortSelect.value = state.sort;
+			apply();
+		}
+
+		initProjectsPage();
+		document.addEventListener("astro:page-load", initProjectsPage);
+		document.addEventListener("swup:contentReplaced", initProjectsPage);
+	</script>
+</MainGridLayout>

@@ -113,6 +113,41 @@ type HandcraftData = {
 
 type HandcraftCollection = CollectionConfig<z.ZodType<HandcraftData>>;
 
+/** 项目页条目：一个项目 = 一篇长文（元数据进 schema，方案与复盘进正文） */
+type ProjectsData = {
+	title: string;
+	/** 一句话价值：说清「它解决了什么」，卡片和 SEO 都用它 */
+	summary: string;
+	/** 我的角色，例如「独立开发」「前端实习生」 */
+	role: string;
+	/** 起止时间 */
+	start: Date;
+	end?: Date;
+	/** 在研 / 已完成 / 已归档 */
+	status: string;
+	/** 实习 / 个人 / 课程 / 实验 */
+	category: string;
+	/** 主要语言，可多选 */
+	languages: string[];
+	/** 技术栈标签，用于筛选 */
+	stack: string[];
+	/** 2-4 个量化指标 */
+	metrics: { label: string; value: string }[];
+	/** 仓库 / 演示 / 文档 */
+	links: { label: string; href: string; icon: string }[];
+	repo: string;
+	license: string;
+	/** 精选项目会单独提到顶部 */
+	featured: boolean;
+	/** 展示顺序（数字越小越靠前） */
+	order: number;
+	/** 项目图标 emoji 或字符，留空则用标题首字 */
+	icon: string;
+	draft: boolean;
+};
+
+type ProjectsCollection = CollectionConfig<z.ZodType<ProjectsData>>;
+
 const postsCollection: PostsCollection = defineCollection({
 	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/posts" }),
 	schema: z.object({
@@ -249,6 +284,46 @@ const handcraftCollection: HandcraftCollection = defineCollection({
 	}),
 });
 
+const projectsCollection: ProjectsCollection = defineCollection({
+	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/projects" }),
+	schema: z.object({
+		title: z.string(),
+		summary: z.string().optional().default(""),
+		role: z.string().optional().default("独立开发"),
+		start: z.date(),
+		end: z.date().optional(),
+		status: z.string().optional().default("已完成"),
+		category: z.string().optional().default("个人"),
+		languages: z.array(z.string()).optional().default([]),
+		stack: z.array(z.string()).optional().default([]),
+		metrics: z
+			.array(
+				z.object({
+					label: z.string(),
+					value: z.string(),
+				}),
+			)
+			.optional()
+			.default([]),
+		links: z
+			.array(
+				z.object({
+					label: z.string(),
+					href: z.string(),
+					icon: z.string().optional().default("material-symbols:open-in-new"),
+				}),
+			)
+			.optional()
+			.default([]),
+		repo: z.string().optional().default(""),
+		license: z.string().optional().default(""),
+		featured: z.boolean().optional().default(false),
+		order: z.number().optional().default(0),
+		icon: z.string().optional().default(""),
+		draft: z.boolean().optional().default(false),
+	}),
+});
+
 export const collections: {
 	posts: typeof postsCollection;
 	spec: typeof specCollection;
@@ -258,6 +333,7 @@ export const collections: {
 	questions: typeof questionCollection;
 	hot100: typeof hot100Collection;
 	handcraft: typeof handcraftCollection;
+	projects: typeof projectsCollection;
 } = {
 	posts: postsCollection,
 	spec: specCollection,
@@ -267,4 +343,5 @@ export const collections: {
 	questions: questionCollection,
 	hot100: hot100Collection,
 	handcraft: handcraftCollection,
+	projects: projectsCollection,
 };

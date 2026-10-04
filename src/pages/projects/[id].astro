@@ -1,0 +1,814 @@
+---
+// 项目详情：一个项目的完整记录 —— 背景、方案、实现、踩坑、复盘
+import { type CollectionEntry, getCollection, render } from "astro:content";
+import { Icon } from "astro-icon/components";
+import {
+	PROJECT_CATEGORY_MAP,
+	PROJECT_STATUS_MAP,
+	projectMeta,
+} from "@/data/projects";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+	const entries = await getCollection("projects", ({ data }) => !data.draft);
+	return entries.map((entry) => ({
+		params: { id: entry.id },
+		props: { entry },
+	}));
+}
+
+interface Props {
+	entry: CollectionEntry<"projects">;
+}
+
+const { entry } = Astro.props;
+const data = entry.data;
+const { Content, headings } = await render(entry);
+
+function fmt(d?: Date) {
+	if (!d) return "至今";
+	return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+const period = data.end
+	? `${fmt(data.start)} – ${fmt(data.end)}`
+	: `${fmt(data.start)} – 至今`;
+
+const status = PROJECT_STATUS_MAP[data.status];
+const tone = status?.tone ?? "gray";
+const category = PROJECT_CATEGORY_MAP[data.category];
+
+/** 关联项目：同分类或技术栈有交集的，最多 3 个 */
+const all = await getCollection("projects", ({ data: d }) => !d.draft);
+const related = all
+	.filter((item) => item.id !== entry.id)
+	.map((item) => {
+		const overlap = item.data.stack.filter((tech) =>
+			data.stack.includes(tech),
+		).length;
+		const sameCat = item.data.category === data.category ? 1 : 0;
+		return { item, score: overlap * 2 + sameCat };
+	})
+	.filter((entryItem) => entryItem.score > 0)
+	.sort((a, b) => b.score - a.score)
+	.slice(0, 3)
+	.map((entryItem) => entryItem.item);
+
+/** 按 order 排的上一篇 / 下一篇 */
+const ordered = [...all].sort((a, b) => a.data.order - b.data.order);
+const currentIndex = ordered.findIndex((item) => item.id === entry.id);
+const prev = currentIndex > 0 ? ordered[currentIndex - 1] : null;
+const next =
+	currentIndex < ordered.length - 1 ? ordered[currentIndex + 1] : null;
+
+/** 正文里的 h2 抽出来做目录 */
+const toc = headings.filter((h) => h.depth === 2);
+
+const stats = [
+	{ label: "角色", value: data.role },
+	{ label: "周期", value: period },
+	{ label: "状态", value: data.status },
+	{ label: "技术栈", value: `${data.stack.length} 项` },
+];
+---
+
+<MainGridLayout
+	title={`${data.title} · 项目`}
+	description={data.summary}
+	hideSidebars
+	fullWidth
+>
+	<div class="pj card-base relative z-10 w-full" data-pj-root>
+		<div class="pj-shell mx-auto w-full max-w-[78rem] px-4 sm:px-6 md:px-8 py-6 sm:py-8">
+			<div class="pj-mobile-title lg:hidden">
+				<span class="pj-mobile-title__kicker">PROJECT</span>
+				<span class="pj-mobile-title__text">{data.title}</span>
+			</div>
+
+			<nav class="pj-crumbs" aria-label="面包屑">
+				<a href="/projects/">
+					<Icon is:inline name="material-symbols:arrow-back-rounded" />
+					返回项目墙
+				</a>
+			</nav>
+
+			<header class="pj-dhead" data-pj-reveal>
+				<div class="pj-dhead__top">
+					<div class="pj-dhead__badges">
+						{
+							category && (
+								<span class="pj-dtag">
+									<Icon is:inline name={category.icon} />
+									<span>{category.label}</span>
+								</span>
+							)
+						}
+						<span class:list={["pj-status", `pj-status--${tone}`]}>
+							<span class="pj-status__dot" aria-hidden="true" />
+							{data.status}
+						</span>
+						{data.license && <span class="pj-dtag">{data.license}</span>}
+					</div>
+					<div class="pj-dhead__links">
+						{
+							data.links.map((link) => (
+								<a
+									class="pj-dlink"
+									href={link.href}
+									target={link.href.startsWith("http") ? "_blank" : undefined}
+									rel={link.href.startsWith("http") ? "noreferrer noopener" : undefined}
+								>
+									<Icon is:inline name={link.icon} />
+									<span>{link.label}</span>
+								</a>
+							))
+						}
+					</div>
+				</div>
+
+				<h1 class="pj-dhead__title">{data.title}</h1>
+				<p class="pj-dhead__summary">{data.summary}</p>
+
+				<ul class="pj-dhead__meta">
+					<li>
+						<Icon is:inline name="material-symbols:badge" />
+						<span>{data.role}</span>
+					</li>
+					<li>
+						<Icon is:inline name="material-symbols:calendar-today-rounded" />
+						<span>{period}</span>
+					</li>
+					{
+						data.languages.length > 0 && (
+							<li>
+								<Icon is:inline name="material-symbols:code" />
+								<span>{data.languages.join(" / ")}</span>
+							</li>
+						)
+					}
+				</ul>
+			</header>
+
+			{
+				data.metrics.length > 0 && (
+					<ul class="pj-dmetrics" data-pj-reveal>
+						{data.metrics.map((metric) => (
+							<li class="pj-dmetric">
+								<span class="pj-dmetric__value">{metric.value}</span>
+								<span class="pj-dmetric__label">{metric.label}</span>
+							</li>
+						))}
+					</ul>
+				)
+			}
+
+			<div class="pj-dlayout">
+				<article class="pj-dbody custom-md">
+					<Content />
+
+					<div class="pj-dstack">
+						<h2 class="pj-dstack__title">
+							<Icon is:inline name="material-symbols:layers-rounded" />
+							技术栈
+						</h2>
+						<ul class="pj-dstack__list">
+							{data.stack.map((tech) => (
+								<li class="pj-stacktag">{tech}</li>
+							))}
+						</ul>
+					</div>
+
+					<nav class="pj-dnav" aria-label="项目导航">
+						{
+							prev ? (
+								<a class="pj-dnav__item pj-dnav__item--prev" href={`/projects/${prev.id}/`}>
+									<span class="pj-dnav__dir">
+										<Icon is:inline name="material-symbols:arrow-back-rounded" />
+										上一个
+									</span>
+									<span class="pj-dnav__name">{prev.data.title}</span>
+								</a>
+							) : (
+								<span class="pj-dnav__item pj-dnav__item--empty" />
+							)
+						}
+						{
+							next && (
+								<a class="pj-dnav__item pj-dnav__item--next" href={`/projects/${next.id}/`}>
+									<span class="pj-dnav__dir">
+										下一个
+										<Icon is:inline name="material-symbols:arrow-forward" />
+									</span>
+									<span class="pj-dnav__name">{next.data.title}</span>
+								</a>
+							)
+						}
+					</nav>
+				</article>
+
+				{
+					toc.length > 2 && (
+						<aside class="pj-dtoc" aria-label="目录">
+							<div class="pj-dtoc__inner">
+								<div class="pj-dtoc__title">目录</div>
+								<ul class="pj-dtoc__list">
+									{toc.map((heading) => (
+										<li>
+											<a href={`#${heading.slug}`}>{heading.text}</a>
+										</li>
+									))}
+								</ul>
+							</div>
+						</aside>
+					)
+				}
+			</div>
+
+			{
+				related.length > 0 && (
+					<section class="pj-related" data-pj-reveal>
+						<div class="pj-related__head">
+							<h2 class="pj-related__title">相关项目</h2>
+							<a class="pj-related__more" href="/projects/">
+								全部项目
+								<Icon is:inline name="material-symbols:arrow-forward" />
+							</a>
+						</div>
+						<div class="pj-related__grid">
+							{related.map((item) => (
+								<a class="pj-related__item" href={`/projects/${item.id}/`}>
+									<span class="pj-related__name">{item.data.title}</span>
+									<span class="pj-related__cat">{item.data.category}</span>
+									<span class="pj-related__summary">{item.data.summary}</span>
+								</a>
+							))}
+						</div>
+					</section>
+				)
+			}
+		</div>
+	</div>
+
+	<style is:global>
+		/* ============================================================================
+		   项目详情设计令牌，与项目墙同一套
+		   ============================================================================ */
+		.pj {
+			--pj-accent: var(--primary);
+			--pj-on-accent: #ffffff;
+			--pj-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+			--pj-title: var(--text-color);
+			--pj-body: color-mix(in srgb, var(--text-color) 76%, transparent);
+			--pj-muted: color-mix(in srgb, var(--text-color) 58%, transparent);
+			--pj-faint: color-mix(in srgb, var(--text-color) 44%, transparent);
+			--pj-line: var(--line-divider);
+			--pj-surface: var(--card-bg);
+			--pj-sunken: color-mix(in srgb, var(--text-color) 6%, transparent);
+		}
+		html.dark .pj {
+			--pj-on-accent: rgb(0 0 0 / 0.8);
+		}
+		.pj-shell {
+			min-width: 0;
+		}
+
+		.pj-mobile-title {
+			display: flex;
+			flex-direction: column;
+			gap: 0.1rem;
+			margin-bottom: 1.3rem;
+		}
+		.pj-mobile-title__kicker {
+			font-size: 0.62rem;
+			font-weight: 700;
+			letter-spacing: 0.24em;
+			color: var(--pj-accent);
+		}
+		.pj-mobile-title__text {
+			font-size: clamp(1.5rem, 7vw, 2rem);
+			font-weight: 800;
+			line-height: 1.12;
+			color: var(--pj-title);
+		}
+
+		/* ===================== 面包屑 ===================== */
+		.pj-crumbs {
+			margin-bottom: 0.9rem;
+		}
+		.pj-crumbs a {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.25rem;
+			font-size: 0.78rem;
+			font-weight: 600;
+			color: var(--pj-muted);
+			text-decoration: none;
+		}
+		.pj-crumbs a:hover {
+			color: var(--pj-accent);
+		}
+
+		/* ===================== 详情头 ===================== */
+		.pj-dhead {
+			padding-bottom: 1.15rem;
+			border-bottom: 1px dashed var(--pj-line);
+		}
+		.pj-dhead__top {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.6rem;
+			flex-wrap: wrap;
+		}
+		.pj-dhead__badges {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 0.35rem;
+		}
+		.pj-dtag {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.28rem;
+			padding: 0.16rem 0.6rem;
+			border-radius: 999px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-sunken);
+			font-size: 0.7rem;
+			font-weight: 600;
+			color: var(--pj-muted);
+		}
+		.pj-dhead__links {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.35rem;
+		}
+		.pj-dlink {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.28rem;
+			padding: 0.3rem 0.7rem;
+			border-radius: 999px;
+			border: 1px solid color-mix(in srgb, var(--pj-accent) 26%, transparent);
+			background: var(--pj-soft);
+			font-size: 0.73rem;
+			font-weight: 600;
+			color: var(--pj-accent);
+			text-decoration: none;
+			transition: background 180ms ease;
+		}
+		.pj-dlink:hover {
+			background: color-mix(in srgb, var(--pj-accent) 20%, transparent);
+		}
+		.pj-dhead__title {
+			margin: 0.7rem 0 0;
+			font-size: clamp(1.5rem, 4.5vw, 2.1rem);
+			font-weight: 800;
+			line-height: 1.15;
+			letter-spacing: -0.01em;
+			color: var(--pj-title);
+		}
+		.pj-dhead__summary {
+			margin: 0.5rem 0 0;
+			font-size: 0.9rem;
+			line-height: 1.75;
+			color: var(--pj-body);
+		}
+		.pj-dhead__meta {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.3rem 1rem;
+			margin: 0.7rem 0 0;
+			padding: 0;
+			list-style: none;
+			font-size: 0.75rem;
+			color: var(--pj-muted);
+		}
+		.pj-dhead__meta li {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.3rem;
+		}
+
+		.pj-status {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.28rem;
+			padding: 0.16rem 0.6rem;
+			border-radius: 999px;
+			font-size: 0.7rem;
+			font-weight: 700;
+			border: 1px solid currentcolor;
+		}
+		.pj-status__dot {
+			width: 0.36rem;
+			height: 0.36rem;
+			border-radius: 999px;
+			background: currentcolor;
+		}
+		.pj-status--green {
+			color: #1d9e75;
+			background: color-mix(in srgb, #1d9e75 12%, transparent);
+		}
+		.pj-status--blue {
+			color: #378add;
+			background: color-mix(in srgb, #378add 12%, transparent);
+		}
+		.pj-status--gray {
+			color: #888780;
+			background: color-mix(in srgb, #888780 12%, transparent);
+		}
+
+		/* ===================== 指标 ===================== */
+		.pj-dmetrics {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+			gap: 0.55rem;
+			margin: 1.1rem 0 0;
+			padding: 0;
+			list-style: none;
+		}
+		.pj-dmetric {
+			display: flex;
+			flex-direction: column;
+			gap: 0.1rem;
+			padding: 0.7rem 0.85rem;
+			border-radius: 14px;
+			background: var(--pj-soft);
+			border: 1px solid color-mix(in srgb, var(--pj-accent) 22%, transparent);
+		}
+		.pj-dmetric__value {
+			font-size: 1.05rem;
+			font-weight: 800;
+			line-height: 1.25;
+			color: var(--pj-title);
+		}
+		.pj-dmetric__label {
+			font-size: 0.68rem;
+			color: var(--pj-muted);
+		}
+
+		/* ===================== 正文布局 ===================== */
+		.pj-dlayout {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr);
+			gap: 1.6rem;
+			margin-top: 1.8rem;
+		}
+		@media (min-width: 1024px) {
+			.pj-dlayout {
+				grid-template-columns: minmax(0, 1fr) 13rem;
+				align-items: start;
+			}
+		}
+
+		.pj-dbody {
+			min-width: 0;
+			font-size: 0.89rem;
+			line-height: 1.9;
+			color: var(--pj-body);
+		}
+		.pj-dbody :global(h2) {
+			margin-top: 1.9rem;
+			margin-bottom: 0.6rem;
+			font-size: 1.05rem;
+			font-weight: 800;
+			line-height: 1.4;
+			color: var(--pj-title);
+			scroll-margin-top: 9rem;
+		}
+		.pj-dbody :global(h2:first-child) {
+			margin-top: 0;
+		}
+		.pj-dbody :global(h3) {
+			margin-top: 1.3rem;
+			font-size: 0.95rem;
+			font-weight: 700;
+			color: var(--pj-title);
+		}
+		.pj-dbody :global(p) {
+			margin: 0.75rem 0;
+		}
+		.pj-dbody :global(ul),
+		.pj-dbody :global(ol) {
+			padding-left: 1.25rem;
+		}
+		.pj-dbody :global(li) {
+			margin: 0.35rem 0;
+		}
+		.pj-dbody :global(blockquote) {
+			border-left: 3px solid color-mix(in srgb, var(--pj-accent) 45%, transparent);
+			padding-left: 0.9rem;
+			margin: 1rem 0;
+			font-size: 0.85rem;
+			color: var(--pj-muted);
+		}
+		.pj-dbody :global(code) {
+			padding: 0.1rem 0.35rem;
+			border-radius: 6px;
+			background: var(--pj-sunken);
+			font-family: var(--font-mono, monospace);
+			font-size: 0.83em;
+			color: var(--pj-accent);
+		}
+		.pj-dbody :global(pre) {
+			padding: 0.9rem 1rem;
+			border-radius: 14px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-sunken);
+			overflow-x: auto;
+			font-size: 0.8rem;
+			line-height: 1.7;
+		}
+		.pj-dbody :global(pre code) {
+			padding: 0;
+			background: none;
+			color: inherit;
+		}
+		.pj-dbody :global(table) {
+			width: 100%;
+			margin: 1rem 0;
+			border-collapse: collapse;
+			font-size: 0.82rem;
+		}
+		.pj-dbody :global(th),
+		.pj-dbody :global(td) {
+			padding: 0.5rem 0.6rem;
+			border: 1px solid var(--pj-line);
+			text-align: left;
+		}
+		.pj-dbody :global(th) {
+			background: var(--pj-sunken);
+			font-weight: 700;
+			color: var(--pj-title);
+		}
+		.pj-dbody :global(a) {
+			color: var(--pj-accent);
+			text-decoration: none;
+		}
+		.pj-dbody :global(a:hover) {
+			text-decoration: underline;
+		}
+
+		/* ===================== 技术栈 ===================== */
+		.pj-dstack {
+			margin-top: 2.2rem;
+			padding-top: 1.1rem;
+			border-top: 1px dashed var(--pj-line);
+		}
+		.pj-dstack__title {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+			margin: 0 0 0.6rem;
+			font-size: 0.95rem;
+			font-weight: 800;
+			color: var(--pj-title);
+		}
+		.pj-dstack__title svg {
+			color: var(--pj-accent);
+		}
+		.pj-dstack__list {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.3rem;
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+		.pj-stacktag {
+			padding: 0.22rem 0.6rem;
+			border-radius: 999px;
+			background: var(--pj-sunken);
+			border: 1px solid var(--pj-line);
+			font-size: 0.72rem;
+			color: var(--pj-muted);
+		}
+
+		/* ===================== 上下篇 ===================== */
+		.pj-dnav {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+			gap: 0.6rem;
+			margin-top: 1.8rem;
+			padding-top: 1.1rem;
+			border-top: 1px dashed var(--pj-line);
+		}
+		.pj-dnav__item {
+			display: flex;
+			flex-direction: column;
+			gap: 0.2rem;
+			padding: 0.7rem 0.85rem;
+			border-radius: 14px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-surface);
+			text-decoration: none;
+			transition: border-color 180ms ease;
+		}
+		.pj-dnav__item:hover {
+			border-color: color-mix(in srgb, var(--pj-accent) 45%, transparent);
+		}
+		.pj-dnav__item--empty {
+			border-style: dashed;
+			opacity: 0;
+			pointer-events: none;
+		}
+		.pj-dnav__item--next {
+			text-align: right;
+		}
+		.pj-dnav__dir {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.25rem;
+			font-size: 0.68rem;
+			color: var(--pj-faint);
+		}
+		.pj-dnav__item--next .pj-dnav__dir {
+			justify-content: flex-end;
+		}
+		.pj-dnav__name {
+			font-size: 0.85rem;
+			font-weight: 700;
+			color: var(--pj-title);
+		}
+
+		/* ===================== 目录 ===================== */
+		.pj-dtoc {
+			order: -1;
+		}
+		@media (min-width: 1024px) {
+			.pj-dtoc {
+				order: 0;
+				position: sticky;
+				top: 5.5rem;
+			}
+		}
+		.pj-dtoc__inner {
+			padding: 0.85rem 0.9rem;
+			border-radius: 16px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-surface);
+		}
+		.pj-dtoc__title {
+			font-size: 0.7rem;
+			font-weight: 700;
+			letter-spacing: 0.14em;
+			color: var(--pj-faint);
+			margin-bottom: 0.5rem;
+		}
+		.pj-dtoc__list {
+			display: flex;
+			flex-direction: column;
+			gap: 0.28rem;
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+		.pj-dtoc__list a {
+			display: block;
+			font-size: 0.76rem;
+			line-height: 1.5;
+			color: var(--pj-muted);
+			text-decoration: none;
+			transition: color 180ms ease;
+		}
+		.pj-dtoc__list a:hover {
+			color: var(--pj-accent);
+		}
+
+		/* ===================== 相关项目 ===================== */
+		.pj-related {
+			margin-top: 2.4rem;
+			padding-top: 1.2rem;
+			border-top: 1px dashed var(--pj-line);
+		}
+		.pj-related__head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.5rem;
+			margin-bottom: 0.8rem;
+		}
+		.pj-related__title {
+			margin: 0;
+			font-size: 1rem;
+			font-weight: 800;
+			color: var(--pj-title);
+		}
+		.pj-related__more {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.22rem;
+			font-size: 0.76rem;
+			font-weight: 600;
+			color: var(--pj-accent);
+			text-decoration: none;
+		}
+		.pj-related__grid {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr);
+			gap: 0.6rem;
+		}
+		@media (min-width: 720px) {
+			.pj-related__grid {
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+			}
+		}
+		.pj-related__item {
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+			padding: 0.8rem 0.9rem;
+			border-radius: 14px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-surface);
+			text-decoration: none;
+			transition:
+				border-color 180ms ease,
+				transform 180ms ease;
+		}
+		.pj-related__item:hover {
+			border-color: color-mix(in srgb, var(--pj-accent) 45%, transparent);
+			transform: translateY(-2px);
+		}
+		.pj-related__name {
+			font-size: 0.87rem;
+			font-weight: 700;
+			color: var(--pj-title);
+		}
+		.pj-related__cat {
+			font-size: 0.66rem;
+			color: var(--pj-accent);
+		}
+		.pj-related__summary {
+			font-size: 0.75rem;
+			line-height: 1.6;
+			color: var(--pj-muted);
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
+			-webkit-box-orient: vertical;
+			overflow: hidden;
+		}
+
+		/* ===================== 滚动渐显 ===================== */
+		.pj [data-pj-reveal] {
+			opacity: 0;
+			transform: translateY(14px);
+			transition:
+				opacity 620ms ease,
+				transform 620ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		}
+		.pj [data-pj-reveal].is-visible {
+			opacity: 1;
+			transform: none;
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.pj [data-pj-reveal] {
+				opacity: 1;
+				transform: none;
+				transition: none;
+			}
+		}
+	</style>
+
+	<script>
+		function initProjectDetail() {
+			const root = document.querySelector<HTMLElement>("[data-pj-root]");
+			if (!root) return;
+			type Pw = Window & { __pjDetailObserver?: { disconnect: () => void } };
+			const pw = window as Pw;
+			pw.__pjDetailObserver?.disconnect();
+
+			const nodes = Array.from(
+				root.querySelectorAll<HTMLElement>("[data-pj-reveal]:not(.is-visible)"),
+			);
+			const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+			const showAll = () => {
+				for (const node of nodes) node.classList.add("is-visible");
+			};
+			if (reduceMotion || !("IntersectionObserver" in window)) {
+				showAll();
+				return;
+			}
+			const observer = new IntersectionObserver(
+				(entries, obs) => {
+					for (const entry of entries) {
+						if (!entry.isIntersecting) continue;
+						(entry.target as HTMLElement).classList.add("is-visible");
+						obs.unobserve(entry.target);
+					}
+				},
+				{ threshold: 0.1, rootMargin: "0px 0px -5% 0px" },
+			);
+			for (const node of nodes) observer.observe(node);
+			pw.__pjDetailObserver = observer;
+		}
+
+		initProjectDetail();
+		document.addEventListener("astro:page-load", initProjectDetail);
+		document.addEventListener("swup:contentReplaced", initProjectDetail);
+	</script>
+</MainGridLayout>

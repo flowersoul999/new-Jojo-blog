@@ -88,6 +88,7 @@ export type SiteConfig = {
 		anime: boolean; // 追番页面开关
 		diary: boolean; // 日记页面开关
 		internship: boolean; // 实习经历页面（Golden Experience）开关
+		projects: boolean; // 项目页面开关
 	};
 
 	// 分类导航栏开关（仅首页 / 归档页 / 文章详情页显示）

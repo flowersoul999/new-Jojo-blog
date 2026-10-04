@@ -1,0 +1,559 @@
+---
+// 技术栈统计：每项技术在几个项目里出现过 + 技术 × 项目矩阵
+import { getCollection } from "astro:content";
+import { Icon } from "astro-icon/components";
+import PageEditor from "@/components/edit/PageEditor.svelte";
+import { PROJECT_VIEWS } from "@/data/projects";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+export const prerender = true;
+
+const entries = (
+	await getCollection("projects", ({ data }) => !data.draft)
+).sort((a, b) => a.data.order - b.data.order);
+
+const langSet = new Set(entries.flatMap((e) => e.data.languages));
+
+/** 技术 → 出现过它的项目 id 集合 */
+const techProjects = new Map<string, string[]>();
+for (const entry of entries) {
+	for (const tech of new Set([...entry.data.stack, ...entry.data.languages])) {
+		const list = techProjects.get(tech) ?? [];
+		list.push(entry.id);
+		techProjects.set(tech, list);
+	}
+}
+
+const rows = [...techProjects.entries()]
+	.map(([name, ids]) => ({
+		name,
+		ids,
+		count: ids.length,
+		isLang: langSet.has(name),
+	}))
+	.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-CN"));
+
+const max = rows[0]?.count ?? 1;
+
+/** 只留出现 2 次以上的进矩阵，全量矩阵太宽不好看 */
+const matrixTechs = rows.filter((row) => row.count >= 2);
+const matrixProjects = entries
+	.filter((entry) => matrixTechs.some((tech) => tech.ids.includes(entry.id)))
+	.map((entry) => ({ id: entry.id, title: entry.data.title }));
+
+const title = "技术栈";
+const description =
+	"这些技术在几个项目里真的被用过、出现过，按项目数从高到低排。矩阵里每个亮着的格子表示「这个项目用到了这项技术」，一眼能看出我的经验分布。";
+
+const editableFiles = [
+	...entries.map((entry) => ({
+		path: `src/content/projects/${entry.id}.md`,
+		label: `项目：${entry.data.title}`,
+		hint: "技术栈字段在这里改",
+	})),
+	{
+		path: "src/pages/projects/stack.astro",
+		label: "页面骨架",
+		hint: "矩阵与分组的筛选阈值",
+	},
+];
+---
+
+<MainGridLayout title={title} description={description} hideSidebars fullWidth>
+	<div class="pj card-base relative z-10 w-full" data-pj-root>
+		<div class="pj-shell mx-auto w-full max-w-[78rem] px-4 sm:px-6 md:px-8 py-6 sm:py-8">
+			<div class="pj-mobile-title lg:hidden">
+				<span class="pj-mobile-title__kicker">STACK</span>
+				<span class="pj-mobile-title__text">{title}</span>
+			</div>
+
+			<nav class="pj-views" aria-label="视图切换">
+				{
+					PROJECT_VIEWS.map((view) => (
+						<a class:list={["pj-view", { "is-on": view.key === "stack" }]} href={view.href}>
+							{view.label}
+						</a>
+					))
+				}
+			</nav>
+
+			<header class="pj-shead" data-pj-reveal>
+				<div class="pj-shead__kicker">PROJECTS · STACK</div>
+				<h1 class="pj-shead__title">{title}</h1>
+				<p class="pj-shead__desc">{description}</p>
+				<div class="pj-shead__actions">
+					<PageEditor title="编辑技术栈页" files={editableFiles} client:load />
+				</div>
+			</header>
+
+			{
+				rows.length === 0 ? (
+					<div class="pj-empty">
+						<p>还没有技术栈数据，先去项目里补上 <code>stack</code> 字段。</p>
+					</div>
+				) : (
+					<>
+						<section class="pj-sblock" data-pj-reveal>
+							<div class="pj-sblock__head">
+								<h2 class="pj-sblock__title">
+									<Icon is:inline name="material-symbols:sort" />
+									使用频次
+								</h2>
+								<span class="pj-sblock__count">{rows.length} 项技术</span>
+							</div>
+							<div class="pj-sgrid">
+								{rows.map((row) => (
+									<div class="pj-srow">
+										<span class="pj-srow__name" title={row.name}>
+											{row.name}
+											{row.isLang && <span class="pj-srow__lang">主语言</span>}
+										</span>
+										<span class="pj-srow__track">
+											<span
+												class:list={["pj-srow__fill", { "is-lang": row.isLang }]}
+												data-pj-w={`${Math.round((row.count / max) * 100)}%`}
+											/>
+										</span>
+										<span class="pj-srow__count">
+											{row.count} 个项目
+										</span>
+									</div>
+								))}
+							</div>
+						</section>
+
+						{matrixTechs.length > 0 && matrixProjects.length > 1 && (
+							<section class="pj-sblock" data-pj-reveal>
+								<div class="pj-sblock__head">
+									<h2 class="pj-sblock__title">
+										<Icon is:inline name="material-symbols:grid-on-rounded" />
+										技术 × 项目矩阵
+									</h2>
+									<span class="pj-sblock__count">
+										{matrixTechs.length} 项技术 · {matrixProjects.length} 个项目
+									</span>
+								</div>
+								<div class="pj-smatrix">
+									<table class="pj-smatrix__table">
+										<thead>
+											<tr>
+												<th class="pj-smatrix__corner">技术 / 项目</th>
+												{matrixProjects.map((project) => (
+													<th class="pj-smatrix__col" title={project.title}>
+														{project.title}
+													</th>
+												))}
+											</tr>
+										</thead>
+										<tbody>
+											{matrixTechs.map((tech) => (
+												<tr>
+													<th class="pj-smatrix__row" scope="row">
+														{tech.name}
+													</th>
+													{matrixProjects.map((project) => (
+														<td class="pj-smatrix__cell">
+															{tech.ids.includes(project.id) ? (
+																<span
+																	class="pj-smatrix__on"
+																	title={`${tech.name} · ${project.title}`}
+																/>
+															) : (
+																<span class="pj-smatrix__off" />
+															)}
+														</td>
+													))}
+												</tr>
+											))}
+										</tbody>
+									</table>
+								</div>
+								<p class="pj-snote">
+									亮格 = 该项目用到了这项技术。技术列表只保留出现2 次以上的，避免太稀疏。
+								</p>
+							</section>
+						)}
+					</>
+				)
+			}
+
+			<div class="pj-foot">
+				<a class="pj-foot__link" href="/projects/">
+					<Icon is:inline name="material-symbols:grid-view-rounded" />
+					回项目墙
+				</a>
+				<a class="pj-foot__link" href="/projects/timeline/">
+					<Icon is:inline name="material-symbols:timeline" />
+					看时间线
+				</a>
+			</div>
+		</div>
+	</div>
+
+	<style is:global>
+		.pj {
+			--pj-accent: var(--primary);
+			--pj-on-accent: #ffffff;
+			--pj-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+			--pj-title: var(--text-color);
+			--pj-body: color-mix(in srgb, var(--text-color) 76%, transparent);
+			--pj-muted: color-mix(in srgb, var(--text-color) 58%, transparent);
+			--pj-faint: color-mix(in srgb, var(--text-color) 44%, transparent);
+			--pj-line: var(--line-divider);
+			--pj-surface: var(--card-bg);
+			--pj-sunken: color-mix(in srgb, var(--text-color) 6%, transparent);
+		}
+		html.dark .pj {
+			--pj-on-accent: rgb(0 0 0 / 0.8);
+		}
+		.pj-shell {
+			min-width: 0;
+		}
+
+		.pj-mobile-title {
+			display: flex;
+			flex-direction: column;
+			gap: 0.1rem;
+			margin-bottom: 1.3rem;
+		}
+		.pj-mobile-title__kicker {
+			font-size: 0.62rem;
+			font-weight: 700;
+			letter-spacing: 0.24em;
+			color: var(--pj-accent);
+		}
+		.pj-mobile-title__text {
+			font-size: clamp(1.6rem, 8vw, 2.1rem);
+			font-weight: 800;
+			line-height: 1.12;
+			color: var(--pj-title);
+		}
+
+		.pj-views {
+			display: inline-flex;
+			gap: 0.25rem;
+			margin-bottom: 1.3rem;
+			padding: 0.25rem;
+			border-radius: 999px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-sunken);
+		}
+		.pj-view {
+			padding: 0.32rem 0.8rem;
+			border-radius: 999px;
+			font-size: 0.78rem;
+			font-weight: 600;
+			color: var(--pj-muted);
+			text-decoration: none;
+		}
+		.pj-view:hover {
+			color: var(--pj-accent);
+		}
+		.pj-view.is-on {
+			background: var(--pj-accent);
+			color: var(--pj-on-accent);
+			font-weight: 700;
+		}
+
+		.pj-shead {
+			padding-bottom: 1.15rem;
+			margin-bottom: 1.6rem;
+			border-bottom: 1px dashed var(--pj-line);
+		}
+		.pj-shead__kicker {
+			font-size: 0.66rem;
+			font-weight: 700;
+			letter-spacing: 0.22em;
+			color: var(--pj-accent);
+		}
+		.pj-shead__title {
+			margin: 0.15rem 0 0;
+			font-size: clamp(1.5rem, 4vw, 2rem);
+			font-weight: 800;
+			line-height: 1.15;
+			color: var(--pj-title);
+		}
+		.pj-shead__desc {
+			margin: 0.45rem 0 0;
+			font-size: 0.87rem;
+			line-height: 1.7;
+			color: var(--pj-muted);
+		}
+		.pj-shead__actions:empty {
+			display: none;
+		}
+
+		.pj-sblock {
+			margin-top: 2rem;
+		}
+		.pj-sblock__head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+			margin-bottom: 0.85rem;
+		}
+		.pj-sblock__title {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.38rem;
+			margin: 0;
+			font-size: 1rem;
+			font-weight: 800;
+			color: var(--pj-title);
+		}
+		.pj-sblock__title svg {
+			color: var(--pj-accent);
+		}
+		.pj-sblock__count {
+			font-size: 0.74rem;
+			color: var(--pj-faint);
+		}
+
+		/* ===================== 频次 ===================== */
+		.pj-sgrid {
+			display: flex;
+			flex-direction: column;
+			gap: 0.45rem;
+			padding: 1.05rem 1.1rem;
+			border-radius: 18px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-surface);
+		}
+		.pj-srow {
+			display: grid;
+			grid-template-columns: minmax(0, 7.5rem) minmax(0, 1fr) 4.2rem;
+			align-items: center;
+			gap: 0.55rem;
+		}
+		.pj-srow__name {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.3rem;
+			font-size: 0.76rem;
+			color: var(--pj-body);
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.pj-srow__lang {
+			flex: none;
+			padding: 0.05rem 0.32rem;
+			border-radius: 5px;
+			background: var(--pj-soft);
+			color: var(--pj-accent);
+			font-size: 0.6rem;
+			font-weight: 700;
+		}
+		.pj-srow__track {
+			height: 0.5rem;
+			border-radius: 999px;
+			background: var(--pj-sunken);
+			overflow: hidden;
+		}
+		.pj-srow__fill {
+			display: block;
+			height: 100%;
+			width: 0;
+			border-radius: 999px;
+			background: color-mix(in srgb, var(--pj-accent) 45%, transparent);
+			transition: width 720ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		}
+		.pj-srow__fill.is-lang {
+			background: var(--pj-accent);
+		}
+		.pj-srow__count {
+			font-size: 0.7rem;
+			color: var(--pj-faint);
+			text-align: right;
+			white-space: nowrap;
+		}
+
+		/* ===================== 矩阵 ===================== */
+		.pj-smatrix {
+			overflow-x: auto;
+			padding: 0.9rem;
+			border-radius: 18px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-surface);
+		}
+		.pj-smatrix__table {
+			width: 100%;
+			min-width: 26rem;
+			border-collapse: collapse;
+		}
+		.pj-smatrix__corner {
+			position: sticky;
+			left: 0;
+			padding: 0.4rem 0.5rem;
+			font-size: 0.68rem;
+			font-weight: 700;
+			color: var(--pj-faint);
+			text-align: left;
+			background: var(--pj-surface);
+			white-space: nowrap;
+		}
+		.pj-smatrix__col {
+			max-width: 6.5rem;
+			padding: 0.4rem 0.35rem;
+			font-size: 0.66rem;
+			font-weight: 600;
+			color: var(--pj-muted);
+			text-align: center;
+			vertical-align: bottom;
+		}
+		.pj-smatrix__row {
+			position: sticky;
+			left: 0;
+			padding: 0.35rem 0.5rem;
+			font-size: 0.74rem;
+			font-weight: 600;
+			color: var(--pj-body);
+			text-align: left;
+			background: var(--pj-surface);
+			white-space: nowrap;
+		}
+		.pj-smatrix__cell {
+			padding: 0.35rem;
+			text-align: center;
+		}
+		.pj-smatrix__on {
+			display: inline-block;
+			width: 0.85rem;
+			height: 0.85rem;
+			border-radius: 5px;
+			background: var(--pj-accent);
+		}
+		.pj-smatrix__off {
+			display: inline-block;
+			width: 0.85rem;
+			height: 0.85rem;
+			border-radius: 5px;
+			background: var(--pj-sunken);
+			border: 1px solid var(--pj-line);
+		}
+		.pj-snote {
+			margin: 0.6rem 0 0;
+			font-size: 0.7rem;
+			color: var(--pj-faint);
+		}
+
+		.pj-empty {
+			margin-top: 2.6rem;
+			padding: 2.5rem 1rem;
+			border: 1px dashed var(--pj-line);
+			border-radius: 18px;
+			text-align: center;
+			font-size: 0.85rem;
+			color: var(--pj-muted);
+		}
+		.pj-empty code {
+			padding: 0.1rem 0.35rem;
+			border-radius: 6px;
+			background: var(--pj-sunken);
+			font-size: 0.8rem;
+			color: var(--pj-accent);
+		}
+		.pj-foot {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.6rem;
+			margin-top: 2.4rem;
+			padding-top: 1.1rem;
+			border-top: 1px dashed var(--pj-line);
+		}
+		.pj-foot__link {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.32rem;
+			padding: 0.35rem 0.8rem;
+			border-radius: 999px;
+			border: 1px solid var(--pj-line);
+			background: var(--pj-sunken);
+			font-size: 0.78rem;
+			font-weight: 600;
+			color: var(--pj-muted);
+			text-decoration: none;
+		}
+		.pj-foot__link:hover {
+			color: var(--pj-accent);
+			border-color: color-mix(in srgb, var(--pj-accent) 40%, transparent);
+		}
+
+		.pj [data-pj-reveal] {
+			opacity: 0;
+			transform: translateY(14px);
+			transition:
+				opacity 620ms ease,
+				transform 620ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		}
+		.pj [data-pj-reveal].is-visible {
+			opacity: 1;
+			transform: none;
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.pj [data-pj-reveal] {
+				opacity: 1;
+				transform: none;
+				transition: none;
+			}
+		}
+	</style>
+
+	<script>
+		function initProjectStack() {
+			const root = document.querySelector<HTMLElement>("[data-pj-root]");
+			if (!root) return;
+			type Pw = Window & { __pjStackObserver?: { disconnect: () => void } };
+			const pw = window as Pw;
+			pw.__pjStackObserver?.disconnect();
+
+			const grow = (scope: HTMLElement) => {
+				for (const bar of scope.querySelectorAll<HTMLElement>("[data-pj-w]")) {
+					const target = bar.dataset.pjW;
+					if (!target) continue;
+					bar.style.width = "0%";
+					requestAnimationFrame(() => {
+						requestAnimationFrame(() => {
+							bar.style.width = target;
+						});
+					});
+				}
+			};
+
+			const nodes = Array.from(
+				root.querySelectorAll<HTMLElement>("[data-pj-reveal]:not(.is-visible)"),
+			);
+			const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+			const showAll = () => {
+				for (const node of nodes) {
+					node.classList.add("is-visible");
+					grow(node);
+				}
+			};
+			if (reduceMotion || !("IntersectionObserver" in window)) {
+				showAll();
+				return;
+			}
+			const observer = new IntersectionObserver(
+				(entries, obs) => {
+					for (const entry of entries) {
+						if (!entry.isIntersecting) continue;
+						const node = entry.target as HTMLElement;
+						node.classList.add("is-visible");
+						grow(node);
+						obs.unobserve(node);
+					}
+				},
+				{ threshold: 0.08, rootMargin: "0px 0px -5% 0px" },
+			);
+			for (const node of nodes) observer.observe(node);
+			pw.__pjStackObserver = observer;
+		}
+
+		initProjectStack();
+		document.addEventListener("astro:page-load", initProjectStack);
+		document.addEventListener("swup:contentReplaced", initProjectStack);
+	</script>
+</MainGridLayout>

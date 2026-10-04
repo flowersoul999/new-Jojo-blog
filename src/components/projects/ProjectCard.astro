@@ -1,0 +1,401 @@
+---
+// 项目墙 · 卡片
+// 筛选靠 data-pj-* 属性交给页面脚本处理，这里只负责渲染和排版。
+import { Icon } from "astro-icon/components";
+import { PROJECT_CATEGORY_MAP, PROJECT_STATUS_MAP } from "@/data/projects";
+
+export interface ProjectCardData {
+	id: string;
+	title: string;
+	summary: string;
+	role: string;
+	period: string;
+	status: string;
+	category: string;
+	stack: string[];
+	metrics: { label: string; value: string }[];
+	featured: boolean;
+	icon: string;
+	repo: string;
+	links: { label: string; href: string; icon: string }[];
+}
+
+interface Props {
+	project: ProjectCardData;
+}
+
+const { project } = Astro.props;
+const status = PROJECT_STATUS_MAP[project.status];
+const tone = status?.tone ?? "gray";
+const category = PROJECT_CATEGORY_MAP[project.category];
+// 首字：优先用项目自带的图标字符，否则取标题第一个非空格字符
+const mark = project.icon || project.title.trim().charAt(0) || "P";
+---
+
+<article
+	class:list={["pj-card", { "pj-card--featured": project.featured }]}
+	data-pj-card
+	data-id={project.id}
+	data-title={project.title}
+	data-summary={project.summary}
+	data-role={project.role}
+	data-category={project.category}
+	data-status={project.status}
+	data-stack={project.stack.join("|")}
+	data-date={`${project.period}|${project.id}`}
+>
+	<header class="pj-card__head">
+		<span class="pj-card__mark" aria-hidden="true">{mark}</span>
+		<div class="pj-card__ident">
+			<h3 class="pj-card__title">
+				<a class="pj-card__link" href={`/projects/${project.id}/`}>{project.title}</a>
+			</h3>
+			<p class="pj-card__meta">
+				<span class="pj-card__role">{project.role}</span>
+				<span class="pj-card__dot" aria-hidden="true">·</span>
+				<span class="pj-card__period">{project.period}</span>
+			</p>
+		</div>
+		<div class="pj-card__badges">
+			{
+				project.featured && (
+					<span class="pj-card__badge pj-card__badge--star" title="代表作">
+						<Icon is:inline name="material-symbols:star" />
+						<span class="sr-only">代表作</span>
+					</span>
+				)
+			}
+			<span class:list={["pj-status", `pj-status--${tone}`]}>
+				<span class="pj-status__dot" aria-hidden="true" />
+				{project.status}
+			</span>
+		</div>
+	</header>
+
+	<p class="pj-card__summary">{project.summary}</p>
+
+	{
+		category && (
+			<p class="pj-card__category">
+				<Icon is:inline name={category.icon} />
+				<span>{category.desc}</span>
+			</p>
+		)
+	}
+
+	{
+		project.metrics.length > 0 && (
+			<ul class="pj-card__metrics">
+				{project.metrics.slice(0, 3).map((metric) => (
+					<li class="pj-card__metric">
+						<span class="pj-card__metric-value">{metric.value}</span>
+						<span class="pj-card__metric-label">{metric.label}</span>
+					</li>
+				))}
+			</ul>
+		)
+	}
+
+	{
+		project.stack.length > 0 && (
+			<ul class="pj-card__stack">
+				{project.stack.slice(0, 6).map((tech) => (
+					<li class="pj-stacktag" data-pj-stacktag={tech}>
+						{tech}
+					</li>
+				))}
+				{project.stack.length > 6 && (
+					<li class="pj-stacktag pj-stacktag--more">+{project.stack.length - 6}</li>
+				)}
+			</ul>
+		)
+	}
+
+	<footer class="pj-card__foot">
+		<a class="pj-card__more" href={`/projects/${project.id}/`}>
+			看详情
+			<Icon is:inline name="material-symbols:arrow-forward" />
+		</a>
+		<div class="pj-card__links">
+			{
+				project.links.slice(0, 3).map((link) => (
+					<a
+						class="pj-card__linkout"
+						href={link.href}
+						target={link.href.startsWith("http") ? "_blank" : undefined}
+						rel={link.href.startsWith("http") ? "noreferrer noopener" : undefined}
+						title={link.label}
+					>
+						<Icon is:inline name={link.icon} />
+						<span class="sr-only">{link.label}</span>
+					</a>
+				))
+			}
+		</div>
+	</footer>
+</article>
+
+<style>
+	.pj-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 1.1rem 1.15rem 1.05rem;
+		border-radius: 18px;
+		border: 1px solid var(--pj-line);
+		background: var(--pj-surface);
+		transition:
+			border-color 200ms ease,
+			transform 200ms ease,
+			box-shadow 200ms ease;
+	}
+	.pj-card:hover {
+		border-color: color-mix(in srgb, var(--pj-accent) 45%, transparent);
+		transform: translateY(-2px);
+		box-shadow: 0 14px 34px -20px rgb(0 0 0 / 0.35);
+	}
+	/* 筛选隐藏：不占位，直接从布局里拿掉 */
+	.pj-card[hidden] {
+		display: none;
+	}
+	.pj-card--featured {
+		border-color: color-mix(in srgb, var(--pj-accent) 32%, transparent);
+		background: color-mix(in srgb, var(--pj-accent) 4%, var(--pj-surface));
+	}
+
+	/* ===================== 头部 ===================== */
+	.pj-card__head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.7rem;
+	}
+	.pj-card__mark {
+		flex: none;
+		width: 2.5rem;
+		height: 2.5rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 14px;
+		background: var(--pj-soft);
+		color: var(--pj-accent);
+		font-size: 1.1rem;
+		font-weight: 800;
+	}
+	.pj-card__ident {
+		min-width: 0;
+		flex: 1;
+	}
+	.pj-card__title {
+		margin: 0;
+		font-size: 1.02rem;
+		font-weight: 800;
+		line-height: 1.35;
+		color: var(--pj-title);
+	}
+	.pj-card__link {
+		color: inherit;
+		text-decoration: none;
+	}
+	.pj-card__link::after {
+		/* 整卡可点，但不让 title 里的下划线被 hover 触发两次 */
+		content: "";
+	}
+	.pj-card__meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.3rem;
+		margin: 0.2rem 0 0;
+		font-size: 0.74rem;
+		color: var(--pj-muted);
+	}
+	.pj-card__dot {
+		color: var(--pj-faint);
+	}
+	.pj-card__badges {
+		flex: none;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.3rem;
+	}
+	.pj-card__badge--star {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.35rem;
+		height: 1.35rem;
+		border-radius: 8px;
+		background: color-mix(in srgb, #f5a524 18%, transparent);
+		color: #f5a524;
+		font-size: 0.9rem;
+	}
+
+	.pj-status {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.28rem;
+		padding: 0.12rem 0.55rem 0.12rem 0.45rem;
+		border-radius: 999px;
+		font-size: 0.68rem;
+		font-weight: 700;
+		white-space: nowrap;
+		border: 1px solid currentcolor;
+	}
+	.pj-status__dot {
+		width: 0.36rem;
+		height: 0.36rem;
+		border-radius: 999px;
+		background: currentcolor;
+	}
+	.pj-status--green {
+		color: #1d9e75;
+		background: color-mix(in srgb, #1d9e75 12%, transparent);
+	}
+	.pj-status--blue {
+		color: #378add;
+		background: color-mix(in srgb, #378add 12%, transparent);
+	}
+	.pj-status--gray {
+		color: #888780;
+		background: color-mix(in srgb, #888780 12%, transparent);
+	}
+
+	/* ===================== 摘要 ===================== */
+	.pj-card__summary {
+		margin: 0;
+		font-size: 0.85rem;
+		line-height: 1.75;
+		color: var(--pj-body);
+	}
+	.pj-card__category {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.32rem;
+		margin: 0;
+		font-size: 0.72rem;
+		line-height: 1.6;
+		color: var(--pj-faint);
+	}
+	.pj-card__category svg {
+		flex: none;
+		margin-top: 0.1rem;
+	}
+
+	/* ===================== 指标 ===================== */
+	.pj-card__metrics {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+		gap: 0.4rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.pj-card__metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.05rem;
+		padding: 0.45rem 0.55rem;
+		border-radius: 11px;
+		background: var(--pj-sunken);
+	}
+	.pj-card__metric-value {
+		font-size: 0.84rem;
+		font-weight: 800;
+		line-height: 1.3;
+		color: var(--pj-title);
+	}
+	.pj-card__metric-label {
+		font-size: 0.65rem;
+		color: var(--pj-muted);
+	}
+
+	/* ===================== 技术栈 ===================== */
+	.pj-card__stack {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.pj-stacktag {
+		padding: 0.2rem 0.55rem;
+		border-radius: 999px;
+		background: var(--pj-sunken);
+		border: 1px solid var(--pj-line);
+		font-size: 0.7rem;
+		color: var(--pj-muted);
+		transition:
+			background 180ms ease,
+			color 180ms ease;
+	}
+	/* 被选中的技术栈高亮 */
+	.pj-stacktag.is-on {
+		background: var(--pj-soft);
+		border-color: color-mix(in srgb, var(--pj-accent) 40%, transparent);
+		color: var(--pj-accent);
+		font-weight: 700;
+	}
+	.pj-stacktag--more {
+		color: var(--pj-faint);
+	}
+
+	/* ===================== 底部 ===================== */
+	.pj-card__foot {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem;
+		margin-top: auto;
+		padding-top: 0.35rem;
+	}
+	.pj-card__more {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.22rem;
+		font-size: 0.78rem;
+		font-weight: 700;
+		color: var(--pj-accent);
+		text-decoration: none;
+	}
+	.pj-card__more:hover {
+		text-decoration: underline;
+	}
+	.pj-card__links {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+	.pj-card__linkout {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.7rem;
+		height: 1.7rem;
+		border-radius: 9px;
+		color: var(--pj-muted);
+		font-size: 1rem;
+		text-decoration: none;
+		transition:
+			background 180ms ease,
+			color 180ms ease;
+	}
+	.pj-card__linkout:hover {
+		background: var(--pj-soft);
+		color: var(--pj-accent);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
+	}
+</style>

@@ -115,6 +115,8 @@ export const siteConfig: SiteConfig = {
 		diary: true,
 		// 实习经历页面（Golden Experience）开关
 		internship: true,
+		// 项目页面开关
+		projects: true,
 	},
 
 	// 分类导航栏开关，在首页、归档页和文章详情页顶部显示分类快捷导航

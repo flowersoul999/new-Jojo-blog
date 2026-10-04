@@ -1,0 +1,187 @@
+---
+// 项目页 · 页头：站标 + 标题 + 一句话定位 + 统计指标 + 快捷入口
+import { Icon } from "astro-icon/components";
+import type { ProjectLink, ProjectProfile } from "@/data/projects";
+
+interface Props {
+	profile: ProjectProfile;
+	links: ProjectLink[];
+	metrics: { label: string; value: string; icon: string }[];
+}
+
+const { profile, links, metrics } = Astro.props;
+---
+
+<header class="pj-head" data-pj-reveal>
+	<div class="pj-head__badge">
+		<Icon is:inline name="material-symbols:widgets-rounded" class="text-[1.5rem]" />
+	</div>
+	<div class="pj-head__text">
+		<div class="pj-head__kicker">{profile.kicker}</div>
+		<div class="pj-head__actions">
+			<slot name="actions" />
+		</div>
+		<h1 class="pj-head__title">{profile.title}</h1>
+		<p class="pj-head__tagline">{profile.tagline}</p>
+	</div>
+</header>
+
+<p class="pj-intro" data-pj-reveal>{profile.intro}</p>
+
+<ul class="pj-metrics" data-pj-reveal>
+	{
+		metrics.map((metric) => (
+			<li class="pj-metric">
+				<span class="pj-metric__icon" aria-hidden="true">
+					<Icon is:inline name={`material-symbols:${metric.icon}`} class="text-[1.2rem]" />
+				</span>
+				<span class="pj-metric__value">{metric.value}</span>
+				<span class="pj-metric__label">{metric.label}</span>
+			</li>
+		))
+	}
+</ul>
+
+{
+	links.length > 0 && (
+		<div class="pj-links" data-pj-reveal>
+			{links.map((link) => (
+				<a
+					class="pj-link"
+					href={link.href}
+					target={link.external ? "_blank" : undefined}
+					rel={link.external ? "noreferrer noopener" : undefined}
+				>
+					<span>{link.label}</span>
+					<Icon is:inline name={link.icon} class="text-base" />
+				</a>
+			))}
+		</div>
+	)
+}
+
+<style>
+	.pj-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.9rem;
+		padding-bottom: 1.15rem;
+		margin-bottom: 1.4rem;
+		border-bottom: 1px dashed var(--pj-line);
+	}
+	.pj-head__badge {
+		flex: none;
+		width: 2.6rem;
+		height: 2.6rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 14px;
+		background: var(--pj-soft);
+		color: var(--pj-accent);
+	}
+	.pj-head__text {
+		min-width: 0;
+		flex: 1;
+	}
+	.pj-head__kicker {
+		font-size: 0.66rem;
+		font-weight: 700;
+		letter-spacing: 0.22em;
+		color: var(--pj-accent);
+	}
+	.pj-head__top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+	/* 没传 actions 时不占位 */
+	.pj-head__actions:empty {
+		display: none;
+	}
+	.pj-head__title {
+		margin: 0.1rem 0 0;
+		font-size: clamp(1.6rem, 4vw, 2.15rem);
+		font-weight: 800;
+		line-height: 1.12;
+		letter-spacing: -0.01em;
+		color: var(--pj-title);
+	}
+	.pj-head__tagline {
+		margin: 0.4rem 0 0;
+		font-size: 0.86rem;
+		line-height: 1.6;
+		color: var(--pj-muted);
+	}
+
+	.pj-intro {
+		margin: 0 0 1.2rem;
+		font-size: 0.92rem;
+		line-height: 1.85;
+		color: var(--pj-body);
+	}
+
+	/* ===================== 指标 ===================== */
+	.pj-metrics {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+		gap: 0.6rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.pj-metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		padding: 0.75rem 0.85rem;
+		border-radius: 14px;
+		background: var(--pj-sunken);
+		border: 1px solid var(--pj-line);
+	}
+	.pj-metric__icon {
+		color: var(--pj-accent);
+		line-height: 1;
+		margin-bottom: 0.15rem;
+	}
+	.pj-metric__value {
+		font-size: 1.1rem;
+		font-weight: 800;
+		line-height: 1.25;
+		color: var(--pj-title);
+	}
+	.pj-metric__label {
+		font-size: 0.7rem;
+		color: var(--pj-muted);
+	}
+
+	/* ===================== 快捷入口 ===================== */
+	.pj-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 1rem;
+	}
+	.pj-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.85rem;
+		border-radius: 999px;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--pj-accent);
+		background: var(--pj-soft);
+		border: 1px solid color-mix(in srgb, var(--pj-accent) 26%, transparent);
+		text-decoration: none;
+		transition:
+			background 200ms ease,
+			transform 200ms ease;
+	}
+	.pj-link:hover {
+		background: color-mix(in srgb, var(--pj-accent) 20%, transparent);
+		transform: translateY(-1px);
+	}
+</style>
