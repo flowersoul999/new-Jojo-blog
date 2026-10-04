@@ -106,11 +106,26 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 
 				<div class="diary-compose-row">
 					<span class="diary-compose-label">图片</span>
-					<textarea
-						id="diary-compose-images"
-						class="diary-compose-input diary-compose-images"
-						placeholder="图片链接，一行一个（可留空）"
-					></textarea>
+					<div class="diary-compose-imgs">
+						<input type="file" id="diary-compose-file" accept="image/*" multiple class="hidden" />
+						<button
+							type="button"
+							id="diary-compose-drop"
+							class="diary-compose-drop"
+							aria-label="添加图片：点击选择，或把图片拖到这里"
+						>
+							<Icon is:inline name="material-symbols:add-photo-alternate" class="text-xl" />
+							<span>点击选择图片，或把图片拖到这里</span>
+							<em>自动压缩为 WebP（质量 80%，最长边 1600px），单张不超过 15 MB</em>
+						</button>
+						<div id="diary-compose-thumbs" class="diary-compose-thumbs"></div>
+						<input
+							type="text"
+							id="diary-compose-url"
+							class="diary-compose-input diary-compose-url"
+							placeholder="或粘贴图片链接，回车添加（可留空）"
+						/>
+					</div>
 				</div>
 
 				<label class="diary-compose-private">
@@ -222,9 +237,112 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			resize: vertical;
 			line-height: 1.7;
 		}
-		.diary-compose-images {
-			min-height: 3.4rem;
-			resize: vertical;
+		.diary-compose-imgs {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+		.diary-compose-drop {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 0.15rem;
+			width: 100%;
+			padding: 0.85rem 0.75rem;
+			border: 1px dashed color-mix(in srgb, var(--primary) 45%, transparent);
+			border-radius: 0.75rem;
+			background: color-mix(in srgb, var(--primary) 4%, transparent);
+			color: color-mix(in srgb, var(--deep-text) 62%, transparent);
+			cursor: pointer;
+			text-align: center;
+			transition:
+				border-color 200ms ease,
+				background 200ms ease,
+				color 200ms ease;
+		}
+		.diary-compose-drop:hover,
+		.diary-compose-drop.is-drag {
+			border-color: var(--primary);
+			background: color-mix(in srgb, var(--primary) 10%, transparent);
+			color: var(--deep-text);
+		}
+		.diary-compose-drop span {
+			font-size: 0.8rem;
+			color: var(--deep-text);
+		}
+		.diary-compose-drop em {
+			font-size: 0.68rem;
+			font-style: normal;
+			opacity: 0.75;
+		}
+		.diary-compose-thumbs {
+			display: grid;
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			gap: 0.4rem;
+		}
+		.diary-compose-thumbs:empty {
+			display: none;
+		}
+		.diary-compose-thumb {
+			position: relative;
+			aspect-ratio: 1;
+			border-radius: 0.5rem;
+			overflow: hidden;
+			border: 1px solid var(--line-divider);
+			background: color-mix(in srgb, var(--deep-text) 6%, transparent);
+		}
+		.diary-compose-thumb img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+		.diary-compose-thumb-bar {
+			position: absolute;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.25rem;
+			padding: 0.15rem 0.3rem;
+			background: rgb(0 0 0 / 0.55);
+			color: #fff;
+			font-size: 0.6rem;
+			line-height: 1.4;
+		}
+		.diary-compose-thumb-del {
+			position: absolute;
+			top: 0.2rem;
+			right: 0.2rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 1.15rem;
+			height: 1.15rem;
+			border: none;
+			border-radius: 999px;
+			background: rgb(0 0 0 / 0.55);
+			color: #fff;
+			font-size: 0.7rem;
+			line-height: 1;
+			cursor: pointer;
+			transition: background 200ms ease;
+		}
+		.diary-compose-thumb-del:hover {
+			background: rgb(0 0 0 / 0.78);
+		}
+		.diary-compose-thumb.is-busy::after {
+			content: "";
+			position: absolute;
+			inset: 0;
+			background: rgb(0 0 0 / 0.45);
+		}
+		.diary-compose-url {
 			font-size: 0.8rem;
 		}
 		.diary-compose-row {
@@ -668,6 +786,18 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		var UNLOCK_KEY = "aemeath-diary-unlocked";
 		var DRAG_THRESHOLD = 6; // 拖动超过该像素才算拖动，否则视为点击
 
+		/* 私密日记解锁：走全站共用的居中弹窗（Layout 里的 DiaryUnlockDialog） */
+		function askDiaryPassword() {
+			if (typeof window.__diaryUnlock !== "function") {
+				return Promise.resolve(window.prompt("这是一篇私密日记，请输入密码：") === DIARY_PASSWORD);
+			}
+			return window.__diaryUnlock({
+				verify: function (pwd) {
+					return pwd === DIARY_PASSWORD;
+				},
+			});
+		}
+
 		var board = document.getElementById("diary-board");
 		var shuffleBtn = document.getElementById("diary-shuffle");
 		var composeBtn = document.getElementById("diary-compose-btn");
@@ -938,17 +1068,15 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		/* ---------- 点击纸片：跳转详情 / 解锁 ---------- */
 		function handleEntryClick(entry) {
 			if (isLocked(entry)) {
-				var pwd = prompt("这是一篇私密日记，请输入密码：");
-				if (pwd === DIARY_PASSWORD) {
+				askDiaryPassword().then(function (ok) {
+					if (!ok) return;
 					try {
 						sessionStorage.setItem(UNLOCK_KEY, "1");
 					} catch (e) {}
 					unlocked = true;
 					renderBoard();
 					gotoDiary(entry.slug);
-				} else if (pwd !== null) {
-					alert("密码错误");
-				}
+				});
 				return;
 			}
 			gotoDiary(entry.slug);
@@ -1029,12 +1157,27 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		var composeStatus = document.getElementById("diary-compose-status");
 		var composeTitle = document.getElementById("diary-compose-title");
 		var composeContent = document.getElementById("diary-compose-content");
-		var composeImages = document.getElementById("diary-compose-images");
+		var composeImages = document.getElementById("diary-compose-thumbs");
+		var composeDrop = document.getElementById("diary-compose-drop");
+		var composeFile = document.getElementById("diary-compose-file");
+		var composeUrl = document.getElementById("diary-compose-url");
 		var composePrivate = document.getElementById("diary-compose-private");
 		var composeMoods = document.getElementById("diary-compose-moods");
 		var composeMood = "neutral";
 		var composeSaving = false;
 		var DIARY_JSON_PATH = "public/diary/index.json";
+		// 本地图片落盘目录（与既有 public/diary/images/ 一致）
+		var DIARY_IMAGE_DIR = "public/diary/images";
+		// 图片压缩参数：与 src/utils/image-compress.ts 保持一致（WebP 质量 0.8）
+		var IMAGE_QUALITY = 0.8;
+		// 最长边限制：日记是碎碎念，小图足够，避免上传体积拖垮 GitHub Contents API
+		var IMAGE_MAX_EDGE = 1600;
+		// 单张原图上限，超出直接拒绝，避免解码时把浏览器内存打爆
+		var MAX_IMAGE_SIZE = 15 * 1024 * 1024;
+
+		// 待上传图片列表：{ id, name, url, dataUrl, width, height, size, hash }
+		// url 类型为用户直接粘贴的链接；file 类型走「压缩 → 上传 public/diary/images/」
+		var pendingImages = [];
 
 		// 渲染心情选项（默认选中"平平淡淡"）
 		Object.keys(MOOD_MAP).forEach(function (key) {
@@ -1070,14 +1213,237 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			composeStatus.classList.toggle("is-error", !!isError);
 		}
 
+		/* ---------- 图片：压缩（与 src/utils/image-compress.ts 同算法） ---------- */
+		// 这里不能直接 import 工具函数（页面脚本是 is:inline，不经过打包），
+		// 所以按同一套参数内联一份：createImageBitmap 解码 → canvas 等比缩放 → toBlob('image/webp', 0.8)
+		function formatBytes(bytes) {
+			if (bytes < 1024) return bytes + " B";
+			if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+			return (bytes / 1024 / 1024).toFixed(2) + " MB";
+		}
+
+		function compressImage(file) {
+			return new Promise(function (resolve, reject) {
+				var done = function (source, w, h) {
+					var ratio = Math.min(1, IMAGE_MAX_EDGE / Math.max(w, h));
+					var width = Math.max(1, Math.round(w * ratio));
+					var height = Math.max(1, Math.round(h * ratio));
+					var canvas = document.createElement("canvas");
+					canvas.width = width;
+					canvas.height = height;
+					var ctx = canvas.getContext("2d");
+					if (!ctx) return reject(new Error("无法初始化画布"));
+					ctx.drawImage(source, 0, 0, width, height);
+					canvas.toBlob(
+						function (blob) {
+							if (!blob) return reject(new Error("无法生成图片文件"));
+							var reader = new FileReader();
+							reader.onload = function () {
+								resolve({
+									dataUrl: reader.result,
+									width: width,
+									height: height,
+									size: blob.size,
+								});
+							};
+							reader.onerror = function () {
+								reject(new Error("图片读取失败"));
+							};
+							reader.readAsDataURL(blob);
+						},
+						"image/webp",
+						IMAGE_QUALITY
+					);
+				};
+
+				if (typeof createImageBitmap === "function") {
+					createImageBitmap(file)
+						.then(function (bitmap) {
+							done(bitmap, bitmap.width, bitmap.height);
+						})
+						.catch(function () {
+							reject(new Error("无法解码该图片，格式可能不受支持"));
+						});
+					return;
+				}
+				// 旧浏览器回退：<img> 解码
+				var objUrl = URL.createObjectURL(file);
+				var img = new Image();
+				img.onload = function () {
+					var w = img.naturalWidth;
+					var h = img.naturalHeight;
+					URL.revokeObjectURL(objUrl);
+					done(img, w, h);
+				};
+				img.onerror = function () {
+					URL.revokeObjectURL(objUrl);
+					reject(new Error("无法解码该图片，格式可能不受支持"));
+				};
+				img.src = objUrl;
+			});
+		}
+
+		function renderThumbs() {
+			composeImages.innerHTML = "";
+			pendingImages.forEach(function (item) {
+				var box = document.createElement("div");
+				box.className = "diary-compose-thumb" + (item.busy ? " is-busy" : "");
+
+				var im = document.createElement("img");
+				im.src = item.dataUrl || item.url;
+				im.alt = "";
+				box.appendChild(im);
+
+				var del = document.createElement("button");
+				del.type = "button";
+				del.className = "diary-compose-thumb-del";
+				del.setAttribute("aria-label", "移除图片");
+				del.textContent = "×";
+				del.addEventListener("click", function () {
+					pendingImages = pendingImages.filter(function (x) {
+						return x.id !== item.id;
+					});
+					renderThumbs();
+				});
+				box.appendChild(del);
+
+				var bar = document.createElement("div");
+				bar.className = "diary-compose-thumb-bar";
+				var left = document.createElement("span");
+				// 粘贴链接的图拿不到本地体积，只标来源，避免显示无意义的 0 B
+				left.textContent = item.busy
+					? "上传中…"
+					: item.kind === "url"
+						? "链接"
+						: formatBytes(item.size || 0);
+				var right = document.createElement("span");
+				right.textContent = item.width ? item.width + "×" + item.height : "外链";
+				bar.appendChild(left);
+				bar.appendChild(right);
+				box.appendChild(bar);
+
+				composeImages.appendChild(box);
+			});
+		}
+
+		// 选中文件 → 压缩 → 加入列表（此时还未落盘，发表时统一上传）
+		function addImageFiles(files) {
+			var arr = Array.prototype.slice.call(files || []);
+			var imageFiles = arr.filter(function (f) {
+				return f.type && f.type.indexOf("image/") === 0;
+			});
+			if (arr.length - imageFiles.length > 0) {
+				showToast(arr.length - imageFiles.length + " 个文件不是图片，已忽略");
+			}
+			if (!imageFiles.length) return;
+
+			var queue = imageFiles.slice();
+			var total = queue.length;
+			var done = 0;
+			var added = 0;
+
+			function next() {
+				if (!queue.length) {
+					setComposeStatus("");
+					if (added) showToast("已添加 " + added + " 张图片（已压缩）");
+					return;
+				}
+				var file = queue.shift();
+				var index = ++done;
+				setComposeStatus("正在压缩 " + index + "/" + total + "：" + file.name);
+
+				if (file.size > MAX_IMAGE_SIZE) {
+					showToast(file.name + " 超过 15 MB，已跳过");
+					next();
+					return;
+				}
+
+				compressImage(file)
+					.then(function (res) {
+						pendingImages.push({
+							id: "img-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+							name: file.name,
+							dataUrl: res.dataUrl,
+							width: res.width,
+							height: res.height,
+							size: res.size,
+							busy: false,
+						});
+						added++;
+						renderThumbs();
+						next();
+					})
+					.catch(function (err) {
+						console.error("图片压缩失败", file, err);
+						showToast(file.name + " 压缩失败，已跳过");
+						next();
+					});
+			}
+
+			next();
+		}
+
+		// 粘贴图片链接（回车 / 点击「添加」）
+		function addUrlImage() {
+			var url = composeUrl.value.trim();
+			if (!url) return;
+			var exists = pendingImages.some(function (x) {
+				return x.kind === "url" && x.url === url;
+			});
+			if (exists) {
+				showToast("该图片已在列表中");
+				return;
+			}
+			pendingImages.push({
+				id: "img-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+				kind: "url",
+				url: url,
+				dataUrl: "",
+				busy: false,
+			});
+			composeUrl.value = "";
+			renderThumbs();
+		}
+
 		function openCompose() {
 			setComposeStatus("");
 			composeModal.hidden = false;
+			renderThumbs();
 			composeContent.focus();
 		}
 
 		function closeCompose() {
 			composeModal.hidden = true;
+		}
+
+		// 把压缩后的 dataURL 落到 public/diary/images/{时间戳}-{随机}.webp
+		// 文件名沿用既有 images/ 目录里的格式；已拿到 url 的直接跳过（失败重试时幂等）
+		function uploadDiaryImage(item) {
+			if (item.url) return Promise.resolve(item.url);
+			var filename =
+				Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".webp";
+			var publicPath = "/diary/images/" + filename;
+			return fetch("/api/content/write/", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					path: DIARY_IMAGE_DIR + "/" + filename,
+					content: (item.dataUrl || "").split(",")[1] || "",
+					encoding: "base64",
+					message: "上传日记图片: " + (item.name || filename),
+				}),
+			})
+				.then(function (r) {
+					return r.json().then(function (data) {
+						if (!r.ok) throw new Error(data.error || "图片上传失败");
+						return publicPath;
+					});
+				})
+				.then(function (path) {
+					item.url = path;
+					item.busy = false;
+					return path;
+				});
 		}
 
 		// 生成 slug：diary-YYYYMMDD-xxxxxx（与现有数据格式一致）
@@ -1114,73 +1480,96 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				setComposeStatus("内容不能为空", true);
 				return;
 			}
-			var imageUrls = composeImages.value
-				.split("\n")
-				.map(function (s) {
-					return s.trim();
-				})
-				.filter(function (s) {
-					return !!s;
-				});
-
-			var entry = {
-				slug: genSlug(),
-				title: composeTitle.value.trim(),
-				content: content,
-				date: localDateStr(),
-				tags: [],
-				images: imageUrls.map(function (url) {
-					return { url: url };
-				}),
-				isPrivate: composePrivate.checked,
-				mood: composeMood,
-			};
+			var localImages = pendingImages.filter(function (x) {
+				return x.kind !== "url";
+			});
 
 			composeSaving = true;
 			composeSubmit.disabled = true;
-			setComposeStatus("正在保存...");
 
-			// 先读最新文件内容和 sha（GitHub Contents API 更新时必须带 sha），避免覆盖别处的新改动
-			fetch("/api/content/read/?path=" + encodeURIComponent(DIARY_JSON_PATH))
-				.then(function (r) {
-					if (!r.ok) throw new Error("读取日记数据失败");
-					return r.json();
-				})
-				.then(function (file) {
-					var arr;
-					try {
-						arr = JSON.parse(file.content || "[]");
-					} catch (e) {
-						arr = [];
-					}
-					if (!Array.isArray(arr)) arr = [];
-					arr.unshift(entry);
-					return fetch("/api/content/write/", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({
-							path: DIARY_JSON_PATH,
-							content: JSON.stringify(arr, null, 2) + "\n",
-							sha: file.sha,
-							message: "新增日记: " + (entry.title || entry.slug),
+			// 先把所有本地图片压缩产物落盘，拿到最终 URL 后再写日记 JSON
+			var uploadAll = localImages.reduce(
+				function (chain, item, i) {
+					return chain.then(function () {
+						item.busy = true;
+						renderThumbs();
+						setComposeStatus(
+							"正在上传图片 " + (i + 1) + "/" + localImages.length + "…"
+						);
+						return uploadDiaryImage(item);
+					});
+				},
+				Promise.resolve()
+			);
+
+			uploadAll
+				.then(function () {
+					var entry = {
+						slug: genSlug(),
+						title: composeTitle.value.trim(),
+						content: content,
+						date: localDateStr(),
+						tags: [],
+						images: pendingImages.map(function (item) {
+							return { url: item.url };
 						}),
-					});
-				})
-				.then(function (r) {
-					return r.json().then(function (data) {
-						if (!r.ok) throw new Error(data.error || "保存失败");
-						// 立即更新本地数据并重渲染，无需等部署
-						entries.unshift(entry);
-						renderBoard();
-						closeCompose();
-						composeTitle.value = "";
-						composeContent.value = "";
-						composeImages.value = "";
-						composePrivate.checked = false;
-						showToast("日记已发表，全站生效约需 1-2 分钟（等待重新部署）");
-					});
+						isPrivate: composePrivate.checked,
+						mood: composeMood,
+					};
+
+					setComposeStatus("正在保存...");
+
+					// 先读最新文件内容和 sha（GitHub Contents API 更新时必须带 sha），避免覆盖别处的新改动
+					return fetch(
+						"/api/content/read/?path=" + encodeURIComponent(DIARY_JSON_PATH)
+					)
+						.then(function (r) {
+							if (!r.ok) throw new Error("读取日记数据失败");
+							return r.json();
+						})
+						.then(function (file) {
+							var arr;
+							try {
+								arr = JSON.parse(file.content || "[]");
+							} catch (e) {
+								arr = [];
+							}
+							if (!Array.isArray(arr)) arr = [];
+							arr.unshift(entry);
+							return fetch("/api/content/write/", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({
+									path: DIARY_JSON_PATH,
+									content: JSON.stringify(arr, null, 2) + "\n",
+									sha: file.sha,
+									message: "新增日记: " + (entry.title || entry.slug),
+								}),
+							});
+						})
+						.then(function (r) {
+							return r.json().then(function (data) {
+								if (!r.ok) throw new Error(data.error || "保存失败");
+								// 立即更新本地数据并重渲染，无需等部署
+								entries.unshift(entry);
+								renderBoard();
+								closeCompose();
+								composeTitle.value = "";
+								composeContent.value = "";
+								composeUrl.value = "";
+								pendingImages = [];
+								renderThumbs();
+								composePrivate.checked = false;
+								showToast("日记已发表，全站生效约需 1-2 分钟（等待重新部署）");
+							});
+						});
 				})
 				.catch(function (err) {
+					// 图片可能已部分落盘，重试时靠 HEAD 检查跳过已存在的文件
+					pendingImages.forEach(function (item) {
+						item.busy = false;
+					});
+					renderThumbs();
 					setComposeStatus(err.message || "保存失败", true);
 				})
 				.finally(function () {
@@ -1193,6 +1582,42 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		composeClose.addEventListener("click", closeCompose);
 		composeMask.addEventListener("click", closeCompose);
 		composeSubmit.addEventListener("click", submitCompose);
+
+		/* 图片：点击选文件 / 拖拽 / 粘贴链接 */
+		composeDrop.addEventListener("click", function () {
+			composeFile.click();
+		});
+		composeFile.addEventListener("change", function () {
+			addImageFiles(composeFile.files);
+			composeFile.value = "";
+		});
+		composeUrl.addEventListener("keydown", function (e) {
+			if (e.key === "Enter") {
+				e.preventDefault();
+				addUrlImage();
+			}
+		});
+		// 整个弹窗都作为拖放区：从桌面拖图片进来松手即可添加
+		["dragenter", "dragover"].forEach(function (type) {
+			composeModal.addEventListener(type, function (e) {
+				if (!e.dataTransfer || Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") === -1) {
+					return;
+				}
+				e.preventDefault();
+				composeDrop.classList.add("is-drag");
+			});
+		});
+		["dragleave", "dragend"].forEach(function (type) {
+			composeModal.addEventListener(type, function () {
+				composeDrop.classList.remove("is-drag");
+			});
+		});
+		composeModal.addEventListener("drop", function (e) {
+			if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+			e.preventDefault();
+			composeDrop.classList.remove("is-drag");
+			addImageFiles(e.dataTransfer.files);
+		});
 		document.addEventListener("keydown", function (e) {
 			if (e.key === "Escape" && !composeModal.hidden) closeCompose();
 		});
