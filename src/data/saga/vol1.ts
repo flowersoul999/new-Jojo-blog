@@ -3,20 +3,9 @@
  *
  * 与技能无关，就是一个穷少年往上爬的故事。
  * 回目顺序即剧情顺序，读完下一封会自动到手（见 src/data/saga.ts）。
- * 卷一计划六十回，主角从炼气一路打到筑基。
+ * 卷一共六十回，主角从炼气一路打到筑基。
  */
-
-/** 一章的原始素材 */
-export interface RawChapter {
-	title: string;
-	paragraphs: string[];
-}
-
-/** 一卷 */
-export interface RawVolume {
-	name: string;
-	chapters: RawChapter[];
-}
+import type { RawVolume } from "@/data/saga/types";
 
 export const VOL1: RawVolume = {
 	name: "卷一·穷巷",
