@@ -49,9 +49,23 @@ let showLog = $state(false);
 let muted = $state(isMuted());
 let logEntries = $state<ReturnType<typeof getCultivationLog>>([]);
 
+/**
+ * 必须用原生 <dialog> + showModal()，不能只写 `open` 属性：
+ * 只有 showModal() 才把元素送进 top layer，祖先 .onload-animation 上的
+ * transform 就不会劫持 fixed 的包含块（否则弹窗会跑到页面下方、只露一半，
+ * ::backdrop 也不生效）。顺带白拿焦点循环和 ESC 关闭。
+ */
+let logEl = $state<HTMLDialogElement | null>(null);
+
 function openLog() {
 	logEntries = getCultivationLog().slice().reverse();
 	showLog = true;
+	// dialog 是常驻 DOM，showModal() 可以直接调
+	if (!logEl?.open) logEl?.showModal();
+}
+
+function closeLog() {
+	logEl?.close();
 }
 
 function toggleMute() {
@@ -115,7 +129,9 @@ function fmt(ts: number): string {
 	</ul>
 
 	<div class="xp-acts">
-		<button type="button" class="xp-act" onclick={openLog}>修行手札</button>
+		<button type="button" class="xp-act" aria-expanded={showLog} onclick={openLog}
+			>修行手札</button
+		>
 		<button
 			type="button"
 			class="xp-act"
@@ -126,28 +142,36 @@ function fmt(ts: number): string {
 		</button>
 	</div>
 
-	{#if showLog}
-		<dialog class="xp-log-modal" open onclick={(e) => { if (e.target === e.currentTarget) showLog = false; }}>
-			<div class="xp-log-box">
-				<header class="xp-log-head">
-					<span class="xp-log-title">修行手札</span>
-					<button type="button" class="xp-log-close" onclick={() => (showLog = false)}>收起</button>
-				</header>
-				{#if logEntries.length === 0}
-					<p class="xp-log-empty">尚无修行记录。去勾掉第一条学习清单，写下你的第一行吧。</p>
-				{:else}
-					<ul class="xp-log-list">
-						{#each logEntries as e, i (i)}
-							<li>
-								<span class="xp-log-time">{fmt(e.ts)}</span>
-								<span class="xp-log-text">{e.verb}「{e.title}」，修为 +{e.xp}</span>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</div>
-		</dialog>
-	{/if}
+	<!-- 常驻 DOM，靠 showModal()/close() 开关；别套 {#if}，否则首次 showModal 会扑空 -->
+	<dialog
+		bind:this={logEl}
+		class="xp-log-modal"
+		aria-label="修行手札"
+		onclose={() => (showLog = false)}
+		onclick={(e) => {
+			if (e.target === logEl) closeLog();
+		}}
+	>
+		<div class="xp-log-box">
+			<header class="xp-log-head">
+				<span class="xp-log-title">修行手札</span>
+				<button type="button" class="xp-log-close" onclick={closeLog}>收起 ✕</button>
+			</header>
+			{#if logEntries.length === 0}
+				<p class="xp-log-empty">尚无修行记录。去勾掉第一条学习清单，写下你的第一行吧。</p>
+			{:else}
+				<ul class="xp-log-list">
+					{#each logEntries as e, i (i)}
+						<li>
+							<span class="xp-log-time">{fmt(e.ts)}</span>
+							<span class="xp-log-text">{e.verb}「{e.title}」，修为 +{e.xp}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			<p class="xp-log-foot">共 {logEntries.length} 条 · 按 Esc 或点空处亦可收起</p>
+		</div>
+	</dialog>
 </section>
 
 <style>
@@ -326,23 +350,29 @@ function fmt(ts: number): string {
 		background: color-mix(in srgb, var(--xp-gold) 16%, transparent);
 	}
 
+	/* ===================== 手札弹窗 ===================== */
+	/* 原生 dialog（showModal 打开）在 top layer 里，UA 样式给了 inset:0 + margin:auto，
+	   天然居中；这里只需要把宽高交给内层 .xp-log-box，别再写 position:fixed
+	   —— 那会跟 top layer 打架，也是之前「只露一半」的根因。 */
 	.xp-log-modal {
-		position: fixed;
-		z-index: 95;
+		max-width: none;
+		max-height: none;
 		margin: auto;
 		padding: 0;
 		border: 0;
-		border-radius: 16px;
 		background: transparent;
-		max-width: 30rem;
-		width: calc(100vw - 2rem);
+		overflow: visible;
 	}
 	.xp-log-modal::backdrop {
 		background: color-mix(in srgb, #1a140a 62%, transparent);
 		backdrop-filter: blur(3px);
 	}
 	.xp-log-box {
-		padding: 1.1rem 1.2rem 1.2rem;
+		display: flex;
+		flex-direction: column;
+		width: min(30rem, calc(100vw - 2rem));
+		max-height: min(78vh, 640px);
+		padding: 1.1rem 1.2rem 0.9rem;
 		border: 1px solid color-mix(in srgb, var(--xp-gold) 40%, transparent);
 		border-radius: 16px;
 		background: var(--xp-panel);
@@ -350,9 +380,12 @@ function fmt(ts: number): string {
 	}
 	.xp-log-head {
 		display: flex;
+		flex: none;
 		align-items: center;
 		justify-content: space-between;
-		margin-bottom: 0.7rem;
+		gap: 0.75rem;
+		padding-bottom: 0.6rem;
+		border-bottom: 1px solid var(--xp-line);
 	}
 	.xp-log-title {
 		font-size: 0.92rem;
@@ -360,6 +393,7 @@ function fmt(ts: number): string {
 		color: var(--xp-ink);
 	}
 	.xp-log-close {
+		flex: none;
 		padding: 0.26rem 0.7rem;
 		border: 1px solid color-mix(in srgb, var(--xp-gold) 36%, transparent);
 		border-radius: 99px;
@@ -367,21 +401,39 @@ function fmt(ts: number): string {
 		font-size: 0.66rem;
 		color: var(--xp-ink-2);
 		cursor: pointer;
+		transition: border-color 160ms ease, color 160ms ease;
+	}
+	.xp-log-close:hover {
+		border-color: color-mix(in srgb, var(--xp-gold) 60%, transparent);
+		color: var(--xp-ink);
 	}
 	.xp-log-empty {
 		margin: 0;
+		padding: 1rem 0;
 		font-size: 0.76rem;
 		line-height: 1.7;
 		color: var(--xp-ink-2);
 	}
 	.xp-log-list {
-		max-height: 60vh;
+		flex: 1 1 auto;
+		min-height: 0;
 		overflow-y: auto;
 		margin: 0;
-		padding: 0;
+		padding: 0.6rem 0 0.2rem;
 		list-style: none;
 		display: grid;
+		align-content: start;
 		gap: 0.28rem;
+		overscroll-behavior: contain;
+	}
+	.xp-log-foot {
+		flex: none;
+		margin: 0;
+		padding-top: 0.55rem;
+		border-top: 1px solid var(--xp-line);
+		font-size: 0.64rem;
+		color: var(--xp-ink-2);
+		text-align: center;
 	}
 	.xp-log-list li {
 		display: grid;
