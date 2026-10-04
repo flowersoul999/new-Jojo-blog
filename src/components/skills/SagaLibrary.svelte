@@ -275,6 +275,13 @@ $effect(() => {
 		background: #fffdf7;
 		color: #4a4335;
 		box-shadow: 0 18px 44px rgb(0 0 0 / 0.24);
+
+		/* ⚠️ 必须显式写回 margin: auto —— 全站 reset（Tailwind preflight）里的
+		   `* { margin: 0 }` 把浏览器 UA 给 dialog:modal 的 `margin: auto` 归零了，
+		   而 modal dialog 的居中**全靠这个 auto**。归零后 UA 的 inset: 0 会让它
+		   贴到视口左上角（position: fixed 还在，top/left 都是 0）。
+		   别学 CultivationPanel 那样只写 max-width/height 就以为居中了。 */
+		margin: auto;
 	}
 	:global(html.dark) .slb-shelf,
 	:global(html.dark) .slb-reader {
