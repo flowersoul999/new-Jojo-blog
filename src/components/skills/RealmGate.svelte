@@ -72,9 +72,9 @@ const pctText = $derived(Math.round(st.pct));
 		--rg-ink: #4a4335;
 		--rg-ink-2: #857d6c;
 		--rg-panel: #fffdf7;
-		position: absolute;
+		position: fixed;
 		inset: 0;
-		z-index: 40;
+		z-index: 80;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -82,7 +82,7 @@ const pctText = $derived(Math.round(st.pct));
 		background: color-mix(in srgb, var(--rg-panel) 82%, transparent);
 		backdrop-filter: blur(7px);
 		-webkit-backdrop-filter: blur(7px);
-		border-radius: 18px;
+		border-radius: 0;
 	}
 
 	:global(html.dark) .realm-gate {

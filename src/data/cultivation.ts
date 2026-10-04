@@ -23,10 +23,20 @@ import { BE_PRESET, BE_SKILLS } from "@/data/backendSkills";
 import { CS_CHECKS } from "@/data/csChecks";
 import { CS_PRESET, CS_SKILLS } from "@/data/csSkills";
 import {
+	COMBO_STORY,
 	FINALE_STORY,
 	FIRST_SLAY_STORY,
+	FLIPFLOP_STORY,
+	GRAPH_FIRST_STORY,
 	GRAPH_STORY,
+	getStory,
+	MILESTONE_STORY,
+	ONE_SHOT_STORY,
 	REALM_STORY,
+	SECRET_POOL,
+	TIME_STORY,
+	UNLEARN_STORY,
+	VISIT_ALL_STORY,
 } from "@/data/cultivationStories";
 import { SKILL_CHECKS } from "@/data/skillChecks";
 import { SKILLS as FE_SKILLS, PRESET } from "@/data/skills";
@@ -354,6 +364,8 @@ export interface SlayLogEntry {
 	index: number;
 	title: string;
 	xp: number;
+	/** 本次修行动词（斩 / 参悟 / 筑 / 点染 …） */
+	verb: string;
 }
 
 export interface SlayInput {
@@ -373,6 +385,12 @@ export interface SlayResult {
 	stories: string[];
 	/** 本次跨到的境界下标（没跨境界则为 null） */
 	breakthroughTo: number | null;
+	/** 本次修行用的动词（斩 / 参悟 / 筑 / 点染 …） */
+	action: string;
+	/** 连悟档位名（如「渐入佳境」），未达档位为 null */
+	comboTier: string | null;
+	/** 本次是否触发了「机缘」金色彩蛋 */
+	isSecret: boolean;
 }
 
 /** 某技能所属方向（从修行路引的技能表里查） */
@@ -387,9 +405,138 @@ export function weightOf(graph: GraphId, skillId: string): number {
 	return (group && XP_WEIGHTS[graph]?.[group]) || 1;
 }
 
+/* ---------- 修行动词：按领域给不同的「修行动作」文案 ---------- */
+/**
+ * 不同方向用不同的动词，让反馈不千篇一律：算法破阵用「斩」、语言基础用「参悟」、
+ * 框架架构用「筑」、工程化安全用「精进」、视觉用「点染」、数据用「汲取」……
+ * 某个方向没显式配，则回退到「参悟」。
+ */
+const ACTION_BY_GROUP: Record<GraphId, Record<string, string>> = {
+	cs: {
+		"cs-math": "斩",
+		"cs-lang": "参悟",
+		"cs-dsa": "斩",
+		"cs-hw": "参悟",
+		"cs-os": "斩",
+		"cs-net": "斩",
+		"cs-db": "汲取",
+		"cs-compiler": "斩",
+		"cs-se": "精进",
+		"cs-adv": "参悟",
+	},
+	fe: {
+		"lang-basics": "参悟",
+		"type-system": "参悟",
+		browser: "参悟",
+		framework: "筑",
+		engineering: "精进",
+		quality: "精进",
+		visual: "点染",
+		backend: "参悟",
+		architecture: "筑",
+		growth: "精进",
+	},
+	be: {
+		"be-start": "参悟",
+		"be-lang": "参悟",
+		"be-web": "筑",
+		"be-data": "汲取",
+		"be-sec": "护",
+		"be-ops": "精进",
+		"be-arch": "筑",
+	},
+	ag: {
+		"ag-foundation": "禀",
+		"ag-prompt": "悟",
+		"ag-rag": "汲取",
+		"ag-tool": "御",
+		"ag-memory": "记",
+		"ag-eval": "鉴",
+		"ag-app": "筑",
+	},
+};
+
+/** 本次「修行动作」的动词（用于飘字 / 手札日志），如 斩 / 参悟 / 筑 / 点染 … */
+export function actionVerb(graph: GraphId, skillId: string): string {
+	const group = groupOf(graph, skillId);
+	return (group && ACTION_BY_GROUP[graph]?.[group]) || "参悟";
+}
+
 /* ---------- 连斩：模块级状态，整页会话内累计 ---------- */
 let lastSlayAt = 0;
 let comboCount = 0;
+
+/* ---------- 取消 / 反复 / 一气呵成：彩蛋判定用的会话与持久状态 ---------- */
+const UNLEARN_KEY = "aemeath-unlearn-count";
+/** 单会话内同一项被反复勾了又取消的次数（心猿意马彩蛋用） */
+const sessionToggles: Record<string, number> = {};
+/** 单会话内某方向首次参悟的时间戳（一气呵成彩蛋用） */
+const groupStart: Record<string, number> = {};
+
+function readUnlearnCount(): number {
+	if (typeof localStorage === "undefined") return 0;
+	try {
+		const raw = localStorage.getItem(UNLEARN_KEY);
+		const n = raw ? Number(raw) : 0;
+		return Number.isFinite(n) ? n : 0;
+	} catch {
+		return 0;
+	}
+}
+
+function writeUnlearnCount(n: number): void {
+	if (typeof localStorage === "undefined") return;
+	try {
+		localStorage.setItem(UNLEARN_KEY, String(n));
+	} catch {
+		/* 忽略 */
+	}
+}
+
+/** 时辰 key：取本地小时落入的区间 */
+function timeKey(hour: number): string | null {
+	if (hour >= 23 || hour < 1) return "zi";
+	if (hour < 3) return "chou";
+	if (hour < 5) return "yin";
+	if (hour < 7) return "mao";
+	if (hour >= 11 && hour < 13) return "wu";
+	return null;
+}
+
+/** 机缘随机池：每次参悟约 6% 概率抽一封未解锁的（用完为止） */
+function maybeSecret(): string | null {
+	if (Math.random() > 0.06) return null;
+	const unlocked = readUnlockedStories();
+	const pool = SECRET_POOL.filter((id) => !unlocked.has(id));
+	if (pool.length === 0) return null;
+	return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * 取消勾选（道心）：写持久取消计数，判定 道心小劫/动摇/魔念，并触发 心猿意马。
+ * 取消也会打断连悟。
+ */
+export function recordUnlearn(graph: GraphId, skillId: string): string[] {
+	comboCount = 0;
+	lastSlayAt = 0;
+	const key = `${graph}:${skillId}`;
+	sessionToggles[key] = (sessionToggles[key] ?? 0) + 1;
+
+	const stories: string[] = [];
+	if (sessionToggles[key] >= 3) stories.push(FLIPFLOP_STORY);
+
+	const n = readUnlearnCount() + 1;
+	writeUnlearnCount(n);
+	const milestone = UNLEARN_STORY[n];
+	if (milestone) stories.push(milestone);
+
+	return unlockStories(stories);
+}
+
+/** 手动触发一个彩蛋（如连点信封），供 UI 直接调用 */
+export function unlockEgg(id: string): string[] {
+	return unlockStories([id]);
+}
 
 /* ---------------- 修为日志（修行手札的数据源） ---------------- */
 function readLog(): SlayLogEntry[] {
@@ -479,38 +626,80 @@ function isGraphComplete(graph: GraphId): boolean {
 }
 
 /**
- * 斩妖主入口：SkillTree 在「勾上一条清单」后调用。
- * 负责给修为、写日志、连斩计数、判断跨境界与各类隐藏剧情触发。
+ * 修行主入口：SkillTree 在「勾上一条清单」后调用。
+ * 负责给修为、写日志、连悟计数、判断跨境界与各类隐藏彩蛋触发。
  */
 export function recordSlay(input: SlayInput): SlayResult {
 	const xpGained = weightOf(input.graph, input.skillId);
+	const now = Date.now();
+	const verb = actionVerb(input.graph, input.skillId);
+
+	// 跨境界 / 各图首悟 需要「落笔前」的快照，先取
+	const beforeGraphCount = readLog().filter(
+		(e) => e.graph === input.graph,
+	).length;
+
 	const logLen = appendLog({
-		ts: Date.now(),
+		ts: now,
 		graph: input.graph,
 		skillId: input.skillId,
 		index: input.index,
 		title: input.title,
 		xp: xpGained,
+		verb,
 	});
 
-	const now = Date.now();
 	comboCount = now - lastSlayAt <= 3000 ? comboCount + 1 : 1;
 	lastSlayAt = now;
 
 	const after = snapshot().realmIndex;
 	const breakthroughTo = after > input.beforeRealm ? after : null;
 
+	const group = groupOf(input.graph, input.skillId);
+
+	// 一气呵成：单方向在 60 秒内从首悟到学满（会话内计时）
+	const gk = `${input.graph}:${group}`;
+	const groupJustDone = group ? isGroupComplete(input.graph, group) : false;
+	if (group && !groupStart[gk]) groupStart[gk] = now;
+
 	const stories: string[] = [];
 	if (logLen === 1) stories.push(FIRST_SLAY_STORY);
-	const group = groupOf(input.graph, input.skillId);
-	if (group && isGroupComplete(input.graph, group))
+	if (beforeGraphCount === 0 && GRAPH_FIRST_STORY[input.graph])
+		stories.push(GRAPH_FIRST_STORY[input.graph]);
+	if (group && groupJustDone) {
 		stories.push(`grp-${input.graph}-${group}`);
+		// 一气呵成：方向刚学满且首悟到此刻 ≤ 60 秒
+		const span = now - (groupStart[gk] ?? now);
+		if (span <= 60000) stories.push(ONE_SHOT_STORY);
+	}
 	if (isGraphComplete(input.graph))
 		stories.push(GRAPH_STORY[input.graph] as string);
 	if (breakthroughTo !== null) {
 		for (let r = input.beforeRealm + 1; r <= breakthroughTo; r++)
 			if (REALM_STORY[r]) stories.push(REALM_STORY[r]);
 	}
+	// 时辰彩蛋
+	const tk = timeKey(new Date(now).getHours());
+	if (tk && TIME_STORY[tk]) stories.push(TIME_STORY[tk]);
+	// 连悟档位
+	const comboTierId =
+		COMBO_STORY[comboCount as keyof typeof COMBO_STORY] ?? null;
+	if (comboTierId) stories.push(comboTierId);
+	// 累计里程碑（日志条数恰好命中阈值时）
+	const milestone = MILESTONE_STORY[logLen as keyof typeof MILESTONE_STORY];
+	if (milestone) stories.push(milestone);
+	// 云游归来：四张图都参悟过
+	if (
+		readLog().some((e) => e.graph === "cs") &&
+		readLog().some((e) => e.graph === "fe") &&
+		readLog().some((e) => e.graph === "be") &&
+		readLog().some((e) => e.graph === "ag")
+	)
+		stories.push(VISIT_ALL_STORY);
+	// 机缘随机池
+	const secret = maybeSecret();
+	if (secret) stories.push(secret);
+	// 全图圆满终局
 	if (after >= REALMS.length - 1 || snapshot().pct >= 100)
 		stories.push(FINALE_STORY);
 
@@ -531,5 +720,16 @@ export function recordSlay(input: SlayInput): SlayResult {
 	if (typeof window !== "undefined")
 		window.dispatchEvent(new CustomEvent(CULTIVATION_EVENT));
 
-	return { xpGained, combo: comboCount, stories: fresh, breakthroughTo };
+	const comboTier = comboTierId != null ? getStory(comboTierId) : null;
+	const comboTierName = comboTier ? comboTier.title : null;
+
+	return {
+		xpGained,
+		combo: comboCount,
+		stories: fresh,
+		breakthroughTo,
+		action: verb,
+		comboTier: comboTierName,
+		isSecret: secret !== null,
+	};
 }

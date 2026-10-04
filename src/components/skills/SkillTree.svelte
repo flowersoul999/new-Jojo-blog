@@ -21,7 +21,14 @@ import { onMount, tick } from "svelte";
 // 所以这里必须自己取 .src。
 import avatarMeta from "@/assets/images/jojo-avatar.webp";
 import { profileConfig } from "@/config/profileConfig";
-import { type GraphId, recordSlay, snapshot } from "@/data/cultivation";
+import {
+	type GraphId,
+	recordSlay,
+	recordUnlearn,
+	snapshot,
+	unlockEgg,
+} from "@/data/cultivation";
+import { DWELL_STORY } from "@/data/cultivationStories";
 import { SKILL_CHECKS as FE_CHECKS } from "@/data/skillChecks";
 import {
 	ATTR_MAP as FE_ATTR_MAP,
@@ -353,16 +360,34 @@ function measure() {
 let hoverId = $state<string | null>(null);
 let shakeId = $state<string | null>(null);
 let toast = $state("");
+/** 本页是否产生过至少一次修行（入定彩蛋判定用） */
+let didSlay = false;
 let rootEl = $state<HTMLDivElement | null>(null);
 
-/* ---------- 斩妖反馈：修为飘字 + 连斩横幅 ---------- */
-let xpFloats = $state<{ key: number; x: number; y: number; amount: number }[]>(
-	[],
+/* ---------- 修行动作反馈：飘字 + 连悟横幅 ---------- */
+let xpFloats = $state<
+	{
+		key: number;
+		x: number;
+		y: number;
+		amount: number;
+		verb: string;
+		title: string;
+		isSecret: boolean;
+	}[]
+>([]);
+let comboFlash = $state<{ n: number; tier: string | null; key: number } | null>(
+	null,
 );
-let comboFlash = $state<{ n: number; key: number } | null>(null);
 let fxKey = 0;
 
-function spawnXp(el: HTMLElement, amount: number) {
+function spawnXp(
+	el: HTMLElement,
+	amount: number,
+	verb: string,
+	title: string,
+	isSecret: boolean,
+) {
 	const r = el.getBoundingClientRect();
 	const base = rootEl?.getBoundingClientRect();
 	const key = ++fxKey;
@@ -373,6 +398,9 @@ function spawnXp(el: HTMLElement, amount: number) {
 			x: r.left - (base?.left ?? 0) + r.width / 2,
 			y: r.top - (base?.top ?? 0) + r.height / 2,
 			amount,
+			verb,
+			title,
+			isSecret,
 		},
 	];
 	setTimeout(() => {
@@ -380,9 +408,9 @@ function spawnXp(el: HTMLElement, amount: number) {
 	}, 1100);
 }
 
-function spawnCombo(n: number) {
+function spawnCombo(n: number, tier: string | null) {
 	const key = ++fxKey;
-	comboFlash = { n, key };
+	comboFlash = { n, tier, key };
 	setTimeout(() => {
 		if (comboFlash && comboFlash.key === key) comboFlash = null;
 	}, 1200);
@@ -682,29 +710,33 @@ function toggle(s: Skill, i: number, el?: EventTarget | null) {
 			s.id,
 			cur.filter((x) => x !== i),
 		);
+		// 取消 = 道心小劫 / 心猿意马 等彩蛋判定
+		recordUnlearn(currentGraph, s.id);
 		return;
 	}
 	const beforeRealm = snapshot().realmIndex;
+	const label = checksOf(s.id)[i]?.[0] ?? s.short;
 	writeDone(
 		s.id,
 		[...cur, i].sort((a, b) => a - b),
 	);
-	// 这一次「斩妖」：给修为、记日志、连斩、触发隐藏剧情
+	// 这一次「修行」：给修为、记日志、连悟、触发隐藏剧情
 	const res = recordSlay({
 		graph: currentGraph,
 		skillId: s.id,
 		index: i,
-		title: checksOf(s.id)[i]?.[0] ?? s.short,
+		title: label,
 		beforeRealm,
 	});
+	didSlay = true;
 	if (el instanceof HTMLElement) {
-		spawnXp(el, res.xpGained);
+		spawnXp(el, res.xpGained, res.action, label, res.isSecret);
 		el.classList.add("sk-check-slain");
 		setTimeout(() => el.classList.remove("sk-check-slain"), 600);
 	}
 	playSlay();
 	if (res.combo >= 2) {
-		spawnCombo(res.combo);
+		spawnCombo(res.combo, res.comboTier);
 		playCombo(res.combo);
 	}
 }
@@ -736,6 +768,8 @@ function stepDown(s: Skill) {
 		s.id,
 		cur.filter((x) => x !== Math.max(...cur)),
 	);
+	// 退掉 = 道心 / 心猿意马 彩蛋判定
+	recordUnlearn(currentGraph, s.id);
 }
 
 function resetToPreset() {
@@ -811,6 +845,14 @@ onMount(() => {
 	window.addEventListener("resize", onScroll);
 	document.fonts?.ready.then(() => measure()).catch(() => {});
 
+	// 入定彩蛋：单页停留满 5 分钟且有过修行 → 触发一次
+	const dwellTimer = setTimeout(
+		() => {
+			if (didSlay) unlockEgg(DWELL_STORY);
+		},
+		5 * 60 * 1000,
+	);
+
 	return () => {
 		mo.disconnect();
 		ro.disconnect();
@@ -818,6 +860,7 @@ onMount(() => {
 		window.removeEventListener("scroll", onScroll, true);
 		window.removeEventListener("resize", onScroll);
 		if (tipRaf) cancelAnimationFrame(tipRaf);
+		clearTimeout(dwellTimer);
 	};
 });
 
@@ -1357,16 +1400,28 @@ $effect(() => {
 		<p class="sk-toast">{toast}</p>
 	{/if}
 
-	<!-- ===================== 斩妖飘字 + 连斩横幅 ===================== -->
+	<!-- ===================== 修行动作飘字 + 连悟横幅 ===================== -->
 	{#if comboFlash}
 		<div class="sk-combo" key={comboFlash.key}>
 			<span class="sk-combo-n">{comboFlash.n}</span>
-			<span class="sk-combo-txt">连斩！</span>
+			<span class="sk-combo-txt"
+				>{comboFlash.tier ?? "连悟"} ×{comboFlash.n}</span
+			>
 		</div>
 	{/if}
 	{#each xpFloats as f (f.key)}
-		<div class="sk-xp-float" style={`left:${f.x}px;top:${f.y}px`}>
-			修为 +{f.amount}
+		<div
+			class="sk-xp-float"
+			style={`left:${f.x}px;top:${f.y}px`}
+			class:is-secret={f.isSecret}
+		>
+			{#if f.isSecret}
+				<span class="sk-xp-secret">✦ 发现机缘 ✦</span>
+			{:else}
+				<span class="sk-xp-verb">{f.verb}</span>
+				<span class="sk-xp-name">「{f.title}」</span>
+			{/if}
+			<span class="sk-xp-amt">+{f.amount} 修为</span>
 		</div>
 	{/each}
 </div>
@@ -2131,14 +2186,64 @@ $effect(() => {
 		z-index: 60;
 		transform: translate(-50%, -50%);
 		pointer-events: none;
-		font-size: 0.8rem;
-		font-weight: 800;
-		letter-spacing: 0.02em;
-		color: #fff3cf;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.08rem;
+		text-align: center;
+		max-width: 13rem;
 		text-shadow:
 			0 1px 3px rgb(0 0 0 / 0.55),
 			0 0 10px color-mix(in srgb, var(--gold) 80%, transparent);
 		animation: sk-xp-rise 1100ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+	}
+	.sk-xp-verb {
+		font-size: 0.74rem;
+		font-weight: 800;
+		color: #fff3cf;
+	}
+	.sk-xp-name {
+		font-size: 0.66rem;
+		font-weight: 600;
+		color: color-mix(in srgb, #fff3cf 82%, transparent);
+		max-width: 12rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.sk-xp-amt {
+		font-size: 0.92rem;
+		font-weight: 900;
+		color: #fff7df;
+		font-variant-numeric: tabular-nums;
+	}
+	.sk-xp-secret {
+		font-size: 0.86rem;
+		font-weight: 900;
+		color: #ffe69a;
+		letter-spacing: 0.08em;
+	}
+	.sk-xp-float.is-secret {
+		text-shadow:
+			0 0 16px rgb(255 210 120 / 0.95),
+			0 1px 3px rgb(0 0 0 / 0.6);
+	}
+	.sk-xp-float.is-secret .sk-xp-secret {
+		animation: sk-secret-pulse 1100ms ease forwards;
+	}
+	@keyframes sk-secret-pulse {
+		0% {
+			opacity: 0;
+			transform: scale(0.6);
+		}
+		20% {
+			opacity: 1;
+			transform: scale(1.12);
+		}
+		100% {
+			opacity: 0;
+			transform: scale(1);
+		}
 	}
 	@keyframes sk-xp-rise {
 		0% {

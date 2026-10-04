@@ -6,8 +6,12 @@
  * 把新信收进信箱、红点亮起、自动拆开第一封；也可随时点信封回看全部信件。
  * 已读状态单独存 localStorage，不影响「已解锁」集合（解锁集合只增不减）。
  */
-import { STORY_EVENT } from "@/data/cultivation";
-import { getStory, STORIES } from "@/data/cultivationStories";
+import { STORY_EVENT, unlockEgg } from "@/data/cultivation";
+import {
+	ENVELOPE_SPAM_STORY,
+	getStory,
+	STORIES,
+} from "@/data/cultivationStories";
 import { playStory } from "@/lib/sfx";
 
 const UNLOCKED_KEY = "aemeath-stories-unlocked";
@@ -41,6 +45,7 @@ let unlockedIds = $state<string[]>(readUnlocked());
 let readIds = $state<Set<string>>(readReadSet());
 let readerId = $state<string | null>(null);
 let mailboxOpen = $state(false);
+let envelopeSpam = 0;
 
 const unread = $derived(unlockedIds.filter((id) => !readIds.has(id)).length);
 
@@ -102,7 +107,13 @@ $effect(() => {
 	type="button"
 	class="sib-envelope"
 	aria-label="飞剑传书收件箱"
-	onclick={() => (mailboxOpen = !mailboxOpen)}
+	onclick={() => {
+		mailboxOpen = !mailboxOpen;
+		if (++envelopeSpam >= 5) {
+			envelopeSpam = 0;
+			unlockEgg(ENVELOPE_SPAM_STORY);
+		}
+	}}
 >
 	<svg viewBox="0 0 24 24" aria-hidden="true">
 		<path
@@ -249,7 +260,9 @@ $effect(() => {
 		transform: translateY(-50%);
 	}
 	.sib-reader {
-		bottom: 1.5rem;
+		top: 50%;
+		bottom: auto;
+		transform: translateY(-50%);
 	}
 
 	.sib-mb-head,

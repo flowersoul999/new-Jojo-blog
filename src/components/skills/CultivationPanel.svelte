@@ -134,13 +134,13 @@ function fmt(ts: number): string {
 					<button type="button" class="xp-log-close" onclick={() => (showLog = false)}>收起</button>
 				</header>
 				{#if logEntries.length === 0}
-					<p class="xp-log-empty">尚无斩妖记录。去勾掉第一条学习清单，写下你的第一行吧。</p>
+					<p class="xp-log-empty">尚无修行记录。去勾掉第一条学习清单，写下你的第一行吧。</p>
 				{:else}
 					<ul class="xp-log-list">
 						{#each logEntries as e, i (i)}
 							<li>
 								<span class="xp-log-time">{fmt(e.ts)}</span>
-								<span class="xp-log-text">斩「{e.title}」，修为 +{e.xp}</span>
+								<span class="xp-log-text">{e.verb}「{e.title}」，修为 +{e.xp}</span>
 							</li>
 						{/each}
 					</ul>
