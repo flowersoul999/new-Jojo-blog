@@ -65,6 +65,17 @@ const pending = $derived(Math.max(0, quota - openedCount));
 /** 全部启封且没有待发的 = 读完这一卷了 */
 const atEnd = $derived(openedCount >= chapters.length);
 
+/** 按卷分组，卷二起不止一卷，目录里要能看出分卷 */
+const grouped = $derived.by(() => {
+	const out: { volume: string; items: SagaChapter[] }[] = [];
+	for (const c of chapters) {
+		const last = out[out.length - 1];
+		if (last && last.volume === c.volume) last.items.push(c);
+		else out.push({ volume: c.volume, items: [c] });
+	}
+	return out;
+});
+
 const reading = $derived(readingId ? getSagaChapter(readingId) : null);
 const readingIdx = $derived(
 	reading ? opened.findIndex((c) => c.id === reading.id) : -1,
@@ -206,36 +217,41 @@ $effect(() => {
 		</p>
 	</div>
 
-	<ul class="slb-list">
-		{#each chapters as c (c.id)}
-			{@const isOpen = unlocked.has(c.id)}
-			<li class:is-locked={!isOpen}>
-				<button
-					type="button"
-					class="slb-item"
-					disabled={!isOpen}
-					onclick={() => openChapter(c.id)}
-				>
-					<span class="slb-no">{label(c)}</span>
-					{#if isOpen}
-						<span class="slb-title" class:is-read={read.has(c.id)}>{c.title}</span>
-						<span class="slb-meta">{c.chars} 字 · {minutes(c.chars)} 分钟</span>
-					{:else}
-						<span class="slb-title slb-locked-title">未启封</span>
-						<svg class="slb-lock" viewBox="0 0 24 24" aria-hidden="true">
-							<path
-								d="M8 10V8a4 4 0 0 1 8 0v2m-9 0h10v9H7v-9Z"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="1.5"
-								stroke-linejoin="round"
-							/>
-						</svg>
-					{/if}
-				</button>
-			</li>
+	<div class="slb-scroll">
+		{#each grouped as group (group.volume)}
+		<h4 class="slb-group">{group.volume}</h4>
+		<ul class="slb-list">
+			{#each group.items as c (c.id)}
+				{@const isOpen = unlocked.has(c.id)}
+				<li class:is-locked={!isOpen}>
+					<button
+						type="button"
+						class="slb-item"
+						disabled={!isOpen}
+						onclick={() => openChapter(c.id)}
+					>
+						<span class="slb-no">{label(c)}</span>
+						{#if isOpen}
+							<span class="slb-title" class:is-read={read.has(c.id)}>{c.title}</span>
+							<span class="slb-meta">{c.chars} 字 · {minutes(c.chars)} 分钟</span>
+						{:else}
+							<span class="slb-title slb-locked-title">未启封</span>
+							<svg class="slb-lock" viewBox="0 0 24 24" aria-hidden="true">
+								<path
+									d="M8 10V8a4 4 0 0 1 8 0v2m-9 0h10v9H7v-9Z"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.5"
+									stroke-linejoin="round"
+								/>
+							</svg>
+						{/if}
+					</button>
+				</li>
+			{/each}
+		</ul>
 		{/each}
-	</ul>
+	</div>
 </dialog>
 
 <!-- 阅读器：与收件箱同款纸卷，只放话本 -->
@@ -423,12 +439,25 @@ $effect(() => {
 		color: #857d6c;
 	}
 
+	.slb-group {
+		margin: 0.5rem 0 0.2rem;
+		padding: 0 0.6rem;
+		font-size: 0.64rem;
+		font-weight: 800;
+		letter-spacing: 0.18em;
+		color: #a08a52;
+	}
+	:global(html.dark) .slb-group {
+		color: #c8ab6a;
+	}
+	.slb-scroll {
+		max-height: 52vh;
+		overflow-y: auto;
+	}
 	.slb-list {
 		margin: 0;
 		padding: 0.5rem;
 		list-style: none;
-		max-height: 52vh;
-		overflow-y: auto;
 		display: grid;
 		gap: 0.15rem;
 	}

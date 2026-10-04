@@ -19,7 +19,9 @@ import {
 	unlockStoryIds,
 } from "@/data/cultivation";
 import type { Story } from "@/data/cultivationStories";
+import type { RawVolume } from "@/data/saga/types";
 import { VOL1 } from "@/data/saga/vol1";
+import { VOL2 } from "@/data/saga/vol2";
 
 /** 话本的一回 */
 export interface SagaChapter {
@@ -35,12 +37,9 @@ export interface SagaChapter {
 }
 
 /** 一卷 = 一组连续的回目 */
-export interface SagaVolume {
-	name: string;
-	chapters: { title: string; paragraphs: string[] }[];
-}
+export type SagaVolume = RawVolume;
 
-const VOLUMES: SagaVolume[] = [VOL1];
+const VOLUMES: SagaVolume[] = [VOL1, VOL2];
 
 /** 全卷按「先卷后回」展开成一维数组，下标即回目顺序 */
 const CHAPTERS: SagaChapter[] = [];
