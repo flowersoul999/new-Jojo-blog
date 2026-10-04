@@ -470,6 +470,12 @@ export const BREAKTHROUGH_EVENT = "aemeath-breakthrough";
 /** 解锁一封新剧情时广播（detail: { ids: string[] }） */
 export const STORY_EVENT = "aemeath-story-unlocked";
 
+/* --- 沉浸层入口的打开指令 ---
+ * 入口按钮放在侧栏「修行」卡片里（随文档滚动，不做 fixed 悬浮），
+ * 主体 dialog 仍常驻 Layout 的 body 底部，两者靠这两个事件搭桥。 */
+export const OPEN_INBOX_EVENT = "aemeath-open-inbox";
+export const OPEN_SHELF_EVENT = "aemeath-open-shelf";
+
 const LOG_KEY = "aemeath-cultivation-log";
 const STORIES_KEY = "aemeath-stories-unlocked";
 const LOG_CAP = 600;

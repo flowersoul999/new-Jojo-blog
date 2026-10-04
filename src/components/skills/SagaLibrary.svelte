@@ -7,8 +7,11 @@
  *
  * 启封规则与引擎一致：彻底点亮一个技能 = 挣得一枚签 = 多开一回；
  * 读完当前这一回，下一回才到手。未启封的回目只显示回序、不显示标题，不剧透。
+ *
+ * ⚠️ 这里只留书架与阅读器本体。入口按钮在侧栏「修行」卡片
+ * （src/components/skills/CultivationDock.svelte）里，靠 OPEN_SHELF_EVENT 开门。
  */
-import { STORY_EVENT } from "@/data/cultivation";
+import { OPEN_SHELF_EVENT, STORY_EVENT } from "@/data/cultivation";
 import {
 	allSagaChapters,
 	getSagaChapter,
@@ -95,15 +98,6 @@ function refresh() {
 	read = readRead();
 }
 
-function toggleShelf() {
-	if (shelfOpen) {
-		shelfOpen = false;
-		return;
-	}
-	refresh();
-	shelfOpen = true;
-}
-
 function openChapter(id: string) {
 	if (!unlocked.has(id)) return;
 	readingId = id;
@@ -159,35 +153,17 @@ $effect(() => {
 	return () =>
 		window.removeEventListener(STORY_EVENT, onStory as EventListener);
 });
-</script>
 
-<!-- 书架入口 -->
-<button
-	type="button"
-	class="slb-shelf-btn"
-	aria-label="话本楼"
-	onclick={toggleShelf}
->
-	<svg viewBox="0 0 24 24" aria-hidden="true">
-		<path
-			d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.6"
-			stroke-linejoin="round"
-		/>
-		<path
-			d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13V4Z"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.6"
-			stroke-linejoin="round"
-		/>
-	</svg>
-	{#if openedCount > 0}
-		<span class="slb-badge">{openedCount}</span>
-	{/if}
-</button>
+/** 侧栏「修行」卡片的书架按钮派单来开门 */
+$effect(() => {
+	const onOpen = () => {
+		refresh();
+		shelfOpen = true;
+	};
+	window.addEventListener(OPEN_SHELF_EVENT, onOpen);
+	return () => window.removeEventListener(OPEN_SHELF_EVENT, onOpen);
+});
+</script>
 
 <!-- 书架：按回目铺开的目录 -->
 <dialog class="slb-shelf" bind:this={shelfEl} onclose={closeShelf}>
@@ -286,57 +262,7 @@ $effect(() => {
 </dialog>
 
 <style>
-	/* 与飞剑传书同源的暖金纸卷，位置让开信封按钮 */
-	.slb-shelf-btn {
-		position: fixed;
-		left: 1.2rem;
-		bottom: 5.3rem;
-		z-index: 90;
-		width: 46px;
-		height: 46px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border: 1px solid color-mix(in srgb, #c9a44c 40%, transparent);
-		border-radius: 14px;
-		background: color-mix(in srgb, #fffdf7 92%, #c9a44c);
-		color: #8a6d24;
-		cursor: pointer;
-		box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
-		transition: transform 160ms ease, box-shadow 160ms ease;
-	}
-	.slb-shelf-btn:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 24px rgb(0 0 0 / 0.22);
-	}
-	.slb-shelf-btn svg {
-		width: 22px;
-		height: 22px;
-	}
-	:global(html.dark) .slb-shelf-btn {
-		background: color-mix(in srgb, #211b13 92%, #d9b45f);
-		color: #e7d09a;
-	}
-	.slb-badge {
-		position: absolute;
-		top: -5px;
-		right: -5px;
-		min-width: 18px;
-		height: 18px;
-		padding: 0 4px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 99px;
-		background: #b08028;
-		font-size: 0.62rem;
-		font-weight: 800;
-		color: #fff;
-		box-shadow: 0 0 0 2px color-mix(in srgb, #fffdf7 80%, transparent);
-	}
-	:global(html.dark) .slb-badge {
-		box-shadow: 0 0 0 2px color-mix(in srgb, #211b13 80%, transparent);
-	}
+	/* 入口按钮已挪到侧栏「修行」卡片（CultivationDock.svelte），这里只留书架/阅读器 */
 
 	.slb-shelf,
 	.slb-reader {

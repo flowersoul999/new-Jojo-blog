@@ -5,13 +5,13 @@
  * 监听 aemeath-story-unlocked（cultivation.ts 在解锁新剧情时派发）：
  * 把新信收进信箱、红点亮起、自动拆开第一封；也可随时点信封回看全部信件。
  * 已读状态单独存 localStorage，不影响「已解锁」集合（解锁集合只增不减）。
+ *
+ * ⚠️ 这里只留信箱与阅读器本体。入口按钮在侧栏「修行」卡片
+ * （src/components/skills/CultivationDock.svelte）里，靠 OPEN_INBOX_EVENT 开门 ——
+ * 别再把入口塞回本页，之前 position:fixed 钉在视口左下角既压内容又永远不动。
  */
-import { STORY_EVENT, unlockEgg } from "@/data/cultivation";
-import {
-	ENVELOPE_SPAM_STORY,
-	getStory,
-	type Story,
-} from "@/data/cultivationStories";
+import { OPEN_INBOX_EVENT, STORY_EVENT } from "@/data/cultivation";
+import { getStory, type Story } from "@/data/cultivationStories";
 import { getSagaChapter, getSagaStory, isSagaId, pumpSaga } from "@/data/saga";
 import { playStory } from "@/lib/sfx";
 
@@ -46,7 +46,6 @@ let unlockedIds = $state<string[]>(readUnlocked());
 let readIds = $state<Set<string>>(readReadSet());
 let readerId = $state<string | null>(null);
 let mailboxOpen = $state(false);
-let envelopeSpam = 0;
 
 /** 收件箱里有两种信：既有的彩蛋小笺，和按卷连载的话本 */
 function storyOf(id: string): Story | null {
@@ -65,8 +64,6 @@ const inboxList = $derived.by(() => {
 	chapters.sort((a, b) => a.no - b.no);
 	return [...chapters.map((x) => x.id), ...others.reverse()];
 });
-
-const unread = $derived(unlockedIds.filter((id) => !readIds.has(id)).length);
 
 const readerStory = $derived(readerId ? storyOf(readerId) : null);
 /** 话本章节的卷信息（小笺为 null） */
@@ -125,34 +122,16 @@ $effect(() => {
 	return () =>
 		window.removeEventListener(STORY_EVENT, onStory as EventListener);
 });
-</script>
 
-<!-- 信封入口 -->
-<button
-	type="button"
-	class="sib-envelope"
-	aria-label="飞剑传书收件箱"
-	onclick={() => {
-		mailboxOpen = !mailboxOpen;
-		if (++envelopeSpam >= 5) {
-			envelopeSpam = 0;
-			unlockEgg(ENVELOPE_SPAM_STORY);
-		}
-	}}
->
-	<svg viewBox="0 0 24 24" aria-hidden="true">
-		<path
-			d="M3 6.5 12 13l9-6.5M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.6"
-			stroke-linejoin="round"
-		/>
-	</svg>
-	{#if unread > 0}
-		<span class="sib-badge">{unread}</span>
-	{/if}
-</button>
+/** 侧栏「修行」卡片的信封按钮派单来开门 */
+$effect(() => {
+	const onOpen = () => {
+		mailboxOpen = true;
+	};
+	window.addEventListener(OPEN_INBOX_EVENT, onOpen);
+	return () => window.removeEventListener(OPEN_INBOX_EVENT, onOpen);
+});
+</script>
 
 <!-- 信箱列表 -->
 {#if mailboxOpen}
@@ -218,57 +197,7 @@ $effect(() => {
 {/if}
 
 <style>
-	/* 二次元暖金，与全站修仙面板同源 */
-	.sib-envelope {
-		position: fixed;
-		left: 1.2rem;
-		bottom: 1.4rem;
-		z-index: 90;
-		width: 46px;
-		height: 46px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border: 1px solid color-mix(in srgb, #c9a44c 40%, transparent);
-		border-radius: 14px;
-		background: color-mix(in srgb, #fffdf7 92%, #c9a44c);
-		color: #8a6d24;
-		cursor: pointer;
-		box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
-		transition: transform 160ms ease, box-shadow 160ms ease;
-	}
-	.sib-envelope:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 24px rgb(0 0 0 / 0.22);
-	}
-	.sib-envelope svg {
-		width: 22px;
-		height: 22px;
-	}
-	:global(html.dark) .sib-envelope {
-		background: color-mix(in srgb, #211b13 92%, #d9b45f);
-		color: #e7d09a;
-	}
-	.sib-badge {
-		position: absolute;
-		top: -5px;
-		right: -5px;
-		min-width: 18px;
-		height: 18px;
-		padding: 0 4px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 99px;
-		background: #c2557a;
-		font-size: 0.62rem;
-		font-weight: 800;
-		color: #fff;
-		box-shadow: 0 0 0 2px color-mix(in srgb, #fffdf7 80%, transparent);
-	}
-	:global(html.dark) .sib-badge {
-		box-shadow: 0 0 0 2px color-mix(in srgb, #211b13 80%, transparent);
-	}
+	/* 入口按钮已挪到侧栏「修行」卡片（CultivationDock.svelte），这里只留信箱/阅读器 */
 
 	.sib-backdrop {
 		position: fixed;
@@ -364,7 +293,8 @@ $effect(() => {
 		background: transparent;
 		box-shadow: inset 0 0 0 1px color-mix(in srgb, #857d6c 60%, transparent);
 	}
-	.sib-mb-item.is-unread .sib-mb-dot {
+	/* 未读红点：is-unread 挂在 <li> 上（见上面的 {#each}），别只匹配 .sib-mb-item */
+	li.is-unread .sib-mb-dot {
 		background: #c2557a;
 		box-shadow: 0 0 0 0 transparent;
 	}

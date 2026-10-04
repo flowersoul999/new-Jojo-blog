@@ -15,6 +15,8 @@ import {
 	GRAPH_JOURNEY,
 	type GraphId,
 	getCultivationLog,
+	OPEN_INBOX_EVENT,
+	OPEN_SHELF_EVENT,
 	snapshot,
 } from "@/data/cultivation";
 import { isMuted, setMuted } from "@/lib/sfx";
@@ -132,6 +134,22 @@ function fmt(ts: number): string {
 		<button type="button" class="xp-act" aria-expanded={showLog} onclick={openLog}
 			>修行手札</button
 		>
+		<!-- 技能图这几页是 hideSidebars，侧栏那张「修行」卡片不渲染，
+		     入口在这里补一份，别让 /skills/ /cs/ /be/ /ag/ 上找不着话本和来信 -->
+		<button
+			type="button"
+			class="xp-act"
+			onclick={() => window.dispatchEvent(new CustomEvent(OPEN_SHELF_EVENT))}
+		>
+			话本楼
+		</button>
+		<button
+			type="button"
+			class="xp-act"
+			onclick={() => window.dispatchEvent(new CustomEvent(OPEN_INBOX_EVENT))}
+		>
+			飞剑传书
+		</button>
 		<button
 			type="button"
 			class="xp-act"

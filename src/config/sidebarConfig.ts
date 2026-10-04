@@ -59,6 +59,18 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			showOnPostPage: true,
 		},
 		{
+			// 组件类型：修行入口（话本楼 + 飞剑传书）
+			// 以前这两个入口是 position:fixed 钉在视口左下角，压正文又跟着全屏滚；
+			// 现在搬进侧栏文档流。position 用 top（不 sticky）——用户明确不要跟随移动。
+			type: "cultivation",
+			// 是否启用该组件
+			enable: true,
+			// 组件位置
+			position: "top",
+			// 是否在文章详情页显示
+			showOnPostPage: true,
+		},
+		{
 			// 组件类型：每日一言
 			type: "quoteOfTheDay",
 			// 是否启用该组件
@@ -263,6 +275,15 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 		{
 			// 组件类型：公告组件
 			type: "announcement",
+			// 是否启用该组件
+			enable: true,
+			// 文章页正文后不再堆叠侧栏卡片，保留正文与页脚的阅读空间
+			showOnPostPage: false,
+		},
+		{
+			// 组件类型：修行入口（话本楼 + 飞剑传书）
+			// 移动端侧栏折叠到底部，这两个入口跟着走，别让窄屏找不到
+			type: "cultivation",
 			// 是否启用该组件
 			enable: true,
 			// 文章页正文后不再堆叠侧栏卡片，保留正文与页脚的阅读空间
