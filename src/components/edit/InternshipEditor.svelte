@@ -1103,7 +1103,11 @@ const canSave = $derived(!!draft && (dirty.value || okMsg) && !saving);
 				{/if}
 			</div>
 
-			<!-- 底部操作条 -->
+			<div class="pe-tabs-hint">改动会直接写回仓库数据文件，Vercel 随后自动部署。</div>
+		</div>
+
+		<!-- 底部操作条：走 Modal 的 footer 插槽，才能钉在卡片底部不跟着正文滚 -->
+		{#snippet footer()}
 			<div class="pe-foot">
 				<span class="pe-foot__hint">
 					{dirty.value ? "有没保存的改动" : okMsg ? "已保存" : "还没改任何东西"}
@@ -1113,7 +1117,7 @@ const canSave = $derived(!!draft && (dirty.value || okMsg) && !saving);
 					{saving ? "保存中…" : "保存并部署"}
 				</button>
 			</div>
-		</div>
+		{/snippet}
 	</Modal>
 {/if}
 
@@ -1191,14 +1195,20 @@ const canSave = $derived(!!draft && (dirty.value || okMsg) && !saving);
 		background: color-mix(in srgb, var(--text-color) 12%, transparent);
 	}
 
+	/* 正文区不再自己限高 / 自己滚：滚动统一交给 Modal 的 .mo-scroll，
+	   底部操作条才能真正钉在卡片底部（以前内层 max-height 会先滚出视口）。 */
 	.pe-body {
 		display: flex;
 		flex-direction: column;
 		gap: 0.9rem;
-		min-height: 20rem;
-		max-height: 58vh;
-		overflow-y: auto;
-		padding-right: 0.15rem;
+		min-height: 0;
+	}
+
+	.pe-tabs-hint {
+		margin-top: 0.15rem;
+		font-size: 0.68rem;
+		line-height: 1.6;
+		color: color-mix(in srgb, var(--text-color) 52%, transparent);
 	}
 
 	/* ---------------- 提示条 ---------------- */
@@ -1503,13 +1513,13 @@ const canSave = $derived(!!draft && (dirty.value || okMsg) && !saving);
 	}
 
 	/* ---------------- 底部条 ---------------- */
+	/* 外框（padding + 上边框）由 Modal 的 .mo-foot 提供，这里只排内部三块 */
 	.pe-foot {
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
 		gap: 0.5rem;
-		padding-top: 0.7rem;
-		border-top: 1px solid color-mix(in srgb, var(--text-color) 12%, transparent);
+		flex-wrap: wrap;
 	}
 	.pe-foot__hint {
 		margin-right: auto;

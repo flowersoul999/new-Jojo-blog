@@ -521,7 +521,7 @@ async function openModal() {
 		display: flex;
 		flex-direction: column;
 		gap: 0.3rem;
-		max-height: 22rem;
+		max-height: min(22rem, 46vh);
 		overflow-y: auto;
 	}
 
@@ -652,9 +652,11 @@ async function openModal() {
 		color: #6ee7b7;
 	}
 
+	/* 高度跟着弹窗走：Modal 卡片有 max-height，正文区才是滚动容器，
+	   所以这里用 min()/vh 收敛，别再写死 26rem 把卡片顶出一屏。 */
 	.pe-textarea {
 		width: 100%;
-		min-height: 26rem;
+		min-height: min(26rem, 46vh);
 		padding: 0.7rem 0.8rem;
 		border-radius: 12px;
 		border: 1px solid rgba(127, 127, 127, 0.3);
