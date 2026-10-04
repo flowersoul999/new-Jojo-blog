@@ -4,7 +4,10 @@ import { getEnabledFriends } from "../src/config/friendsConfig.ts";
 const TIME_ZONE = "Asia/Shanghai";
 const REQUEST_TIMEOUT_MS = 6000;
 const MAX_CONCURRENT_CHECKS = 4;
-const SNAPSHOT_URL = new URL("../src/data/friends-latency-snapshot.json", import.meta.url);
+const SNAPSHOT_URL = new URL(
+	"../src/data/friends-latency-snapshot.json",
+	import.meta.url,
+);
 
 type FriendLatencyState = "fast" | "normal" | "slow" | "down";
 
@@ -16,7 +19,9 @@ const normalizeFriendUrl = (url: string) =>
 		.replace(/\/+$/, "")
 		.toLowerCase();
 
-const classifyLatency = (milliseconds: number): Exclude<FriendLatencyState, "down"> => {
+const classifyLatency = (
+	milliseconds: number,
+): Exclude<FriendLatencyState, "down"> => {
 	if (milliseconds < 500) return "fast";
 	if (milliseconds < 1000) return "normal";
 	return "slow";
@@ -86,7 +91,9 @@ const probeFriends = async () => {
 	};
 
 	await Promise.all(
-		Array.from({ length: Math.min(MAX_CONCURRENT_CHECKS, queue.length) }, () => worker()),
+		Array.from({ length: Math.min(MAX_CONCURRENT_CHECKS, queue.length) }, () =>
+			worker(),
+		),
 	);
 
 	const snapshot = {
@@ -96,7 +103,11 @@ const probeFriends = async () => {
 		slot: getBeijingSlot(),
 		results,
 	};
-	await writeFile(SNAPSHOT_URL, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+	await writeFile(
+		SNAPSHOT_URL,
+		`${JSON.stringify(snapshot, null, 2)}\n`,
+		"utf8",
+	);
 	console.log(
 		`Friend latency snapshot updated: ${Object.keys(results).length} sites, ${snapshot.slot} ${TIME_ZONE}`,
 	);

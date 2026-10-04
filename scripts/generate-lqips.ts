@@ -1,9 +1,9 @@
 // LQIP 方案来源: https://blog.cosine.ren/post/astro-lqip-implementation
 
-import sharp from "sharp";
-import { glob } from "glob";
 import fs from "fs/promises";
+import { glob } from "glob";
 import path from "path";
+import sharp from "sharp";
 
 const SRC_DIR = "src";
 const PUBLIC_DIR = "public";

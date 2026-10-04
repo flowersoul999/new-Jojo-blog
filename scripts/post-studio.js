@@ -1,7 +1,7 @@
-import http from "node:http";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { existsSync } from "node:fs";
+import fs from "node:fs/promises";
+import http from "node:http";
+import path from "node:path";
 
 const root = process.cwd();
 const postsRoot = path.join(root, "src", "content", "posts");
@@ -418,7 +418,9 @@ async function readBody(req) {
 }
 
 function normalizePostPath(fileName, mdx = false) {
-	let normalized = String(fileName || "").trim().replaceAll("\\", "/");
+	let normalized = String(fileName || "")
+		.trim()
+		.replaceAll("\\", "/");
 	normalized = normalized.replace(/^\/+/, "");
 	if (!normalized) throw new Error("请填写文件路径");
 	if (!/\.(md|mdx)$/i.test(normalized)) normalized += mdx ? ".mdx" : ".md";
@@ -451,7 +453,9 @@ function splitTags(value) {
 function buildPost(data) {
 	const lines = ["---"];
 	lines.push(`title: ${yamlString(data.title)}`);
-	lines.push(`published: ${data.published || new Date().toISOString().slice(0, 10)}`);
+	lines.push(
+		`published: ${data.published || new Date().toISOString().slice(0, 10)}`,
+	);
 	if (data.updated) lines.push(`updated: ${data.updated}`);
 	lines.push(`description: ${yamlString(data.description)}`);
 	lines.push(`image: ${yamlString(data.image)}`);
@@ -462,11 +466,13 @@ function buildPost(data) {
 	if (data.lang) lines.push(`lang: ${yamlString(data.lang)}`);
 	if (data.author) lines.push(`author: ${yamlString(data.author)}`);
 	if (data.sourceLink) lines.push(`sourceLink: ${yamlString(data.sourceLink)}`);
-	if (data.licenseName) lines.push(`licenseName: ${yamlString(data.licenseName)}`);
+	if (data.licenseName)
+		lines.push(`licenseName: ${yamlString(data.licenseName)}`);
 	if (data.licenseUrl) lines.push(`licenseUrl: ${yamlString(data.licenseUrl)}`);
 	if (data.comment === false) lines.push("comment: false");
 	if (data.password) lines.push(`password: ${yamlString(data.password)}`);
-	if (data.passwordHint) lines.push(`passwordHint: ${yamlString(data.passwordHint)}`);
+	if (data.passwordHint)
+		lines.push(`passwordHint: ${yamlString(data.passwordHint)}`);
 	lines.push("---", "", String(data.body || "").replace(/\r\n/g, "\n"));
 	return lines.join("\n");
 }
@@ -506,7 +512,7 @@ async function listMarkdownFiles(dir = postsRoot, prefix = "") {
 		const full = path.join(dir, entry.name);
 		const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
 		if (entry.isDirectory()) {
-			result.push(...await listMarkdownFiles(full, rel));
+			result.push(...(await listMarkdownFiles(full, rel)));
 		} else if (/\.(md|mdx)$/i.test(entry.name)) {
 			result.push(rel);
 		}
@@ -539,7 +545,9 @@ async function handleApi(req, res, url) {
 		if (!data.title) throw new Error("请填写标题");
 		const file = normalizePostPath(data.fileName, data.mdx);
 		const target = path.join(postsRoot, file);
-		const currentFile = data.currentFile ? normalizePostPath(data.currentFile, data.mdx) : "";
+		const currentFile = data.currentFile
+			? normalizePostPath(data.currentFile, data.mdx)
+			: "";
 		if (existsSync(target) && currentFile !== file) {
 			throw new Error(`文件已存在：${file}`);
 		}
