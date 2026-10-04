@@ -2,12 +2,16 @@
 import { Icon } from "astro-icon/components";
 ---
 
-<!-- 底部浮动歌词 -->
+<!-- 底部浮动歌词：三行结构（上句 / 当前句 / 下句），当前句保留逐字高亮 -->
 <div
-	class="fm-float-lrc pointer-events-none fixed left-1/2 bottom-8 z-[131] -translate-x-1/2 max-w-[90vw] text-center opacity-0 transition-all duration-300"
+	class="fm-float-lrc pointer-events-none fixed left-1/2 bottom-8 z-[131] w-[min(94vw,860px)] -translate-x-1/2 text-center opacity-0 transition-all duration-300"
 	aria-live="polite"
 >
-	<span class="fm-float-lrc-text block whitespace-nowrap overflow-hidden text-ellipsis text-2xl text-neutral-700/85 dark:text-neutral-200/90"></span>
+	<div class="fm-float-lrc-side fm-float-lrc-prev truncate text-[0.95rem] leading-snug text-neutral-500/60 dark:text-neutral-400/50" aria-hidden="true"></div>
+	<div class="fm-float-lrc-main mt-1.5">
+		<span class="fm-float-lrc-text block truncate text-2xl font-bold text-neutral-700/90 dark:text-neutral-200/95"></span>
+	</div>
+	<div class="fm-float-lrc-side fm-float-lrc-next mt-1.5 truncate text-[0.95rem] leading-snug text-neutral-500/60 dark:text-neutral-400/50" aria-hidden="true"></div>
 </div>
 
 <!-- 悬浮迷你播放器（左下角，参照 fqzlr 毛玻璃风格） -->
@@ -129,7 +133,10 @@ import { Icon } from "astro-icon/components";
             btnMute: mini.querySelector('.fm-mini-mute'),
             iconVolUp: mini.querySelector('.fm-mini-icon-vol-up'),
             iconVolOff: mini.querySelector('.fm-mini-icon-vol-off'),
-            lrcText: floatLrc.querySelector('.fm-float-lrc-text')
+            lrcText: floatLrc.querySelector('.fm-float-lrc-text'),
+            lrcMain: floatLrc.querySelector('.fm-float-lrc-main'),
+            lrcPrev: floatLrc.querySelector('.fm-float-lrc-prev'),
+            lrcNext: floatLrc.querySelector('.fm-float-lrc-next')
         };
 
         // ── 开关状态（持久化）────────────────────────────────
@@ -176,10 +183,13 @@ import { Icon } from "astro-icon/components";
                 && !!currentLyrics[currentLrcIndex];
         }
 
-        /** 重建当前行的逐字 span */
+        /** 重建当前行的逐字 span（同时刷新上下句） */
         function renderFloatLine() {
             var line = currentLyrics[currentLrcIndex];
             els.lrcText.textContent = '';
+            // 上下句：仅纯文本，无逐字高亮；首句/末句没有相邻句时留空，空 div 高度自然塌缩
+            els.lrcPrev.textContent = (currentLyrics[currentLrcIndex - 1] || {}).text || '';
+            els.lrcNext.textContent = (currentLyrics[currentLrcIndex + 1] || {}).text || '';
             if (!line) return;
             if (line.chars && line.chars.length) {
                 line.chars.forEach(function (ch) {
@@ -191,6 +201,13 @@ import { Icon } from "astro-icon/components";
             } else {
                 els.lrcText.textContent = line.text;
             }
+            // 换句时三行一起轻微上浮淡入（重启动画靠移除/回填 class）
+            [els.lrcPrev, els.lrcMain, els.lrcNext].forEach(function (el) {
+                el.classList.remove('is-enter');
+                // 强制回流，让同一 class 得以重新触发动画
+                void el.offsetWidth;
+                el.classList.add('is-enter');
+            });
         }
 
         /** 按真实时间绘制逐字状态（与面板 paintLineChars 同一套规则） */
@@ -467,16 +484,54 @@ import { Icon } from "astro-icon/components";
 <!-- 浮动歌词逐字 span（.fm-fch）由 JS 动态创建，不带 Astro 作用域样式的 data-astro-cid 属性，
      作用域样式无法命中，故必须用 is:global（类名均为 fm- 专用前缀，无冲突）。 -->
 <style is:global>
-    .fm-float-lrc-text {
+	/* ── 三行浮动歌词 ─────────────────────────────────────
+	   中间当前句最大最重，上下句小一号、颜色更淡，形成焦点对比。 */
+	.fm-float-lrc-text {
 		font-family: "STKaiti", "KaiTi", "Kaiti SC", "Yu Mincho", "Yu Gothic", serif;
 		text-shadow:
 			0 1px 12px rgba(255, 255, 255, 0.9),
 			0 0 4px rgba(255, 255, 255, 0.7);
 	}
-	:global(.dark) .fm-float-lrc-text {
+	/* is:global 块里 :global() 不会被解析，光晕的深色覆写一直没生效，这里直接用 .dark */
+	.dark .fm-float-lrc-text {
 		text-shadow:
 			0 1px 12px rgba(0, 0, 0, 0.9),
 			0 0 4px rgba(0, 0, 0, 0.7);
+	}
+
+	/* 上下句：字小，光晕相应减弱，避免糊成一团 */
+	.fm-float-lrc-side {
+		font-family: "STKaiti", "KaiTi", "Kaiti SC", "Yu Mincho", "Yu Gothic", serif;
+		text-shadow:
+			0 1px 10px rgba(255, 255, 255, 0.85),
+			0 0 3px rgba(255, 255, 255, 0.6);
+	}
+	.dark .fm-float-lrc-side {
+		text-shadow:
+			0 1px 10px rgba(0, 0, 0, 0.85),
+			0 0 3px rgba(0, 0, 0, 0.6);
+	}
+
+	/* 换句：三行一起轻微上浮淡入 */
+	@keyframes fm-float-lrc-enter {
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+	.fm-float-lrc-side.is-enter,
+	.fm-float-lrc-main.is-enter {
+		animation: fm-float-lrc-enter 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.fm-float-lrc-side.is-enter,
+		.fm-float-lrc-main.is-enter {
+			animation: none;
+		}
 	}
 
 	/* ── 浮动歌词逐字三态 ─────────────────────────────── */
