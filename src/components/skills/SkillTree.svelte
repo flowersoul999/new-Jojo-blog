@@ -21,6 +21,7 @@ import { onMount, tick } from "svelte";
 // 所以这里必须自己取 .src。
 import avatarMeta from "@/assets/images/jojo-avatar.webp";
 import { profileConfig } from "@/config/profileConfig";
+import { type GraphId, recordSlay, snapshot } from "@/data/cultivation";
 import { SKILL_CHECKS as FE_CHECKS } from "@/data/skillChecks";
 import {
 	ATTR_MAP as FE_ATTR_MAP,
@@ -40,6 +41,7 @@ import {
 	type IconState,
 	iconColor as tintIcon,
 } from "@/data/techIcons";
+import { isMuted, playCombo, playSlay } from "@/lib/sfx";
 
 /** 前端技能图的角色称号阶梯；别的图可以自己传一套 */
 const FE_TITLES = [
@@ -79,6 +81,15 @@ let {
 	/** 角色称号阶梯：按总掌握度百分比给 */
 	titles: TITLES = FE_TITLES,
 } = $props();
+
+/** 由 storageKey 反推这是哪张修行图（recordSlay 需要它来算修为/剧情） */
+const KEY_TO_GRAPH: Record<string, GraphId> = {
+	"aemeath-cs-tree": "cs",
+	"aemeath-skill-tree": "fe",
+	"aemeath-backend-tree": "be",
+	"aemeath-agent-tree": "ag",
+};
+const currentGraph: GraphId = KEY_TO_GRAPH[STORAGE_KEY] ?? "cs";
 
 /** 图标配色：把这张图自己的图标表与方向配色喂进去 */
 function iconColor(id: string, group: string, state: IconState, dark: boolean) {
@@ -342,6 +353,40 @@ function measure() {
 let hoverId = $state<string | null>(null);
 let shakeId = $state<string | null>(null);
 let toast = $state("");
+let rootEl = $state<HTMLDivElement | null>(null);
+
+/* ---------- 斩妖反馈：修为飘字 + 连斩横幅 ---------- */
+let xpFloats = $state<{ key: number; x: number; y: number; amount: number }[]>(
+	[],
+);
+let comboFlash = $state<{ n: number; key: number } | null>(null);
+let fxKey = 0;
+
+function spawnXp(el: HTMLElement, amount: number) {
+	const r = el.getBoundingClientRect();
+	const base = rootEl?.getBoundingClientRect();
+	const key = ++fxKey;
+	xpFloats = [
+		...xpFloats,
+		{
+			key,
+			x: r.left - (base?.left ?? 0) + r.width / 2,
+			y: r.top - (base?.top ?? 0) + r.height / 2,
+			amount,
+		},
+	];
+	setTimeout(() => {
+		xpFloats = xpFloats.filter((f) => f.key !== key);
+	}, 1100);
+}
+
+function spawnCombo(n: number) {
+	const key = ++fxKey;
+	comboFlash = { n, key };
+	setTimeout(() => {
+		if (comboFlash && comboFlash.key === key) comboFlash = null;
+	}, 1200);
+}
 
 /* ---------- 悬停浮层：跟着方块走，永远不出屏 ---------- */
 let tipEl = $state<HTMLDivElement | null>(null);
@@ -629,15 +674,39 @@ function writeDone(id: string, list: number[]) {
 }
 
 /** 勾上 / 取消某一项 —— 弹窗里逐项点的就是这个 */
-function toggle(s: Skill, i: number) {
+function toggle(s: Skill, i: number, el?: EventTarget | null) {
 	if (blocked(s)) return;
 	const cur = done[s.id] ?? [];
+	if (cur.includes(i)) {
+		writeDone(
+			s.id,
+			cur.filter((x) => x !== i),
+		);
+		return;
+	}
+	const beforeRealm = snapshot().realmIndex;
 	writeDone(
 		s.id,
-		cur.includes(i)
-			? cur.filter((x) => x !== i)
-			: [...cur, i].sort((a, b) => a - b),
+		[...cur, i].sort((a, b) => a - b),
 	);
+	// 这一次「斩妖」：给修为、记日志、连斩、触发隐藏剧情
+	const res = recordSlay({
+		graph: currentGraph,
+		skillId: s.id,
+		index: i,
+		title: checksOf(s.id)[i]?.[0] ?? s.short,
+		beforeRealm,
+	});
+	if (el instanceof HTMLElement) {
+		spawnXp(el, res.xpGained);
+		el.classList.add("sk-check-slain");
+		setTimeout(() => el.classList.remove("sk-check-slain"), 600);
+	}
+	playSlay();
+	if (res.combo >= 2) {
+		spawnCombo(res.combo);
+		playCombo(res.combo);
+	}
 }
 
 /** 左键：按从易到难的顺序勾下一项（已经中间挖空时，优先补上第一个空位） */
@@ -760,7 +829,7 @@ $effect(() => {
 });
 </script>
 
-<div class="sk-root">
+<div class="sk-root" bind:this={rootEl}>
 	<!-- ===================== 头部 ===================== -->
 	<header class="sk-head">
 		<div class="sk-head-l">
@@ -1212,14 +1281,14 @@ $effect(() => {
 					{#each mlist as [title, note], i (i)}
 						{@const on = mdone.includes(i)}
 						<li>
-							<button
-								type="button"
-								class="sk-check"
-								class:on
-								data-ci={i}
-								aria-pressed={on}
-								onclick={() => toggle(m, i)}
-							>
+						<button
+							type="button"
+							class="sk-check"
+							class:on
+							data-ci={i}
+							aria-pressed={on}
+							onclick={(e) => toggle(m, i, e.currentTarget)}
+						>
 								<span class="sk-check-box" aria-hidden="true"
 									>{on ? "✓" : ""}</span
 								>
@@ -1287,11 +1356,25 @@ $effect(() => {
 	{#if toast}
 		<p class="sk-toast">{toast}</p>
 	{/if}
+
+	<!-- ===================== 斩妖飘字 + 连斩横幅 ===================== -->
+	{#if comboFlash}
+		<div class="sk-combo" key={comboFlash.key}>
+			<span class="sk-combo-n">{comboFlash.n}</span>
+			<span class="sk-combo-txt">连斩！</span>
+		</div>
+	{/if}
+	{#each xpFloats as f (f.key)}
+		<div class="sk-xp-float" style={`left:${f.x}px;top:${f.y}px`}>
+			修为 +{f.amount}
+		</div>
+	{/each}
 </div>
 
 <style>
 	/* ===================== 设计令牌 ===================== */
 	.sk-root {
+		position: relative;
 		--gold: #c9a44c;
 		--gold-lt: #e7d09a;
 		--gold-dp: #8a6d24;
@@ -2023,6 +2106,106 @@ $effect(() => {
 		font-size: 0.72rem;
 		color: #fdf5e2;
 		box-shadow: 0 6px 18px color-mix(in srgb, var(--gold-dp) 34%, transparent);
+	}
+
+	/* ===================== 斩妖：勾选瞬间的剑光 ===================== */
+	.sk-check.slain {
+		animation: sk-slay 560ms ease;
+	}
+	@keyframes sk-slay {
+		0% {
+			box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 70%, transparent);
+		}
+		35% {
+			box-shadow: 0 0 0 6px color-mix(in srgb, var(--gold) 0%, transparent);
+			background: color-mix(in srgb, var(--gold) 22%, var(--face-1));
+		}
+		100% {
+			box-shadow: 0 0 0 0 transparent;
+		}
+	}
+
+	/* 修为飘字：从勾选点升起、渐隐 */
+	.sk-xp-float {
+		position: absolute;
+		z-index: 60;
+		transform: translate(-50%, -50%);
+		pointer-events: none;
+		font-size: 0.8rem;
+		font-weight: 800;
+		letter-spacing: 0.02em;
+		color: #fff3cf;
+		text-shadow:
+			0 1px 3px rgb(0 0 0 / 0.55),
+			0 0 10px color-mix(in srgb, var(--gold) 80%, transparent);
+		animation: sk-xp-rise 1100ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+	}
+	@keyframes sk-xp-rise {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, -10%) scale(0.7);
+		}
+		18% {
+			opacity: 1;
+			transform: translate(-50%, -60%) scale(1.05);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -190%) scale(1);
+		}
+	}
+
+	/* 连斩横幅：屏幕中央闪一下 */
+	.sk-combo {
+		position: absolute;
+		left: 50%;
+		top: 38%;
+		z-index: 60;
+		transform: translate(-50%, -50%);
+		display: flex;
+		align-items: baseline;
+		gap: 0.4rem;
+		padding: 0.5rem 1.1rem;
+		border-radius: 99px;
+		background: linear-gradient(
+			120deg,
+			color-mix(in srgb, var(--gold-dp) 90%, #000),
+			color-mix(in srgb, var(--gold) 92%, #000)
+		);
+		box-shadow: 0 10px 30px color-mix(in srgb, var(--gold-dp) 45%, transparent);
+		pointer-events: none;
+		animation: sk-combo-pop 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+	}
+	.sk-combo-n {
+		font-size: 2rem;
+		font-weight: 900;
+		font-style: italic;
+		line-height: 1;
+		color: #fff7df;
+		font-variant-numeric: tabular-nums;
+	}
+	.sk-combo-txt {
+		font-size: 0.82rem;
+		font-weight: 800;
+		color: #fdeecb;
+	}
+	@keyframes sk-combo-pop {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, -50%) scale(0.4) rotate(-8deg);
+		}
+		22% {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1.1) rotate(-2deg);
+		}
+		70% {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1) rotate(0deg);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -60%) scale(1);
+		}
 	}
 
 	/* ===================== 悬停浮层 ===================== */

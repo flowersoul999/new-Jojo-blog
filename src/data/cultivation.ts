@@ -22,6 +22,12 @@ import { BE_CHECKS } from "@/data/backendChecks";
 import { BE_PRESET, BE_SKILLS } from "@/data/backendSkills";
 import { CS_CHECKS } from "@/data/csChecks";
 import { CS_PRESET, CS_SKILLS } from "@/data/csSkills";
+import {
+	FINALE_STORY,
+	FIRST_SLAY_STORY,
+	GRAPH_STORY,
+	REALM_STORY,
+} from "@/data/cultivationStories";
 import { SKILL_CHECKS } from "@/data/skillChecks";
 import { SKILLS as FE_SKILLS, PRESET } from "@/data/skills";
 
@@ -319,4 +325,211 @@ export function letVisitorThrough(): void {
 	}
 	if (typeof window !== "undefined")
 		window.dispatchEvent(new CustomEvent(CULTIVATION_EVENT));
+}
+
+/* ===========================================================================
+ * 沉浸层：斩妖 / 连斩 / 修为日志 / 隐藏剧情触发器
+ *
+ * 这一层把「勾选一条清单」包装成一次「斩妖」：给修为、记日志、连斩计数，
+ * 并在跨境界 / 学满方向 / 首杀 / 全图圆满时解锁隐藏的「飞剑传书」剧情。
+ * 所有事件都挂在 window 上，供 SkillTree（飘字 + 音效）、CultivationPanel
+ * （修行手札）、BreakthroughRite（突破大典）、StoryInbox（飞剑传书收件箱）各自监听。
+ * =========================================================================== */
+
+/** 勾选一条清单后广播的「斩妖」事件（detail 见 SlayResult） */
+export const SLAY_EVENT = "aemeath-slay";
+/** 跨过境界阈值时广播（detail: { from, to, realmName }） */
+export const BREAKTHROUGH_EVENT = "aemeath-breakthrough";
+/** 解锁一封新剧情时广播（detail: { ids: string[] }） */
+export const STORY_EVENT = "aemeath-story-unlocked";
+
+const LOG_KEY = "aemeath-cultivation-log";
+const STORIES_KEY = "aemeath-stories-unlocked";
+const LOG_CAP = 600;
+
+export interface SlayLogEntry {
+	ts: number;
+	graph: GraphId;
+	skillId: string;
+	index: number;
+	title: string;
+	xp: number;
+}
+
+export interface SlayInput {
+	graph: GraphId;
+	skillId: string;
+	index: number;
+	title: string;
+	/** 本次勾选前的境界下标（用来判断有没有跨过阈值） */
+	beforeRealm: number;
+}
+
+export interface SlayResult {
+	xpGained: number;
+	/** 连斩数（3 秒内连续勾选累计，单次为 1） */
+	combo: number;
+	/** 本次解锁的剧情 id（已去重，不含之前解锁过的） */
+	stories: string[];
+	/** 本次跨到的境界下标（没跨境界则为 null） */
+	breakthroughTo: number | null;
+}
+
+/** 某技能所属方向（从修行路引的技能表里查） */
+function groupOf(graph: GraphId, skillId: string): string | undefined {
+	const g = GRAPH_JOURNEY.find((x) => x.id === graph);
+	return g?.skills.find((s) => s.id === skillId)?.group;
+}
+
+/** 勾一条清单得多少修为（方向权重） */
+export function weightOf(graph: GraphId, skillId: string): number {
+	const group = groupOf(graph, skillId);
+	return (group && XP_WEIGHTS[graph]?.[group]) || 1;
+}
+
+/* ---------- 连斩：模块级状态，整页会话内累计 ---------- */
+let lastSlayAt = 0;
+let comboCount = 0;
+
+/* ---------------- 修为日志（修行手札的数据源） ---------------- */
+function readLog(): SlayLogEntry[] {
+	if (typeof localStorage === "undefined") return [];
+	try {
+		const raw = localStorage.getItem(LOG_KEY);
+		if (!raw) return [];
+		const v = JSON.parse(raw);
+		return Array.isArray(v) ? (v as SlayLogEntry[]) : [];
+	} catch {
+		return [];
+	}
+}
+
+function appendLog(entry: SlayLogEntry): number {
+	if (typeof localStorage === "undefined") return 0;
+	const log = readLog();
+	log.push(entry);
+	if (log.length > LOG_CAP) log.splice(0, log.length - LOG_CAP);
+	try {
+		localStorage.setItem(LOG_KEY, JSON.stringify(log));
+	} catch {
+		/* 隐私模式忽略 */
+	}
+	return log.length;
+}
+
+export function getCultivationLog(): SlayLogEntry[] {
+	return readLog();
+}
+
+/* ---------------- 已解锁剧情集合（去重 + 持久化） ---------------- */
+function readUnlockedStories(): Set<string> {
+	if (typeof localStorage === "undefined") return new Set();
+	try {
+		const raw = localStorage.getItem(STORIES_KEY);
+		if (!raw) return new Set();
+		const v = JSON.parse(raw);
+		return new Set(Array.isArray(v) ? (v as string[]) : []);
+	} catch {
+		return new Set();
+	}
+}
+
+/** 解锁一批剧情，返回其中「本次新解锁」的 id 并广播 STORY_EVENT */
+function unlockStories(ids: string[]): string[] {
+	if (typeof localStorage === "undefined" || ids.length === 0) return [];
+	const set = readUnlockedStories();
+	const fresh = ids.filter((id) => !set.has(id));
+	if (fresh.length === 0) return [];
+	for (const id of fresh) set.add(id);
+	try {
+		localStorage.setItem(STORIES_KEY, JSON.stringify([...set]));
+	} catch {
+		/* 忽略 */
+	}
+	if (typeof window !== "undefined")
+		window.dispatchEvent(
+			new CustomEvent(STORY_EVENT, { detail: { ids: fresh } }),
+		);
+	return fresh;
+}
+
+/* ---------------- 方向 / 整图 是否学满 ---------------- */
+function isGroupComplete(graph: GraphId, group: string): boolean {
+	const g = GRAPH_JOURNEY.find((x) => x.id === graph);
+	if (!g) return false;
+	const levels = readGraphLevels(g);
+	let done = 0;
+	let total = 0;
+	for (const s of g.skills) {
+		if (s.group !== group) continue;
+		done += Math.min(levels[s.id] ?? 0, g.checks[s.id]?.length ?? 0);
+		total += g.checks[s.id]?.length ?? 0;
+	}
+	return total > 0 && done >= total;
+}
+
+function isGraphComplete(graph: GraphId): boolean {
+	const g = GRAPH_JOURNEY.find((x) => x.id === graph);
+	if (!g) return false;
+	const levels = readGraphLevels(g);
+	for (const s of g.skills) {
+		if ((levels[s.id] ?? 0) < (g.checks[s.id]?.length ?? 0)) return false;
+	}
+	return true;
+}
+
+/**
+ * 斩妖主入口：SkillTree 在「勾上一条清单」后调用。
+ * 负责给修为、写日志、连斩计数、判断跨境界与各类隐藏剧情触发。
+ */
+export function recordSlay(input: SlayInput): SlayResult {
+	const xpGained = weightOf(input.graph, input.skillId);
+	const logLen = appendLog({
+		ts: Date.now(),
+		graph: input.graph,
+		skillId: input.skillId,
+		index: input.index,
+		title: input.title,
+		xp: xpGained,
+	});
+
+	const now = Date.now();
+	comboCount = now - lastSlayAt <= 3000 ? comboCount + 1 : 1;
+	lastSlayAt = now;
+
+	const after = snapshot().realmIndex;
+	const breakthroughTo = after > input.beforeRealm ? after : null;
+
+	const stories: string[] = [];
+	if (logLen === 1) stories.push(FIRST_SLAY_STORY);
+	const group = groupOf(input.graph, input.skillId);
+	if (group && isGroupComplete(input.graph, group))
+		stories.push(`grp-${input.graph}-${group}`);
+	if (isGraphComplete(input.graph))
+		stories.push(GRAPH_STORY[input.graph] as string);
+	if (breakthroughTo !== null) {
+		for (let r = input.beforeRealm + 1; r <= breakthroughTo; r++)
+			if (REALM_STORY[r]) stories.push(REALM_STORY[r]);
+	}
+	if (after >= REALMS.length - 1 || snapshot().pct >= 100)
+		stories.push(FINALE_STORY);
+
+	const fresh = unlockStories(stories);
+
+	if (breakthroughTo !== null && typeof window !== "undefined") {
+		const realm = REALMS[breakthroughTo];
+		window.dispatchEvent(
+			new CustomEvent(BREAKTHROUGH_EVENT, {
+				detail: {
+					from: input.beforeRealm,
+					to: breakthroughTo,
+					realmName: realm.name,
+				},
+			}),
+		);
+	}
+	if (typeof window !== "undefined")
+		window.dispatchEvent(new CustomEvent(CULTIVATION_EVENT));
+
+	return { xpGained, combo: comboCount, stories: fresh, breakthroughTo };
 }

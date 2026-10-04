@@ -14,8 +14,10 @@ import {
 	type CultivationState,
 	GRAPH_JOURNEY,
 	type GraphId,
+	getCultivationLog,
 	snapshot,
 } from "@/data/cultivation";
+import { isMuted, setMuted } from "@/lib/sfx";
 
 interface Props {
 	/** 当前所在的图，用来在路引里点亮「此地」 */
@@ -41,6 +43,27 @@ $effect(() => {
 const barPct = $derived(
 	Math.min(100, Math.max(0, Math.round(st.pct * 10) / 10)),
 );
+
+/* ---------- 修行手札 + 音效开关 ---------- */
+let showLog = $state(false);
+let muted = $state(isMuted());
+let logEntries = $state<ReturnType<typeof getCultivationLog>>([]);
+
+function openLog() {
+	logEntries = getCultivationLog().slice().reverse();
+	showLog = true;
+}
+
+function toggleMute() {
+	muted = !muted;
+	setMuted(muted);
+}
+
+function fmt(ts: number): string {
+	const d = new Date(ts);
+	const p = (n: number) => String(n).padStart(2, "0");
+	return `${d.getMonth() + 1}月${d.getDate()}日 ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 </script>
 
 <section class="xp-panel" aria-label="修仙境界">
@@ -90,6 +113,41 @@ const barPct = $derived(
 			</li>
 		{/each}
 	</ul>
+
+	<div class="xp-acts">
+		<button type="button" class="xp-act" onclick={openLog}>修行手札</button>
+		<button
+			type="button"
+			class="xp-act"
+			onclick={toggleMute}
+			aria-pressed={muted}
+		>
+			{muted ? "🔇 音效已关" : "🔊 音效开启"}
+		</button>
+	</div>
+
+	{#if showLog}
+		<dialog class="xp-log-modal" open onclick={(e) => { if (e.target === e.currentTarget) showLog = false; }}>
+			<div class="xp-log-box">
+				<header class="xp-log-head">
+					<span class="xp-log-title">修行手札</span>
+					<button type="button" class="xp-log-close" onclick={() => (showLog = false)}>收起</button>
+				</header>
+				{#if logEntries.length === 0}
+					<p class="xp-log-empty">尚无斩妖记录。去勾掉第一条学习清单，写下你的第一行吧。</p>
+				{:else}
+					<ul class="xp-log-list">
+						{#each logEntries as e, i (i)}
+							<li>
+								<span class="xp-log-time">{fmt(e.ts)}</span>
+								<span class="xp-log-text">斩「{e.title}」，修为 +{e.xp}</span>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+		</dialog>
+	{/if}
 </section>
 
 <style>
@@ -245,5 +303,104 @@ const barPct = $derived(
 	.xp-stop-gate {
 		font-size: 0.6rem;
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* ===================== 手札 / 音效 ===================== */
+	.xp-acts {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.7rem;
+	}
+	.xp-act {
+		padding: 0.32rem 0.78rem;
+		border: 1px solid color-mix(in srgb, var(--xp-gold) 36%, transparent);
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--xp-gold) 8%, transparent);
+		font-size: 0.68rem;
+		color: var(--xp-ink);
+		cursor: pointer;
+		transition: border-color 160ms ease, background 160ms ease;
+	}
+	.xp-act:hover {
+		border-color: color-mix(in srgb, var(--xp-gold) 60%, transparent);
+		background: color-mix(in srgb, var(--xp-gold) 16%, transparent);
+	}
+
+	.xp-log-modal {
+		position: fixed;
+		z-index: 95;
+		margin: auto;
+		padding: 0;
+		border: 0;
+		border-radius: 16px;
+		background: transparent;
+		max-width: 30rem;
+		width: calc(100vw - 2rem);
+	}
+	.xp-log-modal::backdrop {
+		background: color-mix(in srgb, #1a140a 62%, transparent);
+		backdrop-filter: blur(3px);
+	}
+	.xp-log-box {
+		padding: 1.1rem 1.2rem 1.2rem;
+		border: 1px solid color-mix(in srgb, var(--xp-gold) 40%, transparent);
+		border-radius: 16px;
+		background: var(--xp-panel);
+		box-shadow: 0 18px 44px rgb(0 0 0 / 0.22);
+	}
+	.xp-log-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.7rem;
+	}
+	.xp-log-title {
+		font-size: 0.92rem;
+		font-weight: 800;
+		color: var(--xp-ink);
+	}
+	.xp-log-close {
+		padding: 0.26rem 0.7rem;
+		border: 1px solid color-mix(in srgb, var(--xp-gold) 36%, transparent);
+		border-radius: 99px;
+		background: transparent;
+		font-size: 0.66rem;
+		color: var(--xp-ink-2);
+		cursor: pointer;
+	}
+	.xp-log-empty {
+		margin: 0;
+		font-size: 0.76rem;
+		line-height: 1.7;
+		color: var(--xp-ink-2);
+	}
+	.xp-log-list {
+		max-height: 60vh;
+		overflow-y: auto;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		gap: 0.28rem;
+	}
+	.xp-log-list li {
+		display: grid;
+		grid-template-columns: 6.6rem 1fr;
+		gap: 0.5rem;
+		align-items: baseline;
+		padding: 0.28rem 0.45rem;
+		border-radius: 0.5rem;
+		font-size: 0.72rem;
+		line-height: 1.5;
+	}
+	.xp-log-list li:nth-child(odd) {
+		background: color-mix(in srgb, var(--xp-gold) 7%, transparent);
+	}
+	.xp-log-time {
+		color: var(--xp-ink-2);
+		font-variant-numeric: tabular-nums;
+	}
+	.xp-log-text {
+		color: var(--xp-ink);
 	}
 </style>
