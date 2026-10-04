@@ -38,6 +38,8 @@ import {
 	UNLEARN_STORY,
 	VISIT_ALL_STORY,
 } from "@/data/cultivationStories";
+import { EN_CHECKS } from "@/data/englishChecks";
+import { EN_PRESET, EN_SKILLS } from "@/data/englishSkills";
 import { MU_CHECKS } from "@/data/musicChecks";
 import { MU_PRESET, MU_SKILLS } from "@/data/musicSkills";
 import { SKILL_CHECKS } from "@/data/skillChecks";
@@ -47,11 +49,11 @@ import { SKILLS as FE_SKILLS, PRESET } from "@/data/skills";
  * 站内技能图的统一标识。
  *
  * - cs / fe / be / ag 是**修行路**：进 GRAPH_JOURNEY，算修为、挂境界门禁、发飞剑传书。
- * - mu 是**修行录**：进 GRAPH_JOURNEY 但 `realmIndex: -1` 表示永不受门禁，
- *   且 SkillTree 传了 noCultivation，所以既不加修为也不进九境界的统计。
- *   它的进度只看图内属性（音准 / 技法 / 作品），不进境界链也不领话本签。
+ * - mu / en 是**修行录**：进 GRAPH_RECORD 但没有任何门禁，且 SkillTree 传了
+ *   noCultivation，所以既不加修为也不进九境界的统计、不发传书、不领话本签。
+ *   它们的进度只看图内属性（音准 / 语音 / 词汇 …），不进境界链。
  */
-export type GraphId = "cs" | "fe" | "be" | "ag" | "mu";
+export type GraphId = "cs" | "fe" | "be" | "ag" | "mu" | "en";
 
 /** 一个境界：minPct 是达到该境界所需的全局修为占比 */
 export interface Realm {
@@ -142,7 +144,7 @@ const XP_WEIGHTS: Record<GraphId, Record<string, number>> = {
 		"ag-app": 3,
 	},
 	// 音乐：只在修炼路成立时才会被读到（SkillTree 传 noCultivation 时整个修为层被跳过），
-	// 这里保留一份是为了数据自检时四组权重表结构一致。
+	// 这里保留一份是为了数据自检时几组权重表结构一致。
 	mu: {
 		"mu-listen": 5,
 		"mu-theory": 3,
@@ -151,6 +153,17 @@ const XP_WEIGHTS: Record<GraphId, Record<string, number>> = {
 		"mu-compose": 4,
 		"mu-produce": 3,
 		"mu-stage": 2,
+	},
+	// 英语：同样只为结构一致而存在
+	en: {
+		"en-sound": 5,
+		"en-vocab": 5,
+		"en-grammar": 3,
+		"en-listen": 4,
+		"en-speak": 4,
+		"en-read": 3,
+		"en-write": 3,
+		"en-academic": 2,
 	},
 };
 
@@ -241,6 +254,16 @@ export const GRAPH_RECORD: RecordGraph[] = [
 		skills: MU_SKILLS,
 		checks: MU_CHECKS,
 		preset: MU_PRESET,
+	},
+	{
+		id: "en",
+		name: "英语",
+		href: "/english/",
+		gateLabel: "无门禁 · 随时可进",
+		storageKey: "aemeath-english-tree",
+		skills: EN_SKILLS,
+		checks: EN_CHECKS,
+		preset: EN_PRESET,
 	},
 ];
 
@@ -533,6 +556,17 @@ const ACTION_BY_GROUP: Record<GraphId, Record<string, string>> = {
 		"mu-compose": "谱",
 		"mu-produce": "调",
 		"mu-stage": "演",
+	},
+	// 英语：音靠「正」，词靠「记」，句靠「通」，输出靠「达」
+	en: {
+		"en-sound": "正",
+		"en-vocab": "记",
+		"en-grammar": "通",
+		"en-listen": "闻",
+		"en-speak": "言",
+		"en-read": "读",
+		"en-write": "写",
+		"en-academic": "论",
 	},
 };
 

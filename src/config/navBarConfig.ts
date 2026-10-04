@@ -53,6 +53,7 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 
 			// 修行录：与修行路无先后关系，不计修为、无门禁
 			LinkPresets.MusicRecord,
+			LinkPresets.EnglishRecord,
 		],
 	});
 
@@ -202,6 +203,11 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		name: "音乐（修行录）",
 		url: "/music/",
 		icon: "material-symbols:music-note",
+	},
+	EnglishRecord: {
+		name: "英语（修行录）",
+		url: "/english/",
+		icon: "material-symbols:translate",
 	},
 	Interview: {
 		name: "面试",
