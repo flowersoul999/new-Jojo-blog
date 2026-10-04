@@ -22,7 +22,12 @@ const initial = /[\u4e00-\u9fff]/u.test(rawName)
 		<Icon is:inline name="material-symbols:auto-awesome-rounded" class="text-[1.5rem]" />
 	</div>
 	<div class="gi-head__text">
-		<div class="gi-head__kicker">STAND NAME · 实习经历</div>
+		<div class="gi-head__top">
+			<div class="gi-head__kicker">STAND NAME · 实习经历</div>
+			<div class="gi-head__actions">
+				<slot name="actions" />
+			</div>
+		</div>
 		<div class="gi-head__title">{title}</div>
 		<p class="gi-head__tagline">{tagline}</p>
 	</div>
@@ -128,11 +133,27 @@ const initial = /[\u4e00-\u9fff]/u.test(rawName)
 		background: var(--gi-soft);
 		color: var(--gi-accent);
 	}
+	.gi-head__text {
+		min-width: 0;
+		flex: 1;
+	}
 	.gi-head__kicker {
 		font-size: 0.66rem;
 		font-weight: 700;
 		letter-spacing: 0.22em;
 		color: var(--gi-accent);
+	}
+	/* kicker 与页面级操作按钮（如登录后的「编辑此页」）同一行，左右分列 */
+	.gi-head__top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+	/* 没传 actions 时不占位 */
+	.gi-head__actions:empty {
+		display: none;
 	}
 	.gi-head__title {
 		margin-top: 0.1rem;

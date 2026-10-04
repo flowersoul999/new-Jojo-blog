@@ -31,7 +31,12 @@ const showTabs = current !== "home";
 
 <div class="iv-shell">
 	<header class="iv-hero">
-		<p class="iv-hero__kicker">{kicker}</p>
+		<div class="iv-hero__top">
+			<p class="iv-hero__kicker">{kicker}</p>
+			<div class="iv-hero__actions">
+				<slot name="actions" />
+			</div>
+		</div>
 		<h1 class="iv-hero__title">{title}</h1>
 		{desc && <p class="iv-hero__desc">{desc}</p>}
 
@@ -113,6 +118,18 @@ const showTabs = current !== "home";
 		border: 1px solid var(--iv-line);
 		background: var(--iv-surface);
 		overflow: hidden;
+	}
+	/* kicker 与页面级操作按钮（如登录后的「编辑此页」）同一行，左右分列 */
+	.iv-hero__top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+	/* 没传 actions 时不占位，避免空元素影响 kicker 的基线 */
+	.iv-hero__actions:empty {
+		display: none;
 	}
 	.iv-hero::before {
 		content: "";
