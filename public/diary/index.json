@@ -1,5 +1,19 @@
 [
   {
+    "slug": "diary-20261005-f0slwf",
+    "title": "测试2",
+    "content": "测试2",
+    "date": "2026-10-05T15:05",
+    "tags": [],
+    "images": [
+      {
+        "url": "/diary/images/1791183928441-3zrb9r.webp"
+      }
+    ],
+    "isPrivate": false,
+    "mood": "neutral"
+  },
+  {
     "slug": "diary-20261005-u6frms",
     "title": "测试",
     "content": "测试1",
