@@ -273,7 +273,8 @@ async function writeFriendsFeedSnapshot(records: FeedRecord[]): Promise<void> {
 				})),
 			})),
 	};
-	const serialized = `${JSON.stringify(payload, null, 2)}\n`;
+	// 缩进用 tab：与仓库里 biome 的格式化结果保持一致
+	const serialized = `${JSON.stringify(payload, null, "\t")}\n`;
 
 	let previous = "";
 	try {

@@ -271,7 +271,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 	// 标题是 SEO 与页头都要用的东西，空了会让页面没标题
 	if (!payload.meta.title) payload.meta.title = "Golden Experience";
 
-	const content = `${JSON.stringify(payload, null, 2)}\n`;
+	// 缩进用 tab：与仓库里 biome 的格式化结果保持一致。
+	// （程序写入 src/data 的 JSON 都走这个约定，避免出现大段纯缩进 diff）
+	const content = `${JSON.stringify(payload, null, "\t")}\n`;
 	const message = "Update internship page content";
 
 	try {
