@@ -105,6 +105,22 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				</div>
 
 				<div class="diary-compose-row">
+					<span class="diary-compose-label">时间</span>
+					<div class="diary-compose-time">
+						<input
+							type="datetime-local"
+							id="diary-compose-date"
+							class="diary-compose-input diary-compose-date"
+							step="60"
+							aria-label="日记时间"
+						/>
+						<button type="button" id="diary-compose-now" class="diary-compose-now">
+							此刻
+						</button>
+					</div>
+				</div>
+
+				<div class="diary-compose-row">
 					<span class="diary-compose-label">图片</span>
 					<div class="diary-compose-imgs">
 						<input type="file" id="diary-compose-file" accept="image/*" multiple class="hidden" />
@@ -219,10 +235,10 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			width: 100%;
 			border-radius: 0.65rem;
 			border: 1px solid var(--line-divider);
-			background: color-mix(in srgb, var(--deep-text) 3%, transparent);
+			background: color-mix(in srgb, var(--text-color) 3%, transparent);
 			padding: 0.55rem 0.75rem;
 			font-size: 0.875rem;
-			color: var(--deep-text);
+			color: var(--text-color);
 			outline: none;
 			transition: border-color 200ms ease;
 		}
@@ -230,7 +246,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			border-color: color-mix(in srgb, var(--primary) 55%, transparent);
 		}
 		.diary-compose-input::placeholder {
-			color: color-mix(in srgb, var(--deep-text) 40%, transparent);
+			color: color-mix(in srgb, var(--text-color) 40%, transparent);
 		}
 		.diary-compose-textarea {
 			min-height: 8rem;
@@ -255,7 +271,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			border: 1px dashed color-mix(in srgb, var(--primary) 45%, transparent);
 			border-radius: 0.75rem;
 			background: color-mix(in srgb, var(--primary) 4%, transparent);
-			color: color-mix(in srgb, var(--deep-text) 62%, transparent);
+			color: color-mix(in srgb, var(--text-color) 62%, transparent);
 			cursor: pointer;
 			text-align: center;
 			transition:
@@ -267,11 +283,11 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		.diary-compose-drop.is-drag {
 			border-color: var(--primary);
 			background: color-mix(in srgb, var(--primary) 10%, transparent);
-			color: var(--deep-text);
+			color: var(--text-color);
 		}
 		.diary-compose-drop span {
 			font-size: 0.8rem;
-			color: var(--deep-text);
+			color: var(--text-color);
 		}
 		.diary-compose-drop em {
 			font-size: 0.68rem;
@@ -292,7 +308,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			border-radius: 0.5rem;
 			overflow: hidden;
 			border: 1px solid var(--line-divider);
-			background: color-mix(in srgb, var(--deep-text) 6%, transparent);
+			background: color-mix(in srgb, var(--text-color) 6%, transparent);
 		}
 		.diary-compose-thumb img {
 			width: 100%;
@@ -354,7 +370,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			flex: none;
 			padding-top: 0.3rem;
 			font-size: 0.8rem;
-			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+			color: color-mix(in srgb, var(--text-color) 55%, transparent);
 		}
 		.diary-compose-moods {
 			display: flex;
@@ -370,7 +386,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			background: transparent;
 			padding: 0.28rem 0.65rem;
 			font-size: 0.78rem;
-			color: var(--deep-text);
+			color: var(--text-color);
 			cursor: pointer;
 			transition:
 				border-color 200ms ease,
@@ -383,12 +399,47 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			border-color: var(--primary);
 			background: color-mix(in srgb, var(--primary) 12%, transparent);
 		}
+		.diary-compose-time {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+		.diary-compose-date {
+			flex: 1;
+			min-width: 0;
+			width: auto;
+			font-size: 0.8rem;
+			font-variant-numeric: tabular-nums;
+			color-scheme: light;
+		}
+		html.dark .diary-compose-date {
+			color-scheme: dark;
+		}
+		.diary-compose-now {
+			flex: none;
+			border: 1px solid var(--line-divider);
+			border-radius: 999px;
+			background: transparent;
+			padding: 0.34rem 0.7rem;
+			font-size: 0.78rem;
+			color: var(--text-color);
+			cursor: pointer;
+			transition:
+				border-color 200ms ease,
+				background 200ms ease;
+		}
+		.diary-compose-now:hover {
+			border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+			background: color-mix(in srgb, var(--primary) 10%, transparent);
+		}
 		.diary-compose-private {
 			display: flex;
 			align-items: center;
 			gap: 0.45rem;
 			font-size: 0.8rem;
-			color: color-mix(in srgb, var(--deep-text) 70%, transparent);
+			color: color-mix(in srgb, var(--text-color) 70%, transparent);
 			cursor: pointer;
 		}
 		.diary-compose-foot {
@@ -402,7 +453,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		}
 		.diary-compose-status {
 			font-size: 0.75rem;
-			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+			color: color-mix(in srgb, var(--text-color) 55%, transparent);
 		}
 		.diary-compose-status.is-error {
 			color: #ef4444;
@@ -440,7 +491,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			transform: translateX(-50%);
 			border-radius: 999px;
 			background: var(--card-bg);
-			color: var(--deep-text);
+			color: var(--text-color);
 			border: 1px solid var(--line-divider);
 			box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
 			padding: 0.55rem 1.1rem;
@@ -1163,6 +1214,8 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		var composeUrl = document.getElementById("diary-compose-url");
 		var composePrivate = document.getElementById("diary-compose-private");
 		var composeMoods = document.getElementById("diary-compose-moods");
+		var composeDate = document.getElementById("diary-compose-date");
+		var composeNow = document.getElementById("diary-compose-now");
 		var composeMood = "neutral";
 		var composeSaving = false;
 		var DIARY_JSON_PATH = "public/diary/index.json";
@@ -1408,6 +1461,8 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		function openCompose() {
 			setComposeStatus("");
 			composeModal.hidden = false;
+			// 每次打开都默认「此刻」，要补记往期日记再手动改时间
+			composeDate.value = localDateStr();
 			renderThumbs();
 			composeContent.focus();
 		}
@@ -1447,8 +1502,10 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		}
 
 		// 生成 slug：diary-YYYYMMDD-xxxxxx（与现有数据格式一致）
-		function genSlug() {
-			var d = new Date();
+		// 传 dateStr（YYYY-MM-DDTHH:mm）时按该日期取年月日，便于补记往期日记
+		function genSlug(dateStr) {
+			var d = dateStr ? new Date(dateStr) : new Date();
+			if (isNaN(d.getTime())) d = new Date();
 			var ymd =
 				d.getFullYear() +
 				String(d.getMonth() + 1).padStart(2, "0") +
@@ -1457,9 +1514,8 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			return "diary-" + ymd + "-" + rand;
 		}
 
-		// 生成与现有数据一致的本地时间格式：YYYY-MM-DDTHH:mm
-		function localDateStr() {
-			var d = new Date();
+		// 把 Date 格式化成与现有数据一致的本地时间串：YYYY-MM-DDTHH:mm
+		function toLocalDateStr(d) {
 			return (
 				d.getFullYear() +
 				"-" +
@@ -1471,6 +1527,17 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				":" +
 				String(d.getMinutes()).padStart(2, "0")
 			);
+		}
+
+		function localDateStr() {
+			return toLocalDateStr(new Date());
+		}
+
+		// 读取「时间」行选中的值：空或非法一律回退到当前时刻（datetime-local 的值本身就是 YYYY-MM-DDTHH:mm[:ss]）
+		function composeDateValue() {
+			var v = composeDate && composeDate.value ? composeDate.value.trim().slice(0, 16) : "";
+			if (!v || isNaN(new Date(v).getTime())) return localDateStr();
+			return v;
 		}
 
 		function submitCompose() {
@@ -1504,11 +1571,12 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 
 			uploadAll
 				.then(function () {
+					var when = composeDateValue();
 					var entry = {
-						slug: genSlug(),
+						slug: genSlug(when),
 						title: composeTitle.value.trim(),
 						content: content,
-						date: localDateStr(),
+						date: when,
 						tags: [],
 						images: pendingImages.map(function (item) {
 							return { url: item.url };
@@ -1560,6 +1628,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 								pendingImages = [];
 								renderThumbs();
 								composePrivate.checked = false;
+								composeDate.value = localDateStr();
 								showToast("日记已发表，全站生效约需 1-2 分钟（等待重新部署）");
 							});
 						});
@@ -1582,6 +1651,9 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		composeClose.addEventListener("click", closeCompose);
 		composeMask.addEventListener("click", closeCompose);
 		composeSubmit.addEventListener("click", submitCompose);
+		composeNow.addEventListener("click", function () {
+			composeDate.value = localDateStr();
+		});
 
 		/* 图片：点击选文件 / 拖拽 / 粘贴链接 */
 		composeDrop.addEventListener("click", function () {
