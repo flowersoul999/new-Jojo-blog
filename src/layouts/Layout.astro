@@ -2256,31 +2256,20 @@ function disableAnimation() {
   // Initialize wallpaper mode
   import { applyStoredSelectedWallpaper, initWallpaperMode, initThemeListener } from "@/utils/setting-utils";
   import { initIconLoader } from "@/utils/icon-loader";
-  // ⚠️ 这些步骤必须互相隔离：原来是裸的顺序调用，任何一步抛异常，后面的
-  //    initWallpaperMode() 就再也不会执行 —— 而正文能否显示（给 body 加
-  //    .wallpaper-initialized）恰恰由它放行，于是整页正文永久 visibility:hidden，
-  //    在固定的全屏壁纸下表现为「点进文章只剩一张壁纸、什么都没了」。
-  //    逐步 try/catch 后，单点报错不再拖死主内容的显示。
-  const runLayoutInit = () => {
-    const steps: Array<() => void> = [
-      updateMainGridCols,
-      updateSidebarComponentsVisibility,
-      initWallpaperMode,
-      initThemeListener,
-      initIconLoader,
-    ];
-    for (const step of steps) {
-      try {
-        step();
-      } catch (error) {
-        console.error(`[layout-init] ${step.name} 执行失败：`, error);
-      }
-    }
-  };
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", runLayoutInit);
+    document.addEventListener("DOMContentLoaded", () => {
+      updateMainGridCols();
+      updateSidebarComponentsVisibility();
+      initWallpaperMode();
+      initThemeListener();
+      initIconLoader();
+    });
   } else {
-    runLayoutInit();
+    updateMainGridCols();
+    updateSidebarComponentsVisibility();
+    initWallpaperMode();
+    initThemeListener();
+    initIconLoader();
   }
 
   // LQIP fade-in：图片加载完成后淡出占位渐变

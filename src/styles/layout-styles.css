@@ -810,22 +810,9 @@ html[data-wallpaper-mode="fullscreen"] .w-full.z-30.pointer-events-none {
     top: 0 !important;
 }
 
-/* 初始加载时隐藏主内容，防止壁纸初始化前内容闪烁。
-   ⚠️ 自愈兜底：正常由 JS（utils/setting-utils.ts 的 adjustMainContentPosition）给
-   <body> 加 .wallpaper-initialized 来放行。但那段初始化链路一旦因任何原因没跑到
-   （脚本报错、初始化卡住、切页时序变化），正文就会永久停在 visibility:hidden ——
-   而壁纸是 position:fixed 铺满视口的，读者看到的就是「整屏壁纸、正文整页消失」。
-   这里用 0s 动画在 2s 后强制显示：正常情况 2s 内 JS 早已放行（规则不再匹配、动画随之取消），
-   只有异常时才会兜底生效。 */
+/* 初始加载时隐藏主内容，防止壁纸初始化前内容闪烁 */
 html[data-wallpaper-mode="fullscreen"] body:not(.wallpaper-initialized) .w-full.z-30.pointer-events-none {
     visibility: hidden;
-    animation: aemeath-force-reveal-main 0s linear 2s forwards;
-}
-
-@keyframes aemeath-force-reveal-main {
-    to {
-        visibility: visible;
-    }
 }
 
 /* Fullscreen 模式下移动端非首页隐藏壁纸（与横幅模式一致） */
