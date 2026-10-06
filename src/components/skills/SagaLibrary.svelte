@@ -193,6 +193,11 @@ $effect(() => {
 		</p>
 	</div>
 
+	<!-- ⚠️ 用 {#if shelfOpen} 包住整个目录：该组件挂在 Layout 底部、全站每页都会 SSR 渲染，
+	     不加这个门的话 279 个回目会全部进了每一页的 HTML（实测 124KB + 279 个内联锁 SVG），
+	     而绝大多数访客根本不会点开书架。shelfOpen 初始为 false，SSR 输出为空，
+	     首次点开时才在客户端渲染（279 项，毫秒级）。 -->
+	{#if shelfOpen}
 	<div class="slb-scroll">
 		{#each grouped as group (group.volume)}
 		<h4 class="slb-group">{group.volume}</h4>
@@ -228,6 +233,7 @@ $effect(() => {
 		</ul>
 		{/each}
 	</div>
+	{/if}
 </dialog>
 
 <!-- 阅读器：与收件箱同款纸卷，只放话本 -->
