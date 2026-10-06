@@ -1,11 +1,7 @@
 import * as path from "node:path";
 import { getSortedPosts } from "@/utils/content-utils";
 import { processCoverImageSync } from "@/utils/image-utils";
-import {
-	getFileDirFromPath,
-	getPostUrlBySlug,
-	LOCAL_IMAGE_GLOB,
-} from "@/utils/url-utils";
+import { getFileDirFromPath, getPostUrlBySlug } from "@/utils/url-utils";
 
 const getPostCover = async (
 	image: string | undefined,
@@ -22,7 +18,7 @@ const getPostCover = async (
 	);
 	if (!isLocalImage) return processedImage;
 
-	const files = import.meta.glob<ImageMetadata>(LOCAL_IMAGE_GLOB, {
+	const files = import.meta.glob<ImageMetadata>("../../**", {
 		import: "default",
 	});
 	const basePath = getFileDirFromPath(filePath || "");
