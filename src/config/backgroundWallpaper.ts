@@ -33,6 +33,30 @@ const mobileWallpaperImages = [
 	...otherWallpaperImages,
 ];
 
+/**
+ * 背景视频总清单 —— 导航栏播放按钮按这个顺序轮播。
+ * **数组下标就是 `playerUrl` 的下标**，面板选片、播放器取片都靠它，别随意重排。
+ *
+ * 命名规范：文件名带日期版本号（CDN 强缓存，同名替换不生效）。
+ */
+const playerVideos = [
+	{ src: "/assets/videos/bg-20260928.mp4" },
+	{
+		src: "/assets/videos/bg-20261006-wlop.mp4",
+		label: "WLOP · Aeolian3",
+		poster: "/assets/videos/thumbs/bg-20261006-wlop.webp",
+	},
+];
+
+/**
+ * 显示设置面板「动态壁纸」一栏**只列**这几支 —— 元素是上面 playerVideos 的下标。
+ *
+ * ⚠️ 下标必须**显式写死**：面板按 index 选中、播放器按同一 index 取片。
+ * 曾经用「数组位置」当索引，一旦面板清单是 playerUrl 的子集就会错位，
+ * 出现「选了 A 播出来的是 B」。没列进来的片子仍可由导航栏播放按钮轮播到。
+ */
+const selectableDynamicWallpaperIndices = [1];
+
 export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	// 壁纸模式："banner" 横幅壁纸，"fullscreen" 全屏壁纸，"overlay" 全屏透明，"none" 纯色背景无壁纸
 	mode: "fullscreen",
@@ -79,13 +103,18 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 移动背景图片（支持单张或多张随机）
 		// mobile: "assets/images/MobileWallpaper/m1.webp",
 		mobile: mobileWallpaperImages,
-		// 背景视频播放地址
-		// 支持单个视频路径（字符串）或多个视频循环（数组）
+		// 背景视频播放地址（由文件顶部的 playerVideos 派生，勿在此单独增删）
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
-		// 720p 带音轨版本（44MB），页面加载时后台预加载，点击播放按钮即可秒开
-		// 注意：更换视频文件时建议带上日期版本号命名（如 bg-20260928.mp4），
-		// 避免浏览器与 CDN（Cloudflare）强缓存旧版本导致模糊无声
-		playerUrl: ["/assets/videos/bg-20260928.mp4"],
+		// bg-20260928：720p 带音轨，42MB / 248s（导航栏播放按钮可轮播到，但不在面板可选清单里）
+		// bg-20261006-wlop：720p 带音轨，19MB / 174s（由 1080p / 214MB 源片重压而来）
+		// 未选中动态壁纸时**不随页面加载预加载**，只有点导航栏播放按钮才按需拉取，因此体积不影响首屏；
+		// 一旦访客在显示设置面板里选中了某支，它就等同于壁纸，会随页面加载自动静音起播。
+		playerUrl: playerVideos.map((item) => item.src),
+		// 面板可选的动态壁纸清单：index 指回 playerUrl 的下标，必须是显式的
+		playerItems: selectableDynamicWallpaperIndices.map((index) => ({
+			...playerVideos[index],
+			index,
+		})),
 	},
 	// 横幅壁纸和全屏壁纸共享配置
 	common: {

@@ -9,6 +9,14 @@ export type BackgroundWallpaperConfig = {
 				desktop?: string | string[];
 				mobile?: string | string[];
 				playerUrl?: string | string[]; // 背景视频播放地址，支持单个视频路径或数组（多视频列表循环）
+				// 动态壁纸清单：供显示设置面板渲染**可选**项，允许只列 playerUrl 的一个子集。
+				// 因此每项必须显式带 index 指回 playerUrl 的下标；缺省时才按数组位置兜底。
+				playerItems?: {
+					src: string; // 视频地址，须与 playerUrl 中同一项一致
+					index?: number; // 该视频在 playerUrl 中的下标；面板选中、播放器取片都用它
+					label?: string; // 面板上显示的名称，缺省时回落到「动态壁纸 N」
+					poster?: string; // 面板缩略图；不填则显示占位底色
+				}[];
 		  }; // 支持单个图片、图片数组或分别设置桌面端和移动端图片
 	// 横幅壁纸和全屏壁纸共享配置
 	common?: {
