@@ -271,6 +271,7 @@ export const en: Translation = {
 	// Wallpaper Settings
 	[Key.wallpaperSettings]: "Wallpaper Settings",
 	[Key.builtinWallpaper]: "Built-in Wallpapers",
+	[Key.dynamicWallpaper]: "Dynamic Wallpapers",
 	[Key.wallpaperTitle]: "Home Wallpaper Title",
 	[Key.wallpaperCarousel]: "Wallpaper Carousel",
 	[Key.wavesAnimation]: "Waves Animation",

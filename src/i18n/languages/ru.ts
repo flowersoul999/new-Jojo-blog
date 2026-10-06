@@ -273,6 +273,7 @@ export const ru: Translation = {
 	// Настройки обоев
 	[Key.wallpaperSettings]: "Настройки обоев",
 	[Key.builtinWallpaper]: "Встроенные обои",
+	[Key.dynamicWallpaper]: "Динамические обои",
 	[Key.wallpaperTitle]: "Заголовок главных обоев",
 	[Key.wallpaperCarousel]: "Карусель обоев",
 	[Key.wavesAnimation]: "Анимация волн",

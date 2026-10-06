@@ -263,6 +263,7 @@ export const zh_CN: Translation = {
 	// 壁纸设置
 	[Key.wallpaperSettings]: "壁纸设置",
 	[Key.builtinWallpaper]: "内置壁纸",
+	[Key.dynamicWallpaper]: "动态壁纸",
 	[Key.wallpaperTitle]: "首页壁纸标题",
 	[Key.wallpaperCarousel]: "壁纸轮播",
 	[Key.wavesAnimation]: "水波纹动画",

@@ -261,6 +261,7 @@ enum I18nKey {
 	// 壁纸设置
 	wallpaperSettings = "wallpaperSettings",
 	builtinWallpaper = "builtinWallpaper",
+	dynamicWallpaper = "dynamicWallpaper",
 	wallpaperTitle = "wallpaperTitle",
 	wallpaperCarousel = "wallpaperCarousel",
 	wavesAnimation = "wavesAnimation",

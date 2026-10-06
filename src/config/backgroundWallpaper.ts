@@ -33,6 +33,27 @@ const mobileWallpaperImages = [
 	...otherWallpaperImages,
 ];
 
+/**
+ * 动态壁纸（背景视频）清单 —— 显示设置面板的「动态壁纸」一栏就是渲染这个数组。
+ *
+ * ⚠️ `playerUrl` 由这里 map 出来，两者**必须同序同长**。面板按索引选中、
+ * 播放器按同一索引取片，一旦错位就会出现「选了 A 播的是 B」。
+ *
+ * 命名规范：文件名带日期版本号（CDN 强缓存，同名替换不生效）。
+ * label 缺省时面板回落成「动态壁纸 N」。
+ */
+const dynamicWallpapers = [
+	{
+		src: "/assets/videos/bg-20260928.mp4",
+		poster: "/assets/videos/thumbs/bg-20260928.webp",
+	},
+	{
+		src: "/assets/videos/bg-20261006-wlop.mp4",
+		label: "WLOP · Aeolian3",
+		poster: "/assets/videos/thumbs/bg-20261006-wlop.webp",
+	},
+];
+
 export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	// 壁纸模式："banner" 横幅壁纸，"fullscreen" 全屏壁纸，"overlay" 全屏透明，"none" 纯色背景无壁纸
 	mode: "fullscreen",
@@ -79,18 +100,15 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 移动背景图片（支持单张或多张随机）
 		// mobile: "assets/images/MobileWallpaper/m1.webp",
 		mobile: mobileWallpaperImages,
-		// 背景视频播放地址
-		// 支持单个视频路径（字符串）或多个视频循环（数组）
+		// 背景视频播放地址（由文件顶部的 dynamicWallpapers 派生，勿在此单独增删）
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
 		// bg-20260928：720p 带音轨，42MB / 248s
 		// bg-20261006-wlop：720p 带音轨，19MB / 174s（由 1080p / 214MB 源片重压而来）
-		// 视频一律不随页面加载预加载，只有点击播放按钮才按需拉取，因此体积不影响首屏
-		// 注意：更换视频文件时建议带上日期版本号命名（如 bg-20260928.mp4），
-		// 避免浏览器与 CDN（Cloudflare）强缓存旧版本导致模糊无声
-		playerUrl: [
-			"/assets/videos/bg-20260928.mp4",
-			"/assets/videos/bg-20261006-wlop.mp4",
-		],
+		// 未选中动态壁纸时**不随页面加载预加载**，只有点导航栏播放按钮才按需拉取，因此体积不影响首屏；
+		// 一旦访客在显示设置面板里选中了某支，它就等同于壁纸，会随页面加载自动静音起播。
+		playerUrl: dynamicWallpapers.map((item) => item.src),
+		// 动态壁纸清单（面板用）：与 playerUrl 同序同长
+		playerItems: dynamicWallpapers.map((item) => ({ ...item })),
 	},
 	// 横幅壁纸和全屏壁纸共享配置
 	common: {

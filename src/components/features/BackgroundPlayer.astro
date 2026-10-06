@@ -6,9 +6,18 @@ import { i18n } from "@/i18n/translation";
 export interface Props {
 	playerUrl: string | string[];
 	playerMode?: "order" | "random";
+	/**
+	 * 保存「已选中的动态壁纸索引」的 localStorage 键（来自 setting-utils）。
+	 * 本组件是 is:inline 脚本、无法 import，所以靠这个 prop 透传键名。
+	 */
+	dynamicStorageKey?: string;
 }
 
-const { playerUrl, playerMode = "order" } = Astro.props;
+const {
+	playerUrl,
+	playerMode = "order",
+	dynamicStorageKey = "selectedDynamicWallpaper",
+} = Astro.props;
 
 const urls = Array.isArray(playerUrl) ? playerUrl : [playerUrl];
 const hasMultiple = urls.length > 1;
@@ -63,7 +72,7 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 	)
 }
 
-<script is:inline define:vars={{ urls: urlsJson, playerMode, hasMultiple }}>
+<script is:inline define:vars={{ urls: urlsJson, playerMode, hasMultiple, dynamicStorageKey }}>
 	(() => {
 		var urlList = JSON.parse(urls);
 		if (!urlList.length) return;
@@ -85,9 +94,15 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		var currentIndex = 0;
 		var errorCount = 0;
 		var toastTimer = null;
+		// 被显示设置面板选中的「动态壁纸」索引。非 null 时循环固定这一支、不随机切换，
+		// 语义上等同「我已经把它设成壁纸了」。
+		var pinnedIndex = null;
+		// 本次起播是否静音。面板选中 = 设为壁纸 → 静音起播（也是自动播放策略下唯一稳的方式）；
+		// 用户点导航栏播放按钮则带声音。
+		var startMuted = false;
 
-		// 不再在页面加载时后台预加载 44MB 背景视频（会持续抢占带宽、拖慢点击跳转）。
-		// 改为仅在用户点击「播放视频」按钮时才加载播放，实现页面秒开。
+		// 未选中动态壁纸时**不预加载**任何视频（否则会持续占带宽、拖慢点击跳转）。
+		// 只有两种情况会真正拉流：点导航栏播放按钮，或面板里选中了某支动态壁纸（等同壁纸，随页面加载起播）。
 
 		function showToast() {
 			if (!toast) return;
@@ -131,10 +146,24 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			}
 		}
 
-		function doPlay(changeSrc) {
+		function hideOverlay() {
+			if (overlay) {
+				overlay.classList.remove("opacity-100");
+				overlay.classList.add("opacity-0");
+			}
+		}
+
+		function doPlay(forceMuted) {
 			ensureSrc();
+			if (forceMuted) {
+				// 自动起播（壁纸语义）：只能静音，否则会被浏览器自动播放策略拦掉。
+				video.muted = true;
+				video.play().catch(function () { isPlaying = false; syncAttr(); });
+				return;
+			}
 			// 播放按钮点击本身属于用户手势，直接带声音播放，避免"先静音再解除"在部分浏览器下失效导致无声
 			// 若被浏览器自动播放策略拦截（play 返回 NotAllowedError），则回退为静音播放保证画面可用
+			video.muted = false;
 			video.play().catch(function () {
 				video.muted = true;
 				video.play().catch(function () { isPlaying = false; syncAttr(); });
@@ -145,10 +174,49 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			if (index < 0 || index >= urlList.length) return;
 			currentIndex = index;
 			if (isPlaying) {
-				doPlay();
+				doPlay(startMuted);
 			} else {
 				video.src = urlList[currentIndex];
 				video.load();
+			}
+		}
+
+		// 「把第 index 支设为壁纸」：钉住索引 + 静音起播 + 点亮遮罩。
+		// 面板点选和刷新后恢复都走这里，保证两条路径行为一致。
+		function applyDynamicWallpaper(index) {
+			if (typeof index !== "number" || index < 0 || index >= urlList.length) return;
+			pinnedIndex = index;
+			currentIndex = index;
+			startMuted = true;
+			isPlaying = true;
+			if (overlay) {
+				overlay.classList.remove("opacity-0");
+				overlay.classList.add("opacity-100");
+			}
+			syncAttr();
+			doPlay(true);
+		}
+
+		function clearDynamicWallpaper() {
+			pinnedIndex = null;
+			startMuted = false;
+			if (!isPlaying) return;
+			isPlaying = false;
+			video.pause();
+			hideOverlay();
+			syncAttr();
+		}
+
+		function readStoredDynamicIndex() {
+			try {
+				var raw = window.localStorage.getItem(dynamicStorageKey);
+				if (raw === null) return null;
+				var parsed = parseInt(raw, 10);
+				if (isNaN(parsed) || parsed < 0 || parsed >= urlList.length) return null;
+				return parsed;
+			} catch (e) {
+				// 隐私模式下 localStorage 可能直接抛错，静默降级为「没有动态壁纸」。
+				return null;
 			}
 		}
 
@@ -156,23 +224,31 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			isPlaying = !isPlaying;
 			if (isPlaying) {
 				if (currentIndex >= urlList.length) currentIndex = 0;
+				// 手动播放：用户是主动点的，带声音来。
+				startMuted = false;
 				syncAttr();
 				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
 				doPlay(false);
 			} else {
 				video.pause();
-				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
+				hideOverlay();
 				syncAttr();
 			}
 		}
 
 		function onEnded() {
+			// 被选为动态壁纸时循环同一支 —— 壁纸不该自己换片。
+			if (pinnedIndex !== null) {
+				currentIndex = pinnedIndex;
+				doPlay(true);
+				return;
+			}
 			if (isMultiple) {
 				currentIndex = pickIndex(currentIndex);
-				doPlay();
+				doPlay(startMuted);
 			} else {
 				isPlaying = false;
-				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
+				hideOverlay();
 				syncAttr();
 			}
 		}
@@ -187,7 +263,7 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			} else {
 				// 所有视频都失败或只有单个视频
 				isPlaying = false;
-				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
+				hideOverlay();
 				syncAttr();
 				showToast();
 			}
@@ -202,12 +278,26 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		if (prevBtn) prevBtn.addEventListener("click", function () { switchTrack(prevIndex()); });
 		if (nextBtn) nextBtn.addEventListener("click", function () { switchTrack(pickIndex(currentIndex)); });
 
+		// 显示设置面板里选中/取消动态壁纸（setting-utils 派发）。
+		window.addEventListener("dynamicWallpaperChange", function (event) {
+			var detail = event && event.detail;
+			if (!detail || detail.index === null || detail.index === undefined) {
+				clearDynamicWallpaper();
+				return;
+			}
+			applyDynamicWallpaper(detail.index);
+		});
+
+		// 刷新后沿用已存的动态壁纸（不依赖上面那个事件是否早于本脚本绑定）。
+		var storedDynamicIndex = readStoredDynamicIndex();
+		if (storedDynamicIndex !== null) applyDynamicWallpaper(storedDynamicIndex);
+
 		// 切换壁纸模式时停止播放
 		window.addEventListener("wallpaperModeChange", function (e) {
 			if (e.detail && e.detail.mode === "none" && isPlaying) {
 				isPlaying = false;
 				video.pause();
-				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
+				hideOverlay();
 				syncAttr();
 			}
 		});
@@ -220,7 +310,7 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				if (isPlaying) {
 					isPlaying = false;
 					video.pause();
-					if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
+					hideOverlay();
 					syncAttr();
 				}
 			} else if (pausedByVisibility) {
@@ -228,18 +318,10 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				isPlaying = true;
 				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
 				syncAttr();
-				var resumeSrc = changedIndexGuard(currentIndex);
-				if (resumeSrc !== null) video.src = resumeSrc;
-				video.play().catch(function () { isPlaying = false; syncAttr(); });
+				// 恢复时沿用原来的静音状态：动态壁纸保持静音，手动播放的继续带声音。
+				doPlay(startMuted);
 			}
 		});
-
-		// 恢复播放时若当前 src 已被重设则避免重复设置，简单封装取回当前视频地址
-		function changedIndexGuard(idx) {
-			var cur = video.getAttribute("src");
-			var target = urlList[idx];
-			return cur && cur.indexOf(target) !== -1 ? null : target;
-		}
 
 		// 动态控制 prev/next 按钮显示
 		if (!isMultiple) {
