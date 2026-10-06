@@ -82,10 +82,15 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 背景视频播放地址
 		// 支持单个视频路径（字符串）或多个视频循环（数组）
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
-		// 720p 带音轨版本（44MB），页面加载时后台预加载，点击播放按钮即可秒开
+		// bg-20260928：720p 带音轨，42MB / 248s
+		// bg-20261006-wlop：720p 带音轨，19MB / 174s（由 1080p / 214MB 源片重压而来）
+		// 视频一律不随页面加载预加载，只有点击播放按钮才按需拉取，因此体积不影响首屏
 		// 注意：更换视频文件时建议带上日期版本号命名（如 bg-20260928.mp4），
 		// 避免浏览器与 CDN（Cloudflare）强缓存旧版本导致模糊无声
-		playerUrl: ["/assets/videos/bg-20260928.mp4"],
+		playerUrl: [
+			"/assets/videos/bg-20260928.mp4",
+			"/assets/videos/bg-20261006-wlop.mp4",
+		],
 	},
 	// 横幅壁纸和全屏壁纸共享配置
 	common: {
