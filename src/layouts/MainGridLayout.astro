@@ -1103,17 +1103,8 @@ const hasMultipleImages =
 <style is:global>
   /* 文章详情页：壁纸固定为视口背景，不再占据 100vh 文档流，
      正文卡片直接从导航栏下方开始，读者点进文章即可开始阅读。
-     该类由 MainGridLayout 在文章页输出，切换到其它页面时会被移除。
-
-     ⚠️ 必须带上 `.wallpaper-fullscreen` 这个并列选择器（specificity 1,2,0）：
-     layout-styles.css / main.css 里有
-       `#wallpaper-wrapper.wallpaper-fullscreen { position: relative !important; height: 100vh !important }`
-     它与 `#wallpaper-wrapper.post-detail-fixed-bg`（1,1,0）**同 specificity、同 !important**，
-     且在样式表里更靠后 —— 会把下面这套 fixed 布局整个覆盖掉。
-     后果是壁纸仍以 100vh 占据文档流，正文被推到壁纸下方一屏，
-     读者点进文章只看得见那张壁纸（表现为「点文章先跳回最上面」）。 */
-  #wallpaper-wrapper.post-detail-fixed-bg,
-  #wallpaper-wrapper.post-detail-fixed-bg.wallpaper-fullscreen {
+     该类由 MainGridLayout 在文章页输出，切换到其它页面时会被移除。 */
+  #wallpaper-wrapper.post-detail-fixed-bg {
     position: fixed !important;
     inset: 0 !important;
     top: 0 !important;
