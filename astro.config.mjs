@@ -136,11 +136,7 @@ export default defineConfig({
 					currentPath.startsWith("/memories/")
 				);
 			},
-			// @swup/astro 默认把 updateHead 展开成 awaitAssets: true —— 它会在替换内容【之前】
-			// 等 head 里新增的样式表 load 完，超时 3000ms。而旧内容此时早已淡出（实测 out 动画
-			// 274ms 就结束），这段空等里屏幕上只剩壁纸。关掉后同一条路径
-			// content:replace 由 3945ms 降到 1138ms（实测线上）。title / meta 的同步不受影响。
-			updateHead: { awaitAssets: false },
+			updateHead: true,
 			updateBodyClass: false,
 			globalInstance: true,
 			// 滚动相关配置优化
