@@ -212,6 +212,7 @@
 		private showTimer?: number;
 		private closeTimer?: number;
 		private abortController?: AbortController;
+		private locationPromise?: Promise<string>;
 
 		connectedCallback() {
 			if (sessionStorage.getItem(welcomeSessionKey)) return;
@@ -222,7 +223,38 @@
 				once: true,
 			});
 
-			this.showTimer = window.setTimeout(() => this.show(), 850);
+			// 定位请求与 850ms 入场延迟并行：正常情况（几百毫秒）结果先到，
+			// 卡片照常在 850ms 出场、且出场时文案已经定稿，不会出现
+			// 「先亮通用文案、零点几秒后再补上归属地」的跳变。
+			this.abortController = new AbortController();
+			this.locationPromise = this.fetchLocation();
+
+			this.showTimer = window.setTimeout(() => void this.show(), 850);
+		}
+
+		/**
+		 * 本站接口命中外部定位服务时可能要几秒（geoip 内部 4s 超时 + 兜底源）。
+		 * 这里压到 1.2s：宁可退化成通用文案，也不让欢迎卡迟迟不出现。
+		 */
+		private async fetchLocation(): Promise<string> {
+			const timeout = window.setTimeout(
+				() => this.abortController?.abort(),
+				1200,
+			);
+
+			try {
+				// 站点 trailingSlash: "always"，本站接口一律带尾斜杠（与 /api/admin/stats/ 一致）
+				const response = await fetch("/api/geo/", {
+					signal: this.abortController?.signal,
+				});
+				if (!response.ok) throw new Error("location unavailable");
+				return toCityLevel(readLocation(await response.json()));
+			} catch {
+				// 定位失败 / 超时 / 组件已卸载：交给通用文案
+				return "";
+			} finally {
+				window.clearTimeout(timeout);
+			}
 		}
 
 		disconnectedCallback() {
@@ -243,36 +275,23 @@
 			const greeting = getTimeGreeting(new Date().getHours());
 
 			if (title) title.textContent = `${greeting}，欢迎来到jojo`;
+
+			// 先定稿文案、再亮卡片：两者在同一次 DOM 写入里完成，浏览器只会渲染
+			// 最终态，用户看不到任何中途替换
+			const location = await this.locationPromise;
+
+			// 等待期间组件可能已被移除（Swup 切页 / 卸载），就别再点亮了
+			if (!this.isConnected) return;
+
+			if (message) {
+				message.textContent = location
+					? `来自 ${location}，很高兴遇见你。`
+					: "很高兴在这里遇见你。";
+			}
 			this.dataset.state = "visible";
 
-			this.abortController = new AbortController();
-			// 本站接口命中外部定位服务时最慢可能要几秒（geoip 内部 4s 超时 + 兜底源），
-			// 给到 6s；正常情况是几百毫秒
-			const timeout = window.setTimeout(
-				() => this.abortController?.abort(),
-				6000,
-			);
-
-			try {
-				// 站点 trailingSlash: "always"，本站接口一律带尾斜杠（与 /api/admin/stats/ 一致）
-				const response = await fetch("/api/geo/", {
-					signal: this.abortController.signal,
-				});
-				if (!response.ok) throw new Error("location unavailable");
-				const location = toCityLevel(readLocation(await response.json()));
-				if (message) {
-					message.textContent = location
-						? `来自 ${location}，很高兴遇见你。`
-						: "很高兴在这里遇见你。";
-				}
-			} catch {
-				if (message) message.textContent = "很高兴在这里遇见你。";
-			} finally {
-				window.clearTimeout(timeout);
-			}
-
-			// 定位最慢可能要几秒，收起时间给足，别让地址刚出来就被关掉
-			this.closeTimer = window.setTimeout(() => this.close(), 9000);
+			// 文案已定稿，不再有后续变化，收起时间不必留太久
+			this.closeTimer = window.setTimeout(() => this.close(), 7000);
 		}
 
 		private close() {
