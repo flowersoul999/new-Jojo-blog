@@ -1208,7 +1208,9 @@ function disableAnimation() {
       return;
     }
 
-    const delays = [0, 80, 220, 500, 900];
+    // 只保留两次校正：0ms 立即落位，350ms 等异步组件（图片、字体、TOC）把布局撑开后再校准一次。
+    // 原先 5 次（0/80/220/500/900）在慢网络下每一次都是一次可见位移，读起来就是「跳好几次」。
+    const delays = [0, 350];
 
     delays.forEach((delay, index) => {
       window.setTimeout(() => {

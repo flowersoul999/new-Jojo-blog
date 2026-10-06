@@ -45,6 +45,15 @@ html.is-animating.is-leaving .transition-leaving {
     opacity: 0;
 }
 
+/* 站内切页期间禁用内容层过渡。
+   visit:start 会用「旧 DOM」执行文章页专属布局：壁纸切成 fixed 背景、正文上移到导航栏下方、
+   并把页面滚回顶部。若此刻内容层还在做 120ms 渐隐，读者就会看见旧页面被重新定位的过程，
+   表现为「点进文章先跳回最上面、整屏只剩一张背景图」。禁掉过渡后旧内容瞬间让位、
+   新内容瞬间就位，点进文章直接就是正文。 */
+html.is-page-transitioning .transition-main {
+    transition: none;
+}
+
 /* Swup Fade Fallback */
 html.is-changing .transition-swup-fade {
     transition: all 120ms ease-out;
