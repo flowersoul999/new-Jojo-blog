@@ -90,6 +90,42 @@ export const homePortfolioIntroSettings = {
 			src: "/assets/images/home-truncated/b-1.webp",
 			thumbnail: "/assets/images/home-truncated/b-1.webp",
 		},
+		{
+			id: "character-05",
+			label: "和风巫女",
+			src: "/assets/images/home-truncated/character-05.webp",
+			thumbnail: "/assets/images/home-truncated/character-05.webp",
+		},
+		{
+			id: "character-06",
+			label: "东方仙侠",
+			src: "/assets/images/home-truncated/character-06.webp",
+			thumbnail: "/assets/images/home-truncated/character-06.webp",
+		},
+		{
+			id: "character-07",
+			label: "九尾狐妖",
+			src: "/assets/images/home-truncated/character-07.webp",
+			thumbnail: "/assets/images/home-truncated/character-07.webp",
+		},
+		{
+			id: "character-08",
+			label: "校园少女",
+			src: "/assets/images/home-truncated/character-08.webp",
+			thumbnail: "/assets/images/home-truncated/character-08.webp",
+		},
+		{
+			id: "character-09",
+			label: "星海歌姬",
+			src: "/assets/images/home-truncated/character-09.webp",
+			thumbnail: "/assets/images/home-truncated/character-09.webp",
+		},
+		{
+			id: "character-10",
+			label: "赛博剑士",
+			src: "/assets/images/home-truncated/character-10.webp",
+			thumbnail: "/assets/images/home-truncated/character-10.webp",
+		},
 	],
 } as const;
 
