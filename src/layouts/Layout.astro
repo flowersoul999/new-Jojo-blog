@@ -681,16 +681,21 @@ const canonicalUrl = new URL(
     <DiaryUnlockDialog />
 
     <!-- Tab 径向轮盘：按住 Tab 呼出快速导航 -->
-    <TabRadialMenu client:load />
+    <TabRadialMenu client:idle />
 
-    <!-- 修仙沉浸层：突破大典 + 飞剑传书收件箱 + 话本楼（全站监听勾选事件） -->
-    <BreakthroughRite client:load />
-    <StoryInbox client:load />
-    <SagaLibrary client:load />
+    <!-- 修仙沉浸层：突破大典 + 飞剑传书收件箱 + 话本楼（全站监听勾选事件）
+
+         ⚠️ 必须是 client:idle，不能是 client:load：这四个都是「用户主动触发才用到」的浮层。
+         其中 SagaLibrary 会在 SSR 阶段把话本 279 章全部渲染成 DOM（实测 124KB HTML +
+         279 个内联锁 SVG），并拖着一个 244KB 的 saga.js 客户端 chunk。用 load 等于让
+         每个访客为「可能一辈子不点开的抽屉」付出首屏代价；idle 让它们等主线程空下来再加载。 -->
+    <BreakthroughRite client:idle />
+    <StoryInbox client:idle />
+    <SagaLibrary client:idle />
 
     <!-- Swup 内存缓存自动清理：部署更新后无需手动强制刷新。
          每次导航/预取都会把页面 HTML 缓存进内存，旧版内容会一直残留到重开页面。
-         这里定时 + 切回前台时清空缓存，保证任何页面最长保留 60 秒就自动过期。 -->
+         只在从后台切回前台时清一次，且与上次清理至少间隔 5 分钟，避免频繁清空把缓存收益归零。 -->
     <script is:inline data-swup-ignore-script>
       (() => {
         if (window.__swupCacheAutoClear) return;
@@ -710,11 +715,17 @@ const canonicalUrl = new URL(
           }
         };
 
-        // 每 60 秒清空一次，避免 swup 长期缓存部署前的旧页面
-        setInterval(clearCache, 60 * 1000);
-        // 标签页从后台切回前台时也清一次，防止恢复旧会话中的缓存页面
+        // ⚠️ 不要用 setInterval 定时清缓存（这里曾每 60 秒清一次）：
+        // 缓存一清，用户再点任何链接都要重新下载该页面的完整 HTML（文章页解压后 1MB 级），
+        // 相当于把 swup 预取与缓存的收益反复归零 —— 越是长时间停留、频繁切页的读者越吃亏。
+        // 改成：只在「从后台切回前台」时清，且与上次清理至少间隔 5 分钟。
+        const MIN_CLEAR_INTERVAL = 5 * 60 * 1000;
+        let lastClearedAt = Date.now();
         document.addEventListener("visibilitychange", () => {
-          if (!document.hidden) clearCache();
+          if (document.hidden) return;
+          if (Date.now() - lastClearedAt < MIN_CLEAR_INTERVAL) return;
+          lastClearedAt = Date.now();
+          clearCache();
         });
         // swup 初始化完成后立即清一次（首次加载可能复用旧的缓存记录）
         document.addEventListener("swup:enable", () => setTimeout(clearCache, 0));
