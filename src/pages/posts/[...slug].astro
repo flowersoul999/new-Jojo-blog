@@ -13,7 +13,6 @@ import { getRelatedPosts, getSortedPosts } from "@utils/content-utils";
 import {
 	getFileDirFromPath,
 	getPostUrlBySlug,
-	LOCAL_IMAGE_GLOB,
 	removeFileExtension,
 } from "@utils/url-utils";
 import { Icon } from "astro-icon/components";
@@ -79,7 +78,7 @@ if (processedImage) {
 	);
 	if (isLocal) {
 		const basePath = getFileDirFromPath(entry.filePath || "");
-		const files = import.meta.glob<ImageMetadata>(LOCAL_IMAGE_GLOB, {
+		const files = import.meta.glob<ImageMetadata>("../../**", {
 			import: "default",
 		});
 		let normalizedPath = path
@@ -103,7 +102,7 @@ if (posterAvatarUrl) {
 		posterAvatarUrl.startsWith("data:")
 	);
 	if (isLocalAvatar) {
-		const files = import.meta.glob<ImageMetadata>(LOCAL_IMAGE_GLOB, {
+		const files = import.meta.glob<ImageMetadata>("../../**", {
 			import: "default",
 		});
 		const normalizedPath = path
