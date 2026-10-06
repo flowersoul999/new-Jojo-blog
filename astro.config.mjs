@@ -113,9 +113,12 @@ export default defineConfig({
 			smoothScrolling: false,
 			cache: true,
 			// hover: 鼠标悬停时预取；visible: 链接进入视口即预取。
-			// 列表页/首页的文章卡片在进入视口时就会把详情页 HTML 取回缓存，
-			// 点击时直接命中 swup 缓存，省掉整篇文章（约 1MB）的下载等待。
-			preload: { hover: true, visible: true },
+			// ⚠️ visible 必须关掉（2026-10-06 实测）：首页/列表页视口内十几张卡片，
+			// 会让浏览器把每一篇详情页的完整 HTML（每篇 170KB+，解压后 1MB 级）
+			// 全部并发拉下来 —— 实测单页光 text/html 就多传 600~917KB，
+			// 首屏带宽与主线程全被这些「用户未必会点」的页面占满，这才是"点进去很卡"的主因之一。
+			// 只留 hover：鼠标真的移上去才取，命中率接近 100%，成本趋近于零。
+			preload: { hover: true, visible: false },
 			accessibility: true,
 			// The portfolio is a deliberately full-bleed layout and does not use the
 			// standard MainGridLayout Swup containers. Crossing this layout boundary

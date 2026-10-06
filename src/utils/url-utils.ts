@@ -68,6 +68,21 @@ export function getFileDirFromPath(filePath: string): string {
 	return filePath.replace(/^src\//, "").replace(/\/[^/]+$/, "");
 }
 
+/**
+ * `import.meta.glob` 用的本地图片匹配模式。
+ *
+ * ⚠️ 千万不要写成 `"../../**"`：这两个调用点在 `src/pages/posts/` 与
+ * `src/pages/api/` 下，往上两级正好是整个 `src/**`，等价于把全站所有
+ * `.astro` / `.svelte` / `.tsx` 组件一起拉进构建图。后果是 Astro 会把
+ * 全站每个页面的 CSS 都注入到文章页 —— 实测单个文章页 `<head>` 里有
+ * 57 个 `<link rel="stylesheet">`（连 /diary/、/tools/、/moments/ 的都在），
+ * 体积、请求数、样式重算时间（实测 24s）同时爆炸。
+ *
+ * 限定图片扩展名即可，glob key 的形态（`../../<path>`）完全不变。
+ */
+export const LOCAL_IMAGE_GLOB =
+	"../../**/*.{png,jpg,jpeg,webp,avif,gif,svg,bmp,ico}";
+
 export function getSearchUrl(query: string): string {
 	return url(`/search/?q=${encodeURIComponent(query.trim())}`);
 }
