@@ -17,9 +17,17 @@ const wutheringWavesWallpaperImages = [
 	...importedWutheringWavesImages,
 ];
 const otherWallpaperImages = originalWallpaperImages.slice(1);
+
+/**
+ * 后加的静态壁纸。放 `public/assets/images/wallpaper/`，命名沿用 `wallpaper-NN.webp` ——
+ * 面板缩略图会按同号自动去找 `thumbs/wallpaper-NN.webp`，这里只写大图路径。
+ */
+const customWallpaperImages = ["/assets/images/wallpaper/wallpaper-48.webp"];
+
 const desktopWallpaperImages = [
 	...wutheringWavesWallpaperImages,
 	...otherWallpaperImages,
+	...customWallpaperImages,
 ];
 
 const mobileOnlyWutheringWavesImages = Array.from(
@@ -31,6 +39,7 @@ const mobileWallpaperImages = [
 	...mobileOnlyWutheringWavesImages,
 	...wutheringWavesWallpaperImages,
 	...otherWallpaperImages,
+	...customWallpaperImages,
 ];
 
 /**
