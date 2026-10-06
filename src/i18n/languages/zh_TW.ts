@@ -265,7 +265,6 @@ export const zh_TW: Translation = {
 	// 壁紙設置
 	[Key.wallpaperSettings]: "壁紙設置",
 	[Key.builtinWallpaper]: "內置壁紙",
-	[Key.dynamicWallpaper]: "動態壁紙",
 	[Key.wallpaperTitle]: "首頁壁紙標題",
 	[Key.wallpaperCarousel]: "壁紙輪播",
 	[Key.wavesAnimation]: "水波紋動畫",

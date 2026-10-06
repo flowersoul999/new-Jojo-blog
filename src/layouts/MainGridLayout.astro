@@ -39,7 +39,6 @@ import {
 	getResponsiveSidebarConfig,
 	type ResponsiveSidebarConfig,
 } from "@/utils/responsive-utils";
-import { SELECTED_DYNAMIC_WALLPAPER_KEY } from "@/utils/setting-utils";
 import { url } from "@/utils/url-utils";
 import Layout from "./Layout.astro";
 
@@ -535,10 +534,7 @@ const hasMultipleImages =
 
             function isFixedWallpaperSelected() {
                 var wrapper = document.getElementById('wallpaper-wrapper');
-                if (!wrapper) return false;
-                // 静态图选中，或某支动态壁纸被选为壁纸时，轮播都该停
-                return wrapper.hasAttribute('data-selected-wallpaper')
-                    || wrapper.hasAttribute('data-selected-dynamic-wallpaper');
+                return !!(wrapper && wrapper.hasAttribute('data-selected-wallpaper'));
             }
 
             // 获取当前设备可见的 slide-item
@@ -768,16 +764,6 @@ const hasMultipleImages =
                     startAutoPlay();
                 }
             });
-            // 动态壁纸（背景视频）接管壁纸时同样停轮播；取消后按原配置恢复
-            window.addEventListener('dynamicWallpaperChange', function(e) {
-                if (e.detail && typeof e.detail.index === 'number') {
-                    stopAutoPlay();
-                    return;
-                }
-                if (isCarouselEnabled() && isBannerWallpaperMode()) {
-                    startAutoPlay();
-                }
-            });
 
             // 首张固定使用配置列表第一张，避免首次进入时先渲染再随机切换造成闪黑。
 
@@ -790,7 +776,7 @@ const hasMultipleImages =
     )}
     
     {backgroundWallpaper.playerEnable && typeof backgroundWallpaper.src === "object" && !Array.isArray(backgroundWallpaper.src) && backgroundWallpaper.src.playerUrl && (
-        <BackgroundPlayer playerUrl={backgroundWallpaper.src.playerUrl} playerMode={backgroundWallpaper.common?.playerMode ?? "order"} dynamicStorageKey={SELECTED_DYNAMIC_WALLPAPER_KEY} />
+        <BackgroundPlayer playerUrl={backgroundWallpaper.src.playerUrl} playerMode={backgroundWallpaper.common?.playerMode ?? "order"} />
     )}
 
     <div id="banner-dim-container" class="absolute inset-0 z-10 pointer-events-none">

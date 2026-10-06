@@ -29,12 +29,6 @@ declare global {
 
 const SELECTED_WALLPAPER_INDEX_KEY = "selectedWallpaperIndex";
 const LEGACY_CUSTOM_WALLPAPER_KEY = "customWallpaper";
-/**
- * 选中的动态壁纸（背景视频）索引。
- * ⚠️ 这个字面量会被内联脚本（BackgroundPlayer 是 is:inline，无法 import）通过
- * define:vars 读取，改名必须同步 `SELECTED_DYNAMIC_WALLPAPER_STORAGE_KEY` 的传参。
- */
-export const SELECTED_DYNAMIC_WALLPAPER_KEY = "selectedDynamicWallpaper";
 
 function getConfiguredWallpaperCount(): number {
 	const src = backgroundWallpaper.src;
@@ -52,22 +46,6 @@ function getConfiguredWallpaperCount(): number {
 		return Math.max(desktopCount, mobileCount);
 	}
 	return 0;
-}
-
-function getConfiguredDynamicWallpaperCount(): number {
-	return getConfiguredPlayerUrls().length;
-}
-
-export function getConfiguredPlayerUrls(): string[] {
-	const playerUrl = getPlayerUrlConfig();
-	if (Array.isArray(playerUrl)) return playerUrl.filter(Boolean);
-	return playerUrl ? [playerUrl] : [];
-}
-
-function getPlayerUrlConfig(): string | string[] | undefined {
-	const src = backgroundWallpaper.src;
-	if (!src || typeof src !== "object" || Array.isArray(src)) return undefined;
-	return src.playerUrl;
 }
 
 export function getDefaultHue(): number {
@@ -940,7 +918,6 @@ export function initWallpaperMode(): void {
 	const storedMode = getStoredWallpaperMode();
 	applyWallpaperModeToDocument(storedMode, false);
 	applyStoredSelectedWallpaper();
-	applyStoredDynamicWallpaper();
 }
 
 export function getStoredWallpaperMode(): WALLPAPER_MODE {
@@ -997,8 +974,6 @@ export function setSelectedWallpaperIndex(index: number): void {
 	}
 	localStorage.removeItem(LEGACY_CUSTOM_WALLPAPER_KEY);
 	localStorage.setItem(SELECTED_WALLPAPER_INDEX_KEY, String(index));
-	// 选了静态图就把动态壁纸关掉，否则视频还盖在上面、面板会同时高亮两个。
-	clearSelectedDynamicWallpaper();
 	applySelectedWallpaperToDocument(index);
 	if (typeof window !== "undefined") {
 		window.dispatchEvent(
@@ -1127,105 +1102,6 @@ export function clearSelectedWallpaperFromDocument(): void {
 			);
 		placeholder?.classList.add("loaded");
 	}
-}
-
-// Dynamic wallpaper (background video) selection.
-// 静态壁纸用索引指代，动态壁纸同样用索引 —— 索引同时指回 playerUrl 数组，
-// 播放器按同一索引取片，所以这里的校验必须和 playerUrl 长度对齐。
-
-function dispatchDynamicWallpaperChange(index: number | null): void {
-	applySelectedDynamicWallpaperToDocument(index);
-	if (typeof window === "undefined") return;
-	window.dispatchEvent(
-		new CustomEvent("dynamicWallpaperChange", {
-			detail: { index },
-		}),
-	);
-}
-
-/**
- * 在 #wallpaper-wrapper 上打标，让 MainGridLayout 的轮播知道「壁纸已经被接管」。
- * 和静态壁纸的 `data-selected-wallpaper` 对称 —— 轮播的启停只认这两个属性。
- */
-function applySelectedDynamicWallpaperToDocument(index: number | null): void {
-	if (typeof document === "undefined") return;
-	const wallpaperWrapper = document.getElementById("wallpaper-wrapper");
-	if (!wallpaperWrapper) return;
-	if (index === null) {
-		wallpaperWrapper.removeAttribute("data-selected-dynamic-wallpaper");
-		return;
-	}
-	wallpaperWrapper.setAttribute(
-		"data-selected-dynamic-wallpaper",
-		String(index),
-	);
-}
-
-export function getStoredDynamicWallpaperIndex(): number | null {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return null;
-	}
-	const stored = localStorage.getItem(SELECTED_DYNAMIC_WALLPAPER_KEY);
-	if (stored === null) return null;
-
-	const parsed = Number.parseInt(stored, 10);
-	const count = getConfiguredDynamicWallpaperCount();
-	if (
-		Number.isNaN(parsed) ||
-		parsed < 0 ||
-		(count > 0 && parsed >= count) ||
-		count === 0
-	) {
-		localStorage.removeItem(SELECTED_DYNAMIC_WALLPAPER_KEY);
-		return null;
-	}
-	return parsed;
-}
-
-/**
- * 选中一支动态壁纸。与静态壁纸选择**互斥** —— 视频会盖在静态图上，
- * 两套选择同时生效只会让面板出现两个「已选中」，所以这里顺手清掉静态选择。
- */
-export function setSelectedDynamicWallpaper(index: number): void {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.setItem !== "function"
-	) {
-		return;
-	}
-	const count = getConfiguredDynamicWallpaperCount();
-	if (count === 0 || Number.isNaN(index) || index < 0 || index >= count) {
-		return;
-	}
-
-	if (localStorage.getItem(SELECTED_WALLPAPER_INDEX_KEY) !== null) {
-		clearSelectedWallpaper();
-	}
-	localStorage.setItem(SELECTED_DYNAMIC_WALLPAPER_KEY, String(index));
-	dispatchDynamicWallpaperChange(index);
-}
-
-export function clearSelectedDynamicWallpaper(): void {
-	if (
-		typeof localStorage !== "undefined" &&
-		typeof localStorage.removeItem === "function"
-	) {
-		localStorage.removeItem(SELECTED_DYNAMIC_WALLPAPER_KEY);
-	}
-	dispatchDynamicWallpaperChange(null);
-}
-
-/** 让已存的选择在刷新后生效（轮播开着时动态壁纸不生效，与静态图同一套规则）。 */
-export function applyStoredDynamicWallpaper(): void {
-	if (getStoredBannerCarouselEnabled()) {
-		clearSelectedDynamicWallpaper();
-		return;
-	}
-	const index = getStoredDynamicWallpaperIndex();
-	if (index !== null) dispatchDynamicWallpaperChange(index);
 }
 
 // Overlay settings functions
@@ -1586,8 +1462,6 @@ export function setBannerCarouselEnabled(enabled: boolean): void {
 		localStorage.setItem("bannerCarouselEnabled", String(safeEnabled));
 	}
 	applyBannerCarouselEnabledToDocument(safeEnabled);
-	// 轮播和动态壁纸互斥：开着轮播就没必要再叠一支视频。
-	if (safeEnabled) clearSelectedDynamicWallpaper();
 	if (typeof window !== "undefined") {
 		window.dispatchEvent(
 			new CustomEvent("bannerCarouselChange", {

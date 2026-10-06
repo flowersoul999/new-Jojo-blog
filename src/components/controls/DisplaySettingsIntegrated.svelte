@@ -11,7 +11,6 @@ import { getBackgroundImages } from "@utils/layout-utils";
 import { getResponsiveSidebarConfig } from "@utils/responsive-utils";
 import {
 	applySidebarVisibilityToDocument,
-	clearSelectedDynamicWallpaper,
 	clearSelectedWallpaper,
 	getDefaultBannerCarouselEnabled,
 	getDefaultBannerTitleEnabled,
@@ -25,7 +24,6 @@ import {
 	getHue,
 	getStoredBannerCarouselEnabled,
 	getStoredBannerTitleEnabled,
-	getStoredDynamicWallpaperIndex,
 	getStoredGradientEnabled,
 	getStoredOverlayBlur,
 	getStoredOverlayCardOpacity,
@@ -45,7 +43,6 @@ import {
 	setOverlayCardOpacity,
 	setOverlayOpacity,
 	setSakuraEnabled,
-	setSelectedDynamicWallpaper,
 	setSelectedWallpaperIndex,
 	setSidebarLeftVisible,
 	setSidebarRightVisible,
@@ -83,13 +80,6 @@ type WallpaperOption = {
 	label: string;
 };
 
-type DynamicWallpaperOption = {
-	index: number;
-	src: string;
-	poster: string;
-	label: string;
-};
-
 type MobileSettingsTab = "appearance" | "wallpaper" | "effects";
 
 const wallpaperPreviewModules = import.meta.glob<string>(
@@ -120,26 +110,6 @@ const builtInWallpapers: WallpaperOption[] = configuredWallpapers.desktop.map(
 		label: `${i18n(I18nKey.builtinWallpaper)} ${index + 1}`,
 	}),
 );
-
-// 动态壁纸（背景视频）：索引与 backgroundWallpaper.src.playerUrl 同序，
-// 面板选中后由 setting-utils 派发 dynamicWallpaperChange，BackgroundPlayer 按索引取片。
-const configuredPlayerItems =
-	backgroundWallpaper.playerEnable &&
-	typeof backgroundWallpaper.src === "object" &&
-	!Array.isArray(backgroundWallpaper.src)
-		? (backgroundWallpaper.src.playerItems ?? [])
-		: [];
-
-const dynamicWallpapers: DynamicWallpaperOption[] = configuredPlayerItems.map(
-	(item, index) => ({
-		index,
-		src: item.src,
-		poster: item.poster ?? "",
-		label: item.label || `${i18n(I18nKey.dynamicWallpaper)} ${index + 1}`,
-	}),
-);
-
-const isDynamicWallpaperSwitchable = dynamicWallpapers.length > 0;
 
 let hue = $state(getHue());
 const defaultHue = getDefaultHue();
@@ -180,7 +150,6 @@ const defaultBannerCarouselEnabled = getDefaultBannerCarouselEnabled();
 let sakuraEnabled = $state(true);
 const defaultSakuraEnabled = getDefaultSakuraEnabled();
 let selectedWallpaperIndex: number | null = $state(null);
-let selectedDynamicWallpaperIndex: number | null = $state(null);
 let overlayOpacity = $state(getDefaultOverlayOpacity());
 const defaultOverlayOpacity = getDefaultOverlayOpacity();
 let overlayBlur = $state(getDefaultOverlayBlur());
@@ -384,10 +353,6 @@ function resetBannerSettings() {
 		selectedWallpaperIndex = null;
 		clearSelectedWallpaper();
 	}
-	if (selectedDynamicWallpaperIndex !== null) {
-		selectedDynamicWallpaperIndex = null;
-		clearSelectedDynamicWallpaper();
-	}
 	if (
 		isBannerTitleSwitchable &&
 		bannerTitleEnabled !== defaultBannerTitleEnabled
@@ -415,33 +380,6 @@ function resetBannerSettings() {
 function selectBuiltInWallpaper(index: number) {
 	selectedWallpaperIndex = index;
 	setSelectedWallpaperIndex(index);
-	// setSelectedWallpaperIndex 内部会清掉动态壁纸的存储与播放，这里同步面板状态
-	selectedDynamicWallpaperIndex = null;
-	if (bannerCarouselEnabled) {
-		bannerCarouselEnabled = false;
-		setBannerCarouselEnabled(false);
-	}
-	if (wallpaperMode === WALLPAPER_NONE) {
-		switchWallpaperMode(WALLPAPER_BANNER);
-	}
-}
-
-/**
- * 选中/取消动态壁纸（背景视频）。
- * 再点一次已选中的那支 = 取消，退回静态壁纸 —— 否则面板里没有任何办法撤掉它。
- */
-function selectDynamicWallpaper(index: number) {
-	if (selectedDynamicWallpaperIndex === index) {
-		selectedDynamicWallpaperIndex = null;
-		clearSelectedDynamicWallpaper();
-		return;
-	}
-
-	selectedDynamicWallpaperIndex = index;
-	// 视频会盖在静态图上面，两个「已选中」同时亮着会很怪
-	selectedWallpaperIndex = null;
-	setSelectedDynamicWallpaper(index);
-
 	if (bannerCarouselEnabled) {
 		bannerCarouselEnabled = false;
 		setBannerCarouselEnabled(false);
@@ -455,10 +393,6 @@ function resetOverlaySettings() {
 	if (selectedWallpaperIndex !== null) {
 		selectedWallpaperIndex = null;
 		clearSelectedWallpaper();
-	}
-	if (selectedDynamicWallpaperIndex !== null) {
-		selectedDynamicWallpaperIndex = null;
-		clearSelectedDynamicWallpaper();
 	}
 	if (isOverlayOpacitySwitchable && overlayOpacity !== defaultOverlayOpacity) {
 		overlayOpacity = defaultOverlayOpacity;
@@ -499,10 +433,6 @@ function toggleBannerCarouselEnabled() {
 	if (nextEnabled && selectedWallpaperIndex !== null) {
 		selectedWallpaperIndex = null;
 		clearSelectedWallpaper();
-	}
-	if (nextEnabled && selectedDynamicWallpaperIndex !== null) {
-		selectedDynamicWallpaperIndex = null;
-		clearSelectedDynamicWallpaper();
 	}
 	bannerCarouselEnabled = nextEnabled;
 	setBannerCarouselEnabled(bannerCarouselEnabled);
@@ -829,17 +759,6 @@ onMount(() => {
 	const cleanupWallpaperPreviewLoading = initWallpaperPreviewLoading();
 	selectedWallpaperIndex = getStoredSelectedWallpaperIndex();
 	if (bannerCarouselEnabled && selectedWallpaperIndex !== null) {
-		selectedWallpaperIndex = null;
-		clearSelectedWallpaper();
-	}
-
-	// 动态壁纸与静态图/轮播互斥，只允许一个高亮
-	selectedDynamicWallpaperIndex = getStoredDynamicWallpaperIndex();
-	if (bannerCarouselEnabled && selectedDynamicWallpaperIndex !== null) {
-		selectedDynamicWallpaperIndex = null;
-		clearSelectedDynamicWallpaper();
-	}
-	if (selectedDynamicWallpaperIndex !== null) {
 		selectedWallpaperIndex = null;
 		clearSelectedWallpaper();
 	}
@@ -1188,47 +1107,6 @@ onMount(() => {
                         </div>
                     </div>
                 {/if}
-                {#if isDynamicWallpaperSwitchable}
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-2 px-1 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                            <Icon icon="material-symbols:movie-outline-rounded" class="text-[1rem] shrink-0"></Icon>
-                            <span>{i18n(I18nKey.dynamicWallpaper)}</span>
-                        </div>
-                        <div class="wallpaper-picker-scroll hide-scrollbar grid max-h-64 grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain pr-0.5">
-                            {#each dynamicWallpapers as wallpaper (wallpaper.index)}
-                                <button
-                                    type="button"
-                                    title={wallpaper.label}
-                                    aria-label={wallpaper.label}
-                                    aria-pressed={selectedDynamicWallpaperIndex === wallpaper.index}
-                                    class="wallpaper-picker-item relative aspect-video overflow-hidden rounded-md border-2 transition-all active:scale-95"
-                                    class:border-(--primary)={selectedDynamicWallpaperIndex === wallpaper.index}
-                                    class:border-transparent={selectedDynamicWallpaperIndex !== wallpaper.index}
-                                    class:ring-2={selectedDynamicWallpaperIndex === wallpaper.index}
-                                    class:ring-(--primary)={selectedDynamicWallpaperIndex === wallpaper.index}
-                                    class:ring-offset-1={selectedDynamicWallpaperIndex === wallpaper.index}
-                                    class:ring-offset-transparent={selectedDynamicWallpaperIndex === wallpaper.index}
-                                    onclick={() => selectDynamicWallpaper(wallpaper.index)}
-                                >
-                                    {#if wallpaper.poster}
-                                        <img
-                                            src={wallpaper.poster}
-                                            alt=""
-                                            class="absolute inset-0 h-full w-full object-cover"
-                                            loading="lazy"
-                                            decoding="async"
-                                        />
-                                    {:else}
-                                        <div class="absolute inset-0 bg-(--btn-regular-bg)"></div>
-                                    {/if}
-                                    <span class="absolute left-1 top-1 flex items-center justify-center rounded-full bg-black/45 p-0.5">
-                                        <Icon icon="material-symbols:play-arrow-rounded" class="text-[0.85rem] text-white"></Icon>
-                                    </span>
-                                </button>
-                            {/each}
-                        </div>
-                    </div>
-                {/if}
                 {#each overlaySliderItems as item (item.key)}
                     {#if item.enabled}
                         <div class="rounded-md bg-(--btn-regular-bg) p-2">
@@ -1310,47 +1188,6 @@ onMount(() => {
                                     loading="lazy"
                                     decoding="async"
                                 />
-                            </button>
-                        {/each}
-                    </div>
-                </div>
-                {/if}
-                {#if isDynamicWallpaperSwitchable}
-                <div class="space-y-2">
-                    <div class="flex items-center gap-2 px-1 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                        <Icon icon="material-symbols:movie-outline-rounded" class="text-[1rem] shrink-0"></Icon>
-                        <span>{i18n(I18nKey.dynamicWallpaper)}</span>
-                    </div>
-                    <div class="wallpaper-picker-scroll hide-scrollbar grid max-h-64 grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain pr-0.5">
-                        {#each dynamicWallpapers as wallpaper (wallpaper.index)}
-                            <button
-                                type="button"
-                                title={wallpaper.label}
-                                aria-label={wallpaper.label}
-                                aria-pressed={selectedDynamicWallpaperIndex === wallpaper.index}
-                                class="wallpaper-picker-item relative aspect-video overflow-hidden rounded-md border-2 transition-all active:scale-95"
-                                class:border-(--primary)={selectedDynamicWallpaperIndex === wallpaper.index}
-                                class:border-transparent={selectedDynamicWallpaperIndex !== wallpaper.index}
-                                class:ring-2={selectedDynamicWallpaperIndex === wallpaper.index}
-                                class:ring-(--primary)={selectedDynamicWallpaperIndex === wallpaper.index}
-                                class:ring-offset-1={selectedDynamicWallpaperIndex === wallpaper.index}
-                                class:ring-offset-transparent={selectedDynamicWallpaperIndex === wallpaper.index}
-                                onclick={() => selectDynamicWallpaper(wallpaper.index)}
-                            >
-                                {#if wallpaper.poster}
-                                    <img
-                                        src={wallpaper.poster}
-                                        alt=""
-                                        class="absolute inset-0 h-full w-full object-cover"
-                                        loading="lazy"
-                                        decoding="async"
-                                    />
-                                {:else}
-                                    <div class="absolute inset-0 bg-(--btn-regular-bg)"></div>
-                                {/if}
-                                <span class="absolute left-1 top-1 flex items-center justify-center rounded-full bg-black/45 p-0.5">
-                                    <Icon icon="material-symbols:play-arrow-rounded" class="text-[0.85rem] text-white"></Icon>
-                                </span>
                             </button>
                         {/each}
                     </div>

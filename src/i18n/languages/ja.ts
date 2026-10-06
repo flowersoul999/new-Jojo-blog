@@ -270,7 +270,6 @@ export const ja: Translation = {
 	// 壁紙設定
 	[Key.wallpaperSettings]: "壁紙設定",
 	[Key.builtinWallpaper]: "内蔵壁紙",
-	[Key.dynamicWallpaper]: "動画壁紙",
 	[Key.wallpaperTitle]: "ホーム壁紙タイトル",
 	[Key.wallpaperCarousel]: "壁紙カルーセル",
 	[Key.wavesAnimation]: "波アニメーション",
