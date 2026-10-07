@@ -30,6 +30,14 @@ interface DiaryEntry {
 		height: number;
 		size: number;
 	}[];
+	videos?: {
+		url: string;
+		poster?: string;
+		width?: number;
+		height?: number;
+		size?: number;
+		duration?: number;
+	}[];
 	mood?: string;
 	isPrivate?: boolean;
 }
@@ -90,6 +98,7 @@ function formatChineseTime(dateStr: string) {
 
 // 标题不再用封面配图，全部图片都放到正文里展示
 const images = entry.images || [];
+const videos = entry.videos || [];
 const mood = entry.mood ? MOOD_MAP[entry.mood] : null;
 const tags = entry.tags || [];
 const pageTitle = entry.title || "日记";
@@ -133,6 +142,22 @@ const pageTitle = entry.title || "日记";
 						<div class={"diary-imgs px-5 sm:px-7 pt-5" + (images.length === 1 ? " is-single" : "")}>
 							{images.map((img) => (
 								<img src={img.url} alt="" class="diary-img" data-src={img.url} loading="lazy" draggable="false" />
+							))}
+						</div>
+					)}
+
+					{videos.length > 0 && (
+						<!-- 视频跟照片同区，放在照片之后 -->
+						<div class="diary-videos px-5 sm:px-7 pt-5">
+							{videos.map((v) => (
+								<video
+									src={v.url}
+									poster={v.poster || undefined}
+									controls
+									playsinline
+									preload="metadata"
+									class="diary-video"
+								></video>
 							))}
 						</div>
 					)}
@@ -205,6 +230,20 @@ const pageTitle = entry.title || "日记";
 		}
 		.diary-img:hover {
 			transform: scale(1.02);
+		}
+
+		/* ===================== 视频（照片之后、正文之前） ===================== */
+		.diary-videos {
+			display: grid;
+			gap: 0.6rem;
+		}
+		.diary-video {
+			display: block;
+			width: 100%;
+			max-height: 26rem;
+			border-radius: 12px;
+			background: #000;
+			border: 1px solid var(--line-divider);
 		}
 
 		/* ===================== 正文 ===================== */
@@ -425,6 +464,7 @@ const pageTitle = entry.title || "日记";
 		function renderPrivate(entry) {
 			var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
 			var imgs = entry.images || [];
+			var vids = entry.videos || [];
 
 			var metaHtml =
 				'<div class="diary-meta">' +
@@ -449,6 +489,17 @@ const pageTitle = entry.title || "日记";
 					'<div class="diary-imgs px-5 sm:px-7 pt-5' + (imgs.length === 1 ? " is-single" : "") + '">';
 				imgs.forEach(function (img) {
 					html += '<img src="' + img.url + '" alt="" class="diary-img" data-src="' + img.url + '" loading="lazy" draggable="false">';
+				});
+				html += "</div>";
+			}
+
+			if (vids.length) {
+				html += '<div class="diary-videos px-5 sm:px-7 pt-5">';
+				vids.forEach(function (v) {
+					html +=
+						'<video src="' + v.url + '"' +
+						(v.poster ? ' poster="' + v.poster + '"' : "") +
+						' controls playsinline preload="metadata" class="diary-video"></video>';
 				});
 				html += "</div>";
 			}

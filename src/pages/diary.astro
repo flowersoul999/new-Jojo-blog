@@ -121,25 +121,25 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				</div>
 
 				<div class="diary-compose-row">
-					<span class="diary-compose-label">图片</span>
+					<span class="diary-compose-label">照片/视频</span>
 					<div class="diary-compose-imgs">
-						<input type="file" id="diary-compose-file" accept="image/*" multiple class="hidden" />
+						<input type="file" id="diary-compose-file" accept="image/*,video/*" multiple class="hidden" />
 						<button
 							type="button"
 							id="diary-compose-drop"
 							class="diary-compose-drop"
-							aria-label="添加图片：点击选择，或把图片拖到这里"
+							aria-label="添加照片或视频：点击选择，或把文件拖到这里"
 						>
 							<Icon is:inline name="material-symbols:add-photo-alternate" class="text-xl" />
-							<span>点击选择图片，或把图片拖到这里</span>
-							<em>自动压缩为 WebP（质量 80%，最长边 1600px），单张不超过 15 MB</em>
+							<span>点击选择照片或视频，或把文件拖到这里</span>
+							<em>照片自动压缩为 WebP（质量 80%，最长边 1600px），单张不超过 15 MB；视频大于 6 MB 且 1 分钟内会自动转码到 720p，单个不超过 60 MB</em>
 						</button>
 						<div id="diary-compose-thumbs" class="diary-compose-thumbs"></div>
 						<input
 							type="text"
 							id="diary-compose-url"
 							class="diary-compose-input diary-compose-url"
-							placeholder="或粘贴图片链接，回车添加（可留空）"
+							placeholder="或粘贴图片/视频链接，回车添加（可留空）"
 						/>
 					</div>
 				</div>
@@ -357,6 +357,18 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			position: absolute;
 			inset: 0;
 			background: rgb(0 0 0 / 0.45);
+		}
+		/* 视频角标：居中一个播放三角 */
+		.diary-compose-thumb-play {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 1.1rem;
+			color: #fff;
+			text-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
+			pointer-events: none;
 		}
 		.diary-compose-url {
 			font-size: 0.8rem;
@@ -740,12 +752,14 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			overflow: hidden;
 			border: 1px solid rgb(var(--paper-border) / 0.35);
 		}
-		.diary-paper-thumb img {
+		.diary-paper-thumb img,
+		.diary-paper-thumb video {
 			display: block;
 			width: 100%;
 			aspect-ratio: 16 / 10;
 			object-fit: cover;
 			pointer-events: none;
+			background: #000;
 		}
 
 		/* ---- 纸片内部排版 ---- */
@@ -906,11 +920,18 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			return entry.isPrivate && !unlocked;
 		}
 
-		/* 未锁定的带图日记取首图做纸片缩略图 */
-		function paperImage(entry) {
-			if (isLocked(entry)) return null;
-			return entry.images && entry.images.length ? entry.images[0].url : null;
+	/* 未锁定的日记取首图 / 首个视频封面做纸片缩略图 */
+	function paperThumb(entry) {
+		if (isLocked(entry)) return null;
+		if (entry.images && entry.images.length) {
+			return { type: "image", url: entry.images[0].url, poster: "" };
 		}
+		if (entry.videos && entry.videos.length) {
+			var v = entry.videos[0];
+			return { type: "video", url: v.url, poster: v.poster || "" };
+		}
+		return null;
+	}
 
 		/* 基于 slug 的确定性"随机"漂浮参数 */
 		function floatParams(slug, seed) {
@@ -1013,14 +1034,14 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				var prm = floatParams(entry.slug, shuffleSeed);
 				var locked = isLocked(entry);
 				var mood = entry.mood ? MOOD_MAP[entry.mood] : null;
-				var img = paperImage(entry);
+				var thumb = paperThumb(entry);
 
-				// 带图的纸片固定用便签卡片样式（拍立得感），略宽一点
-				var variant = img ? "card" : prm.variant;
-				var pw = img ? 250 + ((prm.h >>> 2) % 50) : prm.w;
+				// 带图 / 带视频的纸片固定用便签卡片样式（拍立得感），略宽一点
+				var variant = thumb ? "card" : prm.variant;
+				var pw = thumb ? 250 + ((prm.h >>> 2) % 50) : prm.w;
 				pw = Math.min(pw, w * 0.66, w - 20);
 				pw = Math.max(pw, 160);
-				var ph = img ? 300 : variant === "bubble" ? 205 : 185;
+				var ph = thumb ? 300 : variant === "bubble" ? 205 : 185;
 
 				var left, top;
 				if (isMobile) {
@@ -1065,8 +1086,16 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 					html += '<div class="diary-paper-title" style="text-align:center">私密日记</div>';
 					html += '<div class="diary-paper-meta" style="justify-content:center"><span>' + formatDate(entry.date) + "</span></div>";
 				} else {
-					if (img) {
-						html += '<div class="diary-paper-thumb"><img src="' + img + '" alt="" loading="lazy" draggable="false"></div>';
+					if (thumb) {
+						if (thumb.type === "video") {
+							// 不自动播放：只显示封面帧，点击纸片进详情再看
+							html +=
+								'<div class="diary-paper-thumb"><video src="' + thumb.url + '"' +
+								(thumb.poster ? ' poster="' + thumb.poster + '"' : "") +
+								' muted playsinline preload="metadata" draggable="false"></video></div>';
+						} else {
+							html += '<div class="diary-paper-thumb"><img src="' + thumb.url + '" alt="" loading="lazy" draggable="false"></div>';
+						}
 					}
 					html += '<div class="diary-paper-title">' + escapeHtml(entry.title || "无题") + "</div>";
 					html += '<div class="diary-paper-excerpt">' + escapeHtml((entry.content || "").slice(0, 90)) + "</div>";
@@ -1075,6 +1104,9 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 					html += '<span class="flex items-center gap-1">';
 					if (entry.images && entry.images.length > 1) {
 						html += "<span>🖼" + entry.images.length + "</span>";
+					}
+					if (entry.videos && entry.videos.length) {
+						html += "<span>🎬" + entry.videos.length + "</span>";
 					}
 					if (mood) {
 						html += '<span class="diary-paper-mood" title="' + mood.label + '">' + mood.emoji + "</span>";
@@ -1221,6 +1253,8 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		var DIARY_JSON_PATH = "public/diary/index.json";
 		// 本地图片落盘目录（与既有 public/diary/images/ 一致）
 		var DIARY_IMAGE_DIR = "public/diary/images";
+		// 本地视频落盘目录（视频与其封面帧都放这里）
+		var DIARY_VIDEO_DIR = "public/diary/videos";
 		// 图片压缩参数：与 src/utils/image-compress.ts 保持一致（WebP 质量 0.8）
 		var IMAGE_QUALITY = 0.8;
 		// 最长边限制：日记是碎碎念，小图足够，避免上传体积拖垮 GitHub Contents API
@@ -1228,9 +1262,26 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		// 单张原图上限，超出直接拒绝，避免解码时把浏览器内存打爆
 		var MAX_IMAGE_SIZE = 15 * 1024 * 1024;
 
+		// ---------- 视频参数 ----------
+		// 单个原视频上限：再大就不值得推 GitHub（base64 会翻 1.33 倍）
+		var MAX_VIDEO_SIZE = 60 * 1024 * 1024;
+		// 小于这个体积没必要转码，直接原样上传（保真、也不用等）
+		var VIDEO_COMPRESS_MIN_SIZE = 6 * 1024 * 1024;
+		// 转码是「边播边录」，耗时≈时长；超过这个长度就不压了，直接传原片
+		var VIDEO_COMPRESS_MAX_DURATION = 60;
+		// 转码目标：720p / 30fps / 2.5 Mbps
+		var VIDEO_TARGET_EDGE = 720;
+		var VIDEO_TARGET_FPS = 30;
+		var VIDEO_TARGET_BITRATE = 2.5 * 1024 * 1024;
+		// 封面帧最长边（纸片缩略图 + 详情页 poster）
+		var VIDEO_POSTER_EDGE = 640;
+
 		// 待上传图片列表：{ id, name, url, dataUrl, width, height, size, hash }
 		// url 类型为用户直接粘贴的链接；file 类型走「压缩 → 上传 public/diary/images/」
 		var pendingImages = [];
+		// 待上传视频列表：{ id, type:"video", kind:"file"|"url", name, blob, mime, url,
+		//   posterDataUrl, poster, width, height, size, duration, busy }
+		var pendingVideos = [];
 
 		// 渲染心情选项（默认选中"平平淡淡"）
 		Object.keys(MOOD_MAP).forEach(function (key) {
@@ -1336,26 +1387,57 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			});
 		}
 
+		// 从两个待上传列表里移除（图片与视频共用 id 命名空间）
+		function removePending(id) {
+			pendingImages = pendingImages.filter(function (x) {
+				return x.id !== id;
+			});
+			pendingVideos = pendingVideos.filter(function (x) {
+				return x.id !== id;
+			});
+		}
+
 		function renderThumbs() {
 			composeImages.innerHTML = "";
-			pendingImages.forEach(function (item) {
+			pendingImages.concat(pendingVideos).forEach(function (item) {
+				var isVideo = item.type === "video";
 				var box = document.createElement("div");
-				box.className = "diary-compose-thumb" + (item.busy ? " is-busy" : "");
+				box.className =
+					"diary-compose-thumb" + (item.busy ? " is-busy" : "");
 
-				var im = document.createElement("img");
-				im.src = item.dataUrl || item.url;
-				im.alt = "";
-				box.appendChild(im);
+				if (isVideo && item.posterDataUrl) {
+					// 视频用封面帧做缩略图，避免把整段视频解码进网格
+					var im = document.createElement("img");
+					im.src = item.posterDataUrl;
+					im.alt = "";
+					box.appendChild(im);
+				} else if (isVideo && item.poster) {
+					var im2 = document.createElement("img");
+					im2.src = item.poster;
+					im2.alt = "";
+					box.appendChild(im2);
+				} else {
+					var im3 = document.createElement("img");
+					im3.src = item.dataUrl || item.url || "";
+					im3.alt = "";
+					box.appendChild(im3);
+				}
+
+				// 视频角标：播放图标 + 时长
+				if (isVideo) {
+					var badge = document.createElement("div");
+					badge.className = "diary-compose-thumb-play";
+					badge.textContent = "▶";
+					box.appendChild(badge);
+				}
 
 				var del = document.createElement("button");
 				del.type = "button";
 				del.className = "diary-compose-thumb-del";
-				del.setAttribute("aria-label", "移除图片");
+				del.setAttribute("aria-label", isVideo ? "移除视频" : "移除图片");
 				del.textContent = "×";
 				del.addEventListener("click", function () {
-					pendingImages = pendingImages.filter(function (x) {
-						return x.id !== item.id;
-					});
+					removePending(item.id);
 					renderThumbs();
 				});
 				box.appendChild(del);
@@ -1363,14 +1445,20 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				var bar = document.createElement("div");
 				bar.className = "diary-compose-thumb-bar";
 				var left = document.createElement("span");
-				// 粘贴链接的图拿不到本地体积，只标来源，避免显示无意义的 0 B
+				// 粘贴链接的拿不到本地体积，只标来源，避免显示无意义的 0 B
 				left.textContent = item.busy
 					? "上传中…"
 					: item.kind === "url"
 						? "链接"
 						: formatBytes(item.size || 0);
 				var right = document.createElement("span");
-				right.textContent = item.width ? item.width + "×" + item.height : "外链";
+				right.textContent = isVideo
+					? item.duration
+						? formatDuration(item.duration)
+						: "视频"
+					: item.width
+						? item.width + "×" + item.height
+						: "外链";
 				bar.appendChild(left);
 				bar.appendChild(right);
 				box.appendChild(bar);
@@ -1379,15 +1467,461 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			});
 		}
 
-		// 选中文件 → 压缩 → 加入列表（此时还未落盘，发表时统一上传）
+		/* ---------- 视频：读取信息 / 截封面 / 转码 ---------- */
+		function formatDuration(sec) {
+			if (!isFinite(sec) || sec < 0) return "视频";
+			var total = Math.round(sec);
+			var m = Math.floor(total / 60);
+			var s = total % 60;
+			return m + ":" + String(s).padStart(2, "0");
+		}
+
+		function readFileAsDataUrl(blob) {
+			return new Promise(function (resolve, reject) {
+				var reader = new FileReader();
+				reader.onload = function () {
+					resolve(reader.result);
+				};
+				reader.onerror = function () {
+					reject(new Error("文件读取失败"));
+				};
+				reader.readAsDataURL(blob);
+			});
+		}
+
+		// 隐藏的解码用 <video>：必须挂进 DOM，Safari 才肯解码离屏元素
+		function createHiddenVideo(url) {
+			var v = document.createElement("video");
+			v.muted = true;
+			v.playsInline = true;
+			v.preload = "auto";
+			v.setAttribute("aria-hidden", "true");
+			v.style.position = "fixed";
+			v.style.left = "-9999px";
+			v.style.top = "0";
+			v.style.width = "1px";
+			v.style.height = "1px";
+			v.style.opacity = "0";
+			v.style.pointerEvents = "none";
+			document.body.appendChild(v);
+			if (url) v.src = url;
+			return v;
+		}
+
+		function disposeHiddenVideo(v, url) {
+			try {
+				v.pause();
+			} catch (e) {}
+			try {
+				v.removeAttribute("src");
+				v.load();
+			} catch (e) {}
+			if (v.parentNode) v.parentNode.removeChild(v);
+			try {
+				if (url) URL.revokeObjectURL(url);
+			} catch (e) {}
+		}
+
+		// 读取视频宽高与时长（只加载 metadata，不解码整段）
+		function readVideoMeta(file) {
+			return new Promise(function (resolve, reject) {
+				var url = URL.createObjectURL(file);
+				var v = createHiddenVideo(url);
+				var timer = setTimeout(function () {
+					finish();
+					reject(new Error("读取视频信息超时"));
+				}, 15000);
+				function finish() {
+					clearTimeout(timer);
+					disposeHiddenVideo(v, url);
+				}
+				v.onloadedmetadata = function () {
+					var meta = {
+						width: v.videoWidth || 0,
+						height: v.videoHeight || 0,
+						duration: v.duration || 0,
+					};
+					finish();
+					resolve(meta);
+				};
+				v.onerror = function () {
+					finish();
+					reject(new Error("无法读取该视频，格式可能不受支持"));
+				};
+				v.src = url;
+			});
+		}
+
+		// 截取视频首帧当封面（走 canvas → WebP，跟图片压缩同一套路）
+		function captureVideoPoster(file, duration) {
+			return new Promise(function (resolve, reject) {
+				var url = URL.createObjectURL(file);
+				var v = createHiddenVideo(url);
+				var settled = false;
+				var timer = setTimeout(fail, 15000);
+
+				function cleanup() {
+					clearTimeout(timer);
+					disposeHiddenVideo(v, url);
+				}
+				function fail() {
+					if (settled) return;
+					settled = true;
+					cleanup();
+					reject(new Error("无法截取视频封面"));
+				}
+				function grab() {
+					if (settled) return;
+					var w = v.videoWidth || 640;
+					var h = v.videoHeight || 360;
+					var ratio = Math.min(1, VIDEO_POSTER_EDGE / Math.max(w, h));
+					var cw = Math.max(2, Math.round(w * ratio));
+					var ch = Math.max(2, Math.round(h * ratio));
+					var canvas = document.createElement("canvas");
+					canvas.width = cw;
+					canvas.height = ch;
+					var ctx = canvas.getContext("2d");
+					if (!ctx) return fail();
+					try {
+						ctx.drawImage(v, 0, 0, cw, ch);
+					} catch (e) {
+						return fail();
+					}
+					canvas.toBlob(
+						function (blob) {
+							if (settled) return;
+							if (!blob) return fail();
+							settled = true;
+							cleanup();
+							var reader = new FileReader();
+							reader.onload = function () {
+								resolve({
+									dataUrl: reader.result,
+									width: cw,
+									height: ch,
+									size: blob.size,
+								});
+							};
+							reader.onerror = fail;
+							reader.readAsDataURL(blob);
+						},
+						"image/webp",
+						IMAGE_QUALITY
+					);
+				}
+
+				// 首帧常是黑屏，稍微往里挪一点再截
+				v.onloadeddata = function () {
+					var target = Math.min(0.3, (duration || v.duration || 1) / 2);
+					try {
+						v.currentTime = target;
+					} catch (e) {
+						grab();
+					}
+				};
+				v.onseeked = grab;
+				v.onerror = fail;
+				v.src = url;
+			});
+		}
+
+		// MediaRecorder 可用的封装格式：Chrome/Firefox 出 WebM，Safari 出 MP4
+		function pickRecorderMime() {
+			if (typeof MediaRecorder === "undefined") return "";
+			var candidates = [
+				"video/webm;codecs=vp9,opus",
+				"video/webm;codecs=vp8,opus",
+				"video/webm",
+				"video/mp4;codecs=avc1,mp4a.40.2",
+				"video/mp4",
+			];
+			for (var i = 0; i < candidates.length; i++) {
+				try {
+					if (MediaRecorder.isTypeSupported(candidates[i])) return candidates[i];
+				} catch (e) {}
+			}
+			return "";
+		}
+
+		function canCompressVideo() {
+			if (typeof MediaRecorder === "undefined") return false;
+			if (typeof document === "undefined") return false;
+			var c = document.createElement("canvas");
+			return (
+				typeof c.captureStream === "function" &&
+				typeof window.requestAnimationFrame === "function"
+			);
+		}
+
+		function evenSize(n) {
+			var v = Math.max(2, Math.round(n));
+			return v % 2 === 0 ? v : v + 1;
+		}
+
+		// 转码：把视频按目标尺寸画到 canvas，再用 MediaRecorder 重录一遍（边播边录）
+		// 注意：这一步是实时的，耗时≈视频时长，期间页面要在前台（切走标签页 rAF 会暂停）
+		function compressVideo(file, meta, onProgress) {
+			return new Promise(function (resolve, reject) {
+				var srcUrl = URL.createObjectURL(file);
+				var src = createHiddenVideo(srcUrl);
+				// 先用「音量 0 但不静音」播放：这样原音轨还能被 captureStream 捕获；
+				// 若被自动播放策略拦下，再退化成静音播放（代价是录出来没有声音）
+				src.muted = false;
+				src.volume = 0;
+
+				var maxEdge = Math.max(meta.width || 640, meta.height || 360);
+				var ratio = Math.min(1, VIDEO_TARGET_EDGE / maxEdge);
+				var w = evenSize((meta.width || 640) * ratio);
+				var h = evenSize((meta.height || 360) * ratio);
+
+				var canvas = document.createElement("canvas");
+				canvas.width = w;
+				canvas.height = h;
+				var ctx = canvas.getContext("2d");
+				if (!ctx) {
+					disposeHiddenVideo(src, srcUrl);
+					return reject(new Error("无法初始化画布"));
+				}
+
+				var fps = Math.min(VIDEO_TARGET_FPS, 30);
+				var stream = canvas.captureStream(fps);
+				// 尽力带上原音轨（Chrome 系可用，拿不到就静音）
+				try {
+					if (typeof src.captureStream === "function") {
+						var ms = src.captureStream();
+						var tracks = ms.getAudioTracks ? ms.getAudioTracks() : [];
+						for (var i = 0; i < tracks.length; i++) {
+							stream.addTrack(tracks[i]);
+						}
+					}
+				} catch (e) {}
+
+				var mime = pickRecorderMime();
+				var rec;
+				try {
+					rec = new MediaRecorder(
+						stream,
+						mime
+							? {
+									mimeType: mime,
+									videoBitsPerSecond: VIDEO_TARGET_BITRATE,
+									audioBitsPerSecond: 128000,
+								}
+							: undefined
+					);
+				} catch (e) {
+					disposeHiddenVideo(src, srcUrl);
+					return reject(new Error("当前浏览器不支持视频转码"));
+				}
+
+				var chunks = [];
+				var stopped = false;
+				var rafId = 0;
+				var guard = setTimeout(function () {
+					stop(new Error("转码超时，已放弃压缩"));
+				}, (meta.duration || 30) * 3000 + 30000);
+
+				rec.ondataavailable = function (e) {
+					if (e.data && e.data.size) chunks.push(e.data);
+				};
+				rec.onerror = function () {
+					stop(new Error("录制失败"));
+				};
+				rec.onstop = function () {
+					if (stopped) return;
+					stopped = true;
+					clearTimeout(guard);
+					cancelAnimationFrame(rafId);
+					try {
+						disposeHiddenVideo(src, srcUrl);
+					} catch (e) {}
+					try {
+						src.pause();
+					} catch (e) {}
+					if (!chunks.length) return reject(new Error("转码结果为空"));
+					var outMime = mime || chunks[0].type || "video/webm";
+					resolve(new Blob(chunks, { type: outMime }));
+				};
+
+				function stop(err) {
+					if (stopped) return;
+					if (err) {
+						stopped = true;
+						clearTimeout(guard);
+						cancelAnimationFrame(rafId);
+						try {
+							rec.stop();
+						} catch (e) {}
+						try {
+							disposeHiddenVideo(src, srcUrl);
+						} catch (e) {}
+						return reject(err);
+					}
+					try {
+						rec.stop();
+					} catch (e) {
+						reject(new Error("录制结束失败"));
+					}
+				}
+
+				function draw() {
+					if (stopped) return;
+					try {
+						ctx.drawImage(src, 0, 0, w, h);
+					} catch (e) {}
+					if (typeof onProgress === "function" && meta.duration) {
+						onProgress(Math.min(1, src.currentTime / meta.duration));
+					}
+					if (src.ended || src.currentTime >= (meta.duration || 0) - 0.05) {
+						stop();
+						return;
+					}
+					rafId = requestAnimationFrame(draw);
+				}
+
+				src.onloadeddata = function () {
+					var playPromise = src.play();
+					if (playPromise && typeof playPromise.catch === "function") {
+						playPromise.catch(function () {
+							// 被自动播放策略拦了 → 静音重放（画面照转，音轨放弃）
+							try {
+								src.muted = true;
+								var p2 = src.play();
+								if (p2 && typeof p2.catch === "function") {
+									p2.catch(function () {});
+								}
+							} catch (e) {}
+						});
+					}
+					try {
+						rec.start(1000);
+					} catch (e) {
+						stop(new Error("无法开始录制"));
+						return;
+					}
+					rafId = requestAnimationFrame(draw);
+				};
+				src.onerror = function () {
+					stop(new Error("无法播放该视频"));
+				};
+			});
+		}
+
+		// 选中视频 → 按需转码 + 截封面 → 加入列表（落盘在发表时统一做）
+		function addVideoFiles(files) {
+			var arr = Array.prototype.slice.call(files || []).filter(function (f) {
+				return f.type && f.type.indexOf("video/") === 0;
+			});
+			if (!arr.length) return Promise.resolve(0);
+
+			var queue = arr.slice();
+			var total = queue.length;
+			var done = 0;
+			var added = 0;
+
+			function next() {
+				if (!queue.length) {
+					setComposeStatus("");
+					if (added) showToast("已添加 " + added + " 个视频");
+					return Promise.resolve(added);
+				}
+				var file = queue.shift();
+				var index = ++done;
+				if (file.size > MAX_VIDEO_SIZE) {
+					showToast(file.name + " 超过 60 MB，已跳过");
+					return next();
+				}
+
+				setComposeStatus("正在读取视频 " + index + "/" + total + "：" + file.name);
+
+				return readVideoMeta(file)
+					.then(function (meta) {
+						var shouldCompress =
+							canCompressVideo() &&
+							file.size > VIDEO_COMPRESS_MIN_SIZE &&
+							meta.duration > 0 &&
+							meta.duration <= VIDEO_COMPRESS_MAX_DURATION;
+
+						var blobPromise = Promise.resolve(file);
+						if (shouldCompress) {
+							blobPromise = compressVideo(file, meta, function (pct) {
+								setComposeStatus(
+									"正在转码视频 " +
+										index +
+										"/" +
+										total +
+										"：" +
+										Math.round(pct * 100) +
+										"%"
+								);
+							}).then(function (blob) {
+								// 转完反而更大就弃用，直接传原片
+								if (blob && blob.size < file.size) return blob;
+								return file;
+							});
+						}
+
+						// 封面帧独立于转码结果，从原片截更稳（转码产物是 webm 时 seek 不一定顺）
+						return Promise.all([
+							blobPromise,
+							captureVideoPoster(file, meta.duration),
+						]).then(function (res) {
+							var blob = res[0] || file;
+							var poster = res[1] || null;
+							pendingVideos.push({
+								id: "vid-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+								type: "video",
+								kind: "file",
+								name: file.name,
+								blob: blob,
+								mime: blob.type || "",
+								url: "",
+								posterDataUrl: poster ? poster.dataUrl : "",
+								poster: "",
+								width: meta.width || (poster ? poster.width : 0),
+								height: meta.height || (poster ? poster.height : 0),
+								size: blob.size,
+								duration: meta.duration || 0,
+								busy: false,
+							});
+							added++;
+							renderThumbs();
+							return next();
+						});
+					})
+					.catch(function (err) {
+						console.error("视频处理失败", file, err);
+						showToast(file.name + "：" + (err.message || "处理失败"));
+						return next();
+					});
+			}
+
+			return next();
+		}
+
+		// 选中文件 → 按类型分流（图片压缩 / 视频转码）→ 加入列表（此时还未落盘，发表时统一上传）
+		function addPickedFiles(files) {
+			var arr = Array.prototype.slice.call(files || []);
+			var videos = arr.filter(function (f) {
+				return f.type && f.type.indexOf("video/") === 0;
+			});
+			var images = arr.filter(function (f) {
+				return f.type && f.type.indexOf("image/") === 0;
+			});
+			var others = arr.length - videos.length - images.length;
+			if (others > 0) {
+				showToast(others + " 个文件既不是图片也不是视频，已忽略");
+			}
+			addImageFiles(images);
+			// 视频是串行的（要边播边录），放在图片之后处理
+			return addVideoFiles(videos);
+		}
+
 		function addImageFiles(files) {
 			var arr = Array.prototype.slice.call(files || []);
 			var imageFiles = arr.filter(function (f) {
 				return f.type && f.type.indexOf("image/") === 0;
 			});
-			if (arr.length - imageFiles.length > 0) {
-				showToast(arr.length - imageFiles.length + " 个文件不是图片，已忽略");
-			}
 			if (!imageFiles.length) return;
 
 			var queue = imageFiles.slice();
@@ -1436,24 +1970,42 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			next();
 		}
 
-		// 粘贴图片链接（回车 / 点击「添加」）
-		function addUrlImage() {
+		// 粘贴图片 / 视频链接（回车添加）：按扩展名分流
+		function addUrlMedia() {
 			var url = composeUrl.value.trim();
 			if (!url) return;
-			var exists = pendingImages.some(function (x) {
+			var clean = url.split("?")[0].split("#")[0].toLowerCase();
+			var isVideo = /\.(mp4|webm|mov|m4v|ogv)$/.test(clean);
+			var exists = pendingImages.concat(pendingVideos).some(function (x) {
 				return x.kind === "url" && x.url === url;
 			});
 			if (exists) {
-				showToast("该图片已在列表中");
+				showToast("该链接已在列表中");
 				return;
 			}
-			pendingImages.push({
-				id: "img-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
-				kind: "url",
-				url: url,
-				dataUrl: "",
-				busy: false,
-			});
+			var id = (isVideo ? "vid-" : "img-") + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+			if (isVideo) {
+				pendingVideos.push({
+					id: id,
+					type: "video",
+					kind: "url",
+					name: url.split("/").pop() || "外链视频",
+					url: url,
+					poster: "",
+					posterDataUrl: "",
+					size: 0,
+					duration: 0,
+					busy: false,
+				});
+			} else {
+				pendingImages.push({
+					id: id,
+					kind: "url",
+					url: url,
+					dataUrl: "",
+					busy: false,
+				});
+			}
 			composeUrl.value = "";
 			renderThumbs();
 		}
@@ -1471,6 +2023,25 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			composeModal.hidden = true;
 		}
 
+		// 统一的「dataURL → 仓库文件」上传（走 /api/content/write/，base64）
+		function postFile(path, dataUrl, message) {
+			return fetch("/api/content/write/", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					path: path,
+					content: (dataUrl || "").split(",")[1] || "",
+					encoding: "base64",
+					message: message,
+				}),
+			}).then(function (r) {
+				return r.json().then(function (data) {
+					if (!r.ok) throw new Error(data.error || "上传失败");
+					return data;
+				});
+			});
+		}
+
 		// 把压缩后的 dataURL 落到 public/diary/images/{时间戳}-{随机}.webp
 		// 文件名沿用既有 images/ 目录里的格式；已拿到 url 的直接跳过（失败重试时幂等）
 		function uploadDiaryImage(item) {
@@ -1478,27 +2049,55 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			var filename =
 				Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".webp";
 			var publicPath = "/diary/images/" + filename;
-			return fetch("/api/content/write/", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					path: DIARY_IMAGE_DIR + "/" + filename,
-					content: (item.dataUrl || "").split(",")[1] || "",
-					encoding: "base64",
-					message: "上传日记图片: " + (item.name || filename),
-				}),
-			})
-				.then(function (r) {
-					return r.json().then(function (data) {
-						if (!r.ok) throw new Error(data.error || "图片上传失败");
-						return publicPath;
-					});
+			return postFile(
+				DIARY_IMAGE_DIR + "/" + filename,
+				item.dataUrl,
+				"上传日记图片: " + (item.name || filename)
+			).then(function () {
+				item.url = publicPath;
+				item.busy = false;
+				return publicPath;
+			});
+		}
+
+		// 视频落到 public/diary/videos/{时间戳}-{随机}.{mp4|webm}
+		function uploadDiaryVideo(item) {
+			if (item.url) return Promise.resolve(item.url);
+			var base = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+			// 扩展名跟着实际 mime 走：Safari 录出来是 mp4，Chrome/Firefox 是 webm
+			var ext = item.mime && item.mime.indexOf("mp4") >= 0 ? "mp4" : "webm";
+			var filename = base + "." + ext;
+			var publicPath = "/diary/videos/" + filename;
+			item.posterName = base + ".webp";
+			return readFileAsDataUrl(item.blob)
+				.then(function (dataUrl) {
+					return postFile(
+						DIARY_VIDEO_DIR + "/" + filename,
+						dataUrl,
+						"上传日记视频: " + (item.name || filename)
+					);
 				})
-				.then(function (path) {
-					item.url = path;
+				.then(function () {
+					item.url = publicPath;
 					item.busy = false;
-					return path;
+					return publicPath;
 				});
+		}
+
+		// 视频封面帧单独落一张 webp，纸片缩略图和详情页 poster 都用它
+		function uploadDiaryPoster(item) {
+			if (!item.posterDataUrl || item.poster) {
+				return Promise.resolve(item.poster || "");
+			}
+			var filename = item.posterName || Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".webp";
+			return postFile(
+				DIARY_VIDEO_DIR + "/" + filename,
+				item.posterDataUrl,
+				"上传日记视频封面: " + (item.name || filename)
+			).then(function () {
+				item.poster = "/diary/videos/" + filename;
+				return item.poster;
+			});
 		}
 
 		// 生成 slug：diary-YYYYMMDD-xxxxxx（与现有数据格式一致）
@@ -1550,6 +2149,9 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			var localImages = pendingImages.filter(function (x) {
 				return x.kind !== "url";
 			});
+			var localVideos = pendingVideos.filter(function (x) {
+				return x.kind !== "url";
+			});
 
 			composeSaving = true;
 			composeSubmit.disabled = true;
@@ -1569,6 +2171,26 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				Promise.resolve()
 			);
 
+			// 视频串行上传：先视频本体，再它的封面帧
+			uploadAll = localVideos.reduce(function (chain, item, i) {
+				return chain
+					.then(function () {
+						item.busy = true;
+						renderThumbs();
+						setComposeStatus(
+							"正在上传视频 " + (i + 1) + "/" + localVideos.length + "…"
+						);
+						return uploadDiaryVideo(item);
+					})
+					.then(function () {
+						if (!item.posterDataUrl) return "";
+						setComposeStatus(
+							"正在上传视频封面 " + (i + 1) + "/" + localVideos.length + "…"
+						);
+						return uploadDiaryPoster(item);
+					});
+			}, uploadAll);
+
 			uploadAll
 				.then(function () {
 					var when = composeDateValue();
@@ -1580,6 +2202,16 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 						tags: [],
 						images: pendingImages.map(function (item) {
 							return { url: item.url };
+						}),
+						videos: pendingVideos.map(function (item) {
+							return {
+								url: item.url,
+								poster: item.poster || "",
+								width: item.width || 0,
+								height: item.height || 0,
+								size: item.size || 0,
+								duration: item.duration || 0,
+							};
 						}),
 						isPrivate: composePrivate.checked,
 						mood: composeMood,
@@ -1626,6 +2258,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 								composeContent.value = "";
 								composeUrl.value = "";
 								pendingImages = [];
+								pendingVideos = [];
 								renderThumbs();
 								composePrivate.checked = false;
 								composeDate.value = localDateStr();
@@ -1634,8 +2267,8 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 						});
 				})
 				.catch(function (err) {
-					// 图片可能已部分落盘，重试时靠 HEAD 检查跳过已存在的文件
-					pendingImages.forEach(function (item) {
+					// 图片 / 视频可能已部分落盘，重试时靠已拿到的 url 跳过（幂等）
+					pendingImages.concat(pendingVideos).forEach(function (item) {
 						item.busy = false;
 					});
 					renderThumbs();
@@ -1655,21 +2288,21 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			composeDate.value = localDateStr();
 		});
 
-		/* 图片：点击选文件 / 拖拽 / 粘贴链接 */
+		/* 照片 / 视频：点击选文件 / 拖拽 / 粘贴链接 */
 		composeDrop.addEventListener("click", function () {
 			composeFile.click();
 		});
 		composeFile.addEventListener("change", function () {
-			addImageFiles(composeFile.files);
+			addPickedFiles(composeFile.files);
 			composeFile.value = "";
 		});
 		composeUrl.addEventListener("keydown", function (e) {
 			if (e.key === "Enter") {
 				e.preventDefault();
-				addUrlImage();
+				addUrlMedia();
 			}
 		});
-		// 整个弹窗都作为拖放区：从桌面拖图片进来松手即可添加
+		// 整个弹窗都作为拖放区：从桌面拖照片或视频进来松手即可添加
 		["dragenter", "dragover"].forEach(function (type) {
 			composeModal.addEventListener(type, function (e) {
 				if (!e.dataTransfer || Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") === -1) {
@@ -1688,7 +2321,7 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 			if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
 			e.preventDefault();
 			composeDrop.classList.remove("is-drag");
-			addImageFiles(e.dataTransfer.files);
+			addPickedFiles(e.dataTransfer.files);
 		});
 		document.addEventListener("keydown", function (e) {
 			if (e.key === "Escape" && !composeModal.hidden) closeCompose();
