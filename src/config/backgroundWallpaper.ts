@@ -27,14 +27,22 @@ type PlayerVideo = {
 };
 
 /**
- * 2026-10-07：动态壁纸已全部下架，`public/assets/videos/` 下的片子一并删了。
- * 留空数组即可，组件无需改动 —— `playerEnable: false` 时导航栏不渲染播放按钮，
- * BackgroundPlayer 也会因 `urls.length === 0` 整块不输出（内联脚本同样提前 return）。
+ * 2026-10-07 恢复：只留一支「夕阳花海 · 列车」。
  *
- * 想重新启用：把 mp4 放回 `public/assets/videos/`（720p / H.264，文件名带日期版本号
- * 以便绕过 CDN 强缓存），往这里加条目，再把 `playerEnable` 改回 `true`。
+ * 源：Wallpaper Engine `3556986318` 的 `.mpkg`（`PKGM0019` 打包格式）——
+ * 它**不是**纯 scene（着色器现算、抽不出画面），里面第 1408 字节起是一段完整 MP4
+ * （ftyp/moov/free/mdat 原子链完整），可直接切出来用。详见 `.workbuddy/memory/2026-10-07.md`。
+ *
+ * 规格：4K/60fps/19.75s/无音轨 源片 → 1080p60 / H.264 CRF27 / 7.6MB，首尾帧差 1.7（无缝循环）。
+ * 文件名带日期版本号，CDN 强缓存下同名替换不生效。
  */
-const playerVideos: PlayerVideo[] = [];
+const playerVideos: PlayerVideo[] = [
+	{
+		src: "/assets/videos/bg-20261007-sunset-train.mp4",
+		label: "夕阳花海 · 列车",
+		poster: "/assets/videos/thumbs/bg-20261007-sunset-train.webp",
+	},
+];
 
 /**
  * 显示设置面板「动态壁纸」一栏**只列**这几支 —— 元素是上面 playerVideos 的下标。
@@ -43,7 +51,7 @@ const playerVideos: PlayerVideo[] = [];
  * 曾经用「数组位置」当索引，一旦面板清单是 playerUrl 的子集就会错位，
  * 出现「选了 A 播出来的是 B」。没列进来的片子仍可由导航栏播放按钮轮播到。
  */
-const selectableDynamicWallpaperIndices: number[] = [];
+const selectableDynamicWallpaperIndices: number[] = [0];
 
 export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	// 壁纸模式："banner" 横幅壁纸，"fullscreen" 全屏壁纸，"overlay" 全屏透明，"none" 纯色背景无壁纸
@@ -53,8 +61,7 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	// 推荐只选择自己喜欢的模式并关闭切换功能
 	switchable: true,
 	// 是否启用背景视频播放，配置后将在导航栏显示视频播放按钮
-	// 2026-10-07：动态壁纸已全部下架（playerVideos 为空），关掉以免导航栏出现无效按钮
-	playerEnable: false,
+	playerEnable: true,
 	/**
 	 * 背景图片配置
 	 * 图片路径支持三种格式：
@@ -96,6 +103,7 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
 		// 未选中动态壁纸时**不随页面加载预加载**，只有点导航栏播放按钮才按需拉取，因此体积不影响首屏；
 		// 一旦访客在显示设置面板里选中了某支，它就等同于壁纸，会随页面加载自动静音起播。
+		// bg-20261007-sunset-train：1080p60 无音轨，7.6MB / 19.75s，首尾帧一致可无缝循环
 		playerUrl: playerVideos.map((item) => item.src),
 		// 面板可选的动态壁纸清单：index 指回 playerUrl 的下标，必须是显式的
 		playerItems: selectableDynamicWallpaperIndices.map((index) => ({
