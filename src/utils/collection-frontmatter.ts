@@ -34,7 +34,11 @@ function unquote(token: string): string {
 /** 把单个 token 解析为标量原始值（字符串 / 数字 / 布尔） */
 function parseScalar(token: string): string | number | boolean {
 	const t = token.trim();
-	if (t.length >= 2 && ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'")))) {
+	if (
+		t.length >= 2 &&
+		((t.startsWith('"') && t.endsWith('"')) ||
+			(t.startsWith("'") && t.endsWith("'")))
+	) {
 		return unquote(t);
 	}
 	if (t === "true") return true;
@@ -48,9 +52,7 @@ function parseScalar(token: string): string | number | boolean {
 function parseFlowArray(raw: string): Array<string | number> {
 	const inner = raw.trim().slice(1, -1).trim();
 	if (!inner) return [];
-	return inner
-		.split(",")
-		.map((part) => parseScalar(part) as string | number);
+	return inner.split(",").map((part) => parseScalar(part) as string | number);
 }
 
 /** 解析 block 列表（标量数组或对象数组），返回 { value, next } */
@@ -186,14 +188,16 @@ function serializeValue(
 			return `${key}: [${arr.map((s) => quoteStr(String(s))).join(", ")}]`;
 		}
 		case "objectList": {
-			const arr = Array.isArray(value) ? (value as Record<string, string>[]) : [];
+			const arr = Array.isArray(value)
+				? (value as Record<string, string>[])
+				: [];
 			if (arr.length === 0) return `${key}: []`;
 			const lines: string[] = [`${key}:`];
 			for (const item of arr) {
-			const entries: string[] = subFields
-				? subFields.map((sf) => sf.key)
-				: Object.keys(item);
-			entries.forEach((sk, idx) => {
+				const entries: string[] = subFields
+					? subFields.map((sf) => sf.key)
+					: Object.keys(item);
+				entries.forEach((sk, idx) => {
 					const sv = item[sk] ?? "";
 					const indent = idx === 0 ? "  - " : "    ";
 					lines.push(`${indent}${sk}: ${quoteStr(sv)}`);
