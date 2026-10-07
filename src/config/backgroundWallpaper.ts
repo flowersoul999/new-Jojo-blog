@@ -1,46 +1,18 @@
 import type { BackgroundWallpaperConfig } from "@/types/backgroundWallpaper";
 
-const originalWallpaperImages = Array.from(
-	{ length: 24 },
-	(_, index) =>
-		`/assets/images/wallpaper/wallpaper-${String(index + 1).padStart(2, "0")}.webp`,
-);
-
-const importedWutheringWavesImages = Array.from(
-	{ length: 23 },
-	(_, index) =>
-		`/assets/images/wallpaper/wallpaper-${String(index + 25).padStart(2, "0")}.webp`,
-);
-
-const wutheringWavesWallpaperImages = [
-	originalWallpaperImages[0],
-	...importedWutheringWavesImages,
-];
-const otherWallpaperImages = originalWallpaperImages.slice(1);
-
 /**
- * 后加的静态壁纸。放 `public/assets/images/wallpaper/`，命名沿用 `wallpaper-NN.webp` ——
- * 面板缩略图会按同号自动去找 `thumbs/wallpaper-NN.webp`，这里只写大图路径。
+ * 站内静态壁纸清单（桌面端与移动端共用同一张）。
+ *
+ * 2026-10-07 清理：原先 47 张横屏 + 3 张竖屏全部下架，只留 wallpaper-06。
+ *
+ * 想加回来：把图放进 `public/assets/images/wallpaper/`，命名沿用 `wallpaper-NN.webp`
+ * （2560 宽 WebP），再配一张 `thumbs/wallpaper-NN.webp`（320×180）当面板缩略图，
+ * 然后把大图路径加进下面这个数组 —— 缩略图按同号自动命中，不用另配。
  */
-const customWallpaperImages = ["/assets/images/wallpaper/wallpaper-48.webp"];
+const wallpaperImages = ["/assets/images/wallpaper/wallpaper-06.webp"];
 
-const desktopWallpaperImages = [
-	...wutheringWavesWallpaperImages,
-	...otherWallpaperImages,
-	...customWallpaperImages,
-];
-
-const mobileOnlyWutheringWavesImages = Array.from(
-	{ length: 3 },
-	(_, index) =>
-		`/assets/images/wallpaper/wallpaper-mobile-${String(index + 1).padStart(2, "0")}.webp`,
-);
-const mobileWallpaperImages = [
-	...mobileOnlyWutheringWavesImages,
-	...wutheringWavesWallpaperImages,
-	...otherWallpaperImages,
-	...customWallpaperImages,
-];
+const desktopWallpaperImages = wallpaperImages;
+const mobileWallpaperImages = wallpaperImages;
 
 /**
  * 背景视频总清单 —— 导航栏播放按钮按这个顺序轮播。
@@ -48,14 +20,21 @@ const mobileWallpaperImages = [
  *
  * 命名规范：文件名带日期版本号（CDN 强缓存，同名替换不生效）。
  */
-const playerVideos = [
-	{ src: "/assets/videos/bg-20260928.mp4" },
-	{
-		src: "/assets/videos/bg-20261006-wlop.mp4",
-		label: "WLOP · Aeolian3",
-		poster: "/assets/videos/thumbs/bg-20261006-wlop.webp",
-	},
-];
+type PlayerVideo = {
+	src: string;
+	label?: string;
+	poster?: string;
+};
+
+/**
+ * 2026-10-07：动态壁纸已全部下架，`public/assets/videos/` 下的片子一并删了。
+ * 留空数组即可，组件无需改动 —— `playerEnable: false` 时导航栏不渲染播放按钮，
+ * BackgroundPlayer 也会因 `urls.length === 0` 整块不输出（内联脚本同样提前 return）。
+ *
+ * 想重新启用：把 mp4 放回 `public/assets/videos/`（720p / H.264，文件名带日期版本号
+ * 以便绕过 CDN 强缓存），往这里加条目，再把 `playerEnable` 改回 `true`。
+ */
+const playerVideos: PlayerVideo[] = [];
 
 /**
  * 显示设置面板「动态壁纸」一栏**只列**这几支 —— 元素是上面 playerVideos 的下标。
@@ -64,7 +43,7 @@ const playerVideos = [
  * 曾经用「数组位置」当索引，一旦面板清单是 playerUrl 的子集就会错位，
  * 出现「选了 A 播出来的是 B」。没列进来的片子仍可由导航栏播放按钮轮播到。
  */
-const selectableDynamicWallpaperIndices = [1];
+const selectableDynamicWallpaperIndices: number[] = [];
 
 export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	// 壁纸模式："banner" 横幅壁纸，"fullscreen" 全屏壁纸，"overlay" 全屏透明，"none" 纯色背景无壁纸
@@ -74,7 +53,8 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	// 推荐只选择自己喜欢的模式并关闭切换功能
 	switchable: true,
 	// 是否启用背景视频播放，配置后将在导航栏显示视频播放按钮
-	playerEnable: true,
+	// 2026-10-07：动态壁纸已全部下架（playerVideos 为空），关掉以免导航栏出现无效按钮
+	playerEnable: false,
 	/**
 	 * 背景图片配置
 	 * 图片路径支持三种格式：
@@ -114,8 +94,6 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		mobile: mobileWallpaperImages,
 		// 背景视频播放地址（由文件顶部的 playerVideos 派生，勿在此单独增删）
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
-		// bg-20260928：720p 带音轨，42MB / 248s（导航栏播放按钮可轮播到，但不在面板可选清单里）
-		// bg-20261006-wlop：720p 带音轨，19MB / 174s（由 1080p / 214MB 源片重压而来）
 		// 未选中动态壁纸时**不随页面加载预加载**，只有点导航栏播放按钮才按需拉取，因此体积不影响首屏；
 		// 一旦访客在显示设置面板里选中了某支，它就等同于壁纸，会随页面加载自动静音起播。
 		playerUrl: playerVideos.map((item) => item.src),
@@ -201,7 +179,8 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 壁纸轮播配置，横幅壁纸和全屏壁纸共享，仅在配置多张图片时生效
 		carousel: {
 			// 是否启用壁纸轮播；关闭时保持每次刷新随机显示一张
-			enable: true,
+			// 2026-10-07：只剩一张壁纸，轮播没有意义（每 5s 重复一次缩放动画），关掉
+			enable: false,
 			// 轮播切换间隔（毫秒）
 			interval: 5000,
 			// 过渡效果: 'fade' 渐变 | 'zoom' 缩放 | 'slide' 滑动 | 'kenburns' 旋转木马

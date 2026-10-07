@@ -189,7 +189,7 @@ const { class: className, style } = Astro.props;
 		flex: none;
 		background-image: var(
 			--time-greeting-image,
-			url("/assets/images/wallpaper/thumbs/wallpaper-18.webp")
+			url("/assets/images/wallpaper/thumbs/wallpaper-06.webp")
 		);
 		background-position: center;
 		background-size: cover;
@@ -260,19 +260,15 @@ const { class: className, style } = Astro.props;
 		"SATURDAY",
 	];
 
-	const wutheringWavesImages = [
-		"01",
-		...Array.from({ length: 23 }, (_, index) =>
-			String(index + 25).padStart(2, "0"),
-		),
-	].map(
-		(index) =>
-			`/assets/images/wallpaper/wallpaper-${index}.webp`,
+	// 2026-10-07：壁纸清理后站内只剩 wallpaper-06，原先的随机清单退化成单张。
+	// 想恢复随机：往这里加编号（对应 public/assets/images/wallpaper/wallpaper-NN.webp）。
+	const landscapeImages = ["06"].map(
+		(index) => `/assets/images/wallpaper/wallpaper-${index}.webp`,
 	);
 
-	function getRandomWutheringWavesImage(): string {
-		return wutheringWavesImages[
-			Math.floor(Math.random() * wutheringWavesImages.length)
+	function getRandomLandscapeImage(): string {
+		return landscapeImages[
+			Math.floor(Math.random() * landscapeImages.length)
 		];
 	}
 
@@ -316,13 +312,13 @@ const { class: className, style } = Astro.props;
 			if (this.imageInitialized) return;
 			this.imageInitialized = true;
 
-			const imageUrl = getRandomWutheringWavesImage();
-			const image = new Image();
-			image.onload = () => this.setLandscapeImage(imageUrl);
-			image.onerror = () =>
-				this.setLandscapeImage(
-					"/assets/images/wallpaper/wallpaper-01.webp",
-				);
+		const imageUrl = getRandomLandscapeImage();
+		const image = new Image();
+		image.onload = () => this.setLandscapeImage(imageUrl);
+		image.onerror = () =>
+			this.setLandscapeImage(
+				"/assets/images/wallpaper/wallpaper-06.webp",
+			);
 			image.src = imageUrl;
 		}
 
