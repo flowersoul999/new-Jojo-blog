@@ -31,8 +31,15 @@ interface RawEntry {
 	date: string;
 	tags?: string[];
 	images?: { url: string }[];
+	// 视频日记：封面图走 poster，一并进媒体墙
+	videos?: { url: string; poster?: string }[];
 	mood?: string;
 	isPrivate?: boolean;
+}
+
+interface MediaItem {
+	url: string;
+	isVideo: boolean;
 }
 
 // 读取日记数据（与画布页 /diary/ 共用同一份数据源）
@@ -80,8 +87,17 @@ function excerpt(content?: string, len = 96) {
 	return s.length > len ? s.slice(0, len) + "…" : s;
 }
 
-function thumbnail(e: RawEntry) {
-	return e.images && e.images.length ? e.images[0].url : null;
+// 汇总一条日志的全部媒体（图片 + 视频封面），私密日记一律返回空
+function mediaList(e: RawEntry): MediaItem[] {
+	if (e.isPrivate) return [];
+	const list: MediaItem[] = [];
+	for (const img of e.images || []) {
+		if (img && img.url) list.push({ url: img.url, isVideo: false });
+	}
+	for (const v of e.videos || []) {
+		if (v && v.poster) list.push({ url: v.poster, isVideo: true });
+	}
+	return list;
 }
 
 const title = "日志";
@@ -98,21 +114,21 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 				>
 					<Icon is:inline name="material-symbols:timeline" class="text-[1.5rem]" />
 				</div>
-				<div class="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">
+				<div class="text-3xl sm:text-4xl font-extrabold text-neutral-900 dark:text-neutral-100">
 					{title}
 				</div>
 				<a
 					href="/diary/"
 					id="life-to-canvas"
-					class="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3 py-1.5 text-sm text-(--btn-content) transition-colors hover:bg-(--btn-regular-bg-hover)"
+					class="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-(--btn-regular-bg) px-3.5 py-2 text-base font-medium text-(--btn-content) transition-colors hover:bg-(--btn-regular-bg-hover)"
 				>
 					<Icon is:inline name="material-symbols:apps" class="text-base" />
 					<span>画布模式</span>
 				</a>
 			</div>
-			<p class="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
-				{description}
-			</p>
+<p class="text-base text-neutral-700 dark:text-neutral-300 leading-relaxed mb-5">
+			{description}
+		</p>
 
 			<!-- 月份筛选 -->
 			{monthGroups.length > 0 && (
@@ -151,7 +167,9 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 									>
 										{(() => {
 											const mood = e.mood ? MOOD_MAP[e.mood] : null;
-											const img = e.isPrivate ? null : thumbnail(e);
+											const media = mediaList(e);
+											// 超过 6 张才收敛高度（2 行），其余全部铺开
+											const capped = media.length > 6;
 											return (
 												<article
 													class="life-card"
@@ -179,18 +197,43 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 																</div>
 															)}
 															<h3 class="life-title">{e.title || "无题"}</h3>
-															{img && (
-																<div class="life-thumb">
-																	<img
-																		src={img}
-																		alt=""
-																		loading="lazy"
-																		draggable="false"
-																	/>
+{media.length > 0 && (
+																<div
+																	class="life-media"
+																	class:list={{ "is-capped": capped }}
+																	data-total={media.length}
+																>
+																	{media.slice(0, capped ? 6 : media.length).map((m, i) => (
+																		<figure class="life-media-cell">
+																			<img
+																				src={m.url}
+																				alt=""
+																				loading="lazy"
+																				decoding="async"
+																				draggable="false"
+																			/>
+																			{m.isVideo && (
+																				<span class="life-media-badge" title="含视频">
+																					<Icon
+																						is:inline
+																						name="material-symbols:play-circle-filled"
+																						class="text-[1.35rem]"
+																													/>
+																				</span>
+																			)}
+																			{capped && i === 5 && (
+																				<span class="life-media-more">
+																					+{media.length - 5}
+																				</span>
+																			)}
+																		</figure>
+																	))}
 																</div>
 															)}
 															{(e.content || "").trim() && (
-																<p class="life-excerpt" data-excerpt>{excerpt(e.content)}</p>
+																<p class="life-excerpt" data-excerpt>
+																	{excerpt(e.content)}
+																</p>
 															)}
 														</>
 													)}
@@ -213,8 +256,8 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 			</div>
 
 			<!-- 底部提示 -->
-			<div class="flex items-center justify-center gap-1.5 pt-4 text-xs text-neutral-400 dark:text-neutral-500">
-				<Icon is:inline name="material-symbols:open-in-new-rounded" class="text-sm" />
+<div class="flex items-center justify-center gap-1.5 pt-5 text-sm text-neutral-600 dark:text-neutral-300">
+			<Icon is:inline name="material-symbols:open-in-new-rounded" class="text-base" />
 				<span>点击卡片查看完整日记，或切换到画布模式自由摆放</span>
 			</div>
 		</div>
@@ -242,20 +285,22 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 			border: 1px solid var(--line-divider);
 			border-radius: 999px;
 			background: transparent;
-			padding: 0.35rem 0.9rem;
-			font-size: 0.82rem;
-			color: color-mix(in srgb, var(--deep-text) 72%, transparent);
+			padding: 0.42rem 1rem;
+			font-size: 0.95rem;
+			font-weight: 500;
+			color: var(--text-color);
 			cursor: pointer;
 			transition: all 200ms ease;
 		}
 		.life-filter-pill:hover {
-			border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+			border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+			background: color-mix(in srgb, var(--primary) 10%, transparent);
 		}
 		.life-filter-pill.is-active {
 			border-color: var(--primary);
-			background: color-mix(in srgb, var(--primary) 14%, transparent);
-			color: var(--primary);
-			font-weight: 600;
+			background: color-mix(in srgb, var(--primary) 16%, transparent);
+			color: color-mix(in srgb, var(--primary) 78%, var(--text-color));
+			font-weight: 700;
 		}
 
 		/* ===================== 时间线主体 ===================== */
@@ -273,11 +318,11 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 			margin: 0;
 			display: flex;
 			align-items: center;
-			gap: 0.55rem;
-			font-size: 1.25rem;
+			gap: 0.6rem;
+			font-size: 1.45rem;
 			font-weight: 800;
 			letter-spacing: 0.02em;
-			color: color-mix(in srgb, var(--deep-text) 88%, transparent);
+			color: var(--text-color);
 		}
 		.life-month-title::after {
 			content: "";
@@ -314,8 +359,8 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 			position: relative;
 			display: flex;
 			flex-direction: column;
-			gap: 0.6rem;
-			padding: 1.05rem 1.25rem;
+			gap: 0.75rem;
+			padding: 1.25rem 1.5rem;
 			border-radius: 20px;
 			border: 1px solid var(--line-divider);
 			background: var(--card-bg);
@@ -329,18 +374,18 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 		}
 		/* 有心情的卡片：左侧显示专属色条 */
 		.life-card[data-mood]:not([data-mood=""]) {
-			padding-left: 1.45rem;
+			padding-left: 1.65rem;
 		}
 		.life-card[data-mood]:not([data-mood=""])::before {
 			content: "";
 			position: absolute;
 			left: 0;
-			top: 1rem;
-			bottom: 1rem;
-			width: 4px;
-			border-radius: 0 4px 4px 0;
+			top: 1.1rem;
+			bottom: 1.1rem;
+			width: 5px;
+			border-radius: 0 5px 5px 0;
 			background: var(--mood-color, var(--primary));
-			opacity: 0.85;
+			opacity: 0.9;
 		}
 		.life-entry:hover {
 			transform: translateY(-3px);
@@ -358,61 +403,126 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 		.life-chips {
 			display: flex;
 			flex-wrap: wrap;
-			gap: 0.35rem;
+			gap: 0.4rem;
 		}
 		.life-chip {
 			display: inline-flex;
 			align-items: center;
 			border-radius: 999px;
-			padding: 0.12rem 0.6rem;
-			font-size: 0.72rem;
+			padding: 0.2rem 0.7rem;
+			font-size: 0.84rem;
 			font-weight: 600;
 			border: 1px solid var(--line-divider);
 			background: color-mix(in srgb, var(--card-bg) 70%, transparent);
-			color: color-mix(in srgb, var(--deep-text) 72%, transparent);
+			color: var(--text-color);
 		}
 		.life-chip-mood {
-			border-color: color-mix(in srgb, var(--mood-color, var(--primary)) 45%, transparent);
-			background: color-mix(in srgb, var(--mood-color, var(--primary)) 14%, transparent);
-			color: var(--mood-color, var(--primary));
+			border-color: color-mix(in srgb, var(--mood-color, var(--primary)) 55%, transparent);
+			background: color-mix(in srgb, var(--mood-color, var(--primary)) 16%, transparent);
+			color: color-mix(in srgb, var(--mood-color, var(--primary)) 72%, var(--text-color));
 			font-weight: 700;
 		}
 		.life-lock {
-			font-size: 1.3rem;
+			font-size: 1.4rem;
 			line-height: 1;
 		}
 
+		/* 标题：明显加大加粗，用主题安全文字色 */
 		.life-title {
 			margin: 0;
-			font-size: 1.05rem;
-			font-weight: 700;
-			line-height: 1.45;
-			color: var(--deep-text);
-			word-break: break-all;
+			font-size: 1.32rem;
+			font-weight: 800;
+			line-height: 1.4;
+			color: var(--text-color);
+			word-break: break-word;
 		}
 
-		.life-thumb {
+		/* ===================== 媒体墙 ===================== */
+		.life-media {
+			display: grid;
+			gap: 0.5rem;
 			width: 100%;
-			max-width: 20rem;
-			border-radius: 12px;
-			overflow: hidden;
-			border: 1px solid var(--line-divider);
+			/* 按图片数量选列数：图少就大、图多就密，避免出现半空的窄条 */
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
-		.life-thumb img {
+		.life-media[data-total="1"] {
+			grid-template-columns: 1fr;
+		}
+		.life-media[data-total="3"],
+		.life-media[data-total="5"] {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+		.life-media[data-total="4"] {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.life-media-cell {
+			position: relative;
+			margin: 0;
+			overflow: hidden;
+			border-radius: 12px;
+			border: 1px solid var(--line-divider);
+			background: color-mix(in srgb, var(--card-bg) 70%, var(--muted));
+			aspect-ratio: 4 / 3;
+		}
+		.life-media-cell img {
 			display: block;
 			width: 100%;
-			aspect-ratio: 16 / 10;
+			height: 100%;
 			object-fit: cover;
 			pointer-events: none;
+			transition: transform 0.4s ease;
+		}
+		.life-entry:hover .life-media-cell img {
+			transform: scale(1.04);
+		}
+		/* 封面角标（视频） */
+		.life-media-badge {
+			position: absolute;
+			top: 0.3rem;
+			right: 0.3rem;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 1.75rem;
+			height: 1.75rem;
+			border-radius: 999px;
+			color: #fff;
+			background: rgb(0 0 0 / 0.45);
+			backdrop-filter: blur(2px);
+			pointer-events: none;
+		}
+		/* 「还有 N 张」遮罩 */
+		.life-media-more {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 1.25rem;
+			font-weight: 800;
+			letter-spacing: 0.02em;
+			color: #fff;
+			background: rgb(0 0 0 / 0.5);
+			pointer-events: none;
+		}
+		/* 单图给足版面（16:9大图）；两图 4:3，视觉重心更稳 */
+		.life-media[data-total="1"] .life-media-cell {
+			aspect-ratio: 16 / 9;
+		}
+		/* 超过 6 张才收敛高度（2 行），其余全部铺开 */
+		.life-media.is-capped {
+			max-height: calc((100% - 0.5rem) / 2);
+			overflow: hidden;
 		}
 
+		/* 摘要：加大字号、提高对比度 */
 		.life-excerpt {
 			margin: 0;
-			font-size: 0.88rem;
-			line-height: 1.75;
-			color: color-mix(in srgb, var(--deep-text) 68%, transparent);
+			font-size: 1rem;
+			line-height: 1.85;
+			color: var(--text-color);
 			display: -webkit-box;
-			-webkit-line-clamp: 3;
+			-webkit-line-clamp: 4;
 			-webkit-box-orient: vertical;
 			overflow: hidden;
 			white-space: pre-wrap;
@@ -420,22 +530,26 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 		}
 
 		.life-meta {
-			margin-top: 0.2rem;
+			margin-top: 0.35rem;
+			padding-top: 0.65rem;
+			border-top: 1px dashed var(--line-divider);
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
 			gap: 0.5rem;
-			font-size: 0.78rem;
-			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+			font-size: 0.88rem;
+			font-weight: 500;
+			color: var(--text-color);
 		}
 		.life-date {
 			display: inline-flex;
 			align-items: center;
-			gap: 0.3rem;
+			gap: 0.35rem;
 		}
 		.life-arrow {
 			transition: transform 0.25s ease;
-			color: color-mix(in srgb, var(--primary) 70%, transparent);
+			font-size: 1.2rem;
+			color: var(--primary);
 		}
 
 		/* 隐藏被筛选掉的月份 */
@@ -451,13 +565,26 @@ const description = "记录生活的细节点滴，按月份整理成时间线�
 			justify-content: center;
 			gap: 0.3rem;
 			padding: 3.5rem 1rem;
-			color: color-mix(in srgb, var(--deep-text) 55%, transparent);
+			color: var(--text-color);
 		}
 
 		/* 移动端微调：单列自然堆叠 */
 		@media (max-width: 639px) {
 			.life-card {
-				padding: 0.95rem 1rem;
+				padding: 1.1rem 1.15rem;
+			}
+			.life-title {
+				font-size: 1.2rem;
+			}
+			.life-excerpt {
+				font-size: 1rem;
+			}
+			.life-media[data-total="3"],
+			.life-media[data-total="5"] {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+			.life-media[data-total="4"] {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
 			}
 		}
 	</style>
