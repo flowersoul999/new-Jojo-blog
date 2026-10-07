@@ -373,6 +373,16 @@ export function applyWallpaperModeToDocument(
 	// 如果模式没有变化，直接返回
 	if (currentMode === mode) {
 		// 即使是相同模式，也要确保UI状态正确
+		//
+		// ⚠️ 这里必须同时做「主内容定位」，不能只调 ensureWallpaperState。
+		// ensureWallpaperState 只切 body 上的类、不动主内容，而放行主内容可见性的
+		// `wallpaper-initialized` 类是在 adjustMainContentPosition 末尾才加的
+		// （layout-styles.css: html[data-wallpaper-mode="fullscreen"]
+		//   body:not(.wallpaper-initialized) .w-full.z-30 { visibility: hidden }）。
+		// 冷加载时 data-wallpaper-mode 由 SSR 直接写成配置的 "fullscreen"，与
+		// getStoredWallpaperMode() 的返回值相同 → 曾经走的就是这条分支 →
+		// 主内容永久 visibility:hidden，只剩壁纸（2026-10-07 复现）。
+		adjustMainContentPosition(mode, false);
 		ensureWallpaperState(mode);
 		return;
 	}

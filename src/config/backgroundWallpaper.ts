@@ -1,25 +1,23 @@
 import type { BackgroundWallpaperConfig } from "@/types/backgroundWallpaper";
 
 /**
- * 站内静态壁纸清单（桌面端与移动端共用同一张）。
+ * 站内静态壁纸清单（桌面端与移动端共用）。
  *
- * 2026-10-07 清理：原先 47 张横屏 + 3 张竖屏全部下架，只留 wallpaper-06。
+ * 2026-10-07 清理：原先 47 张横屏 + 3 张竖屏全部下架，只留 wallpaper-06；
+ * 同日把「夕阳花海 · 列车」的静帧抽出来做成 wallpaper-49 加入。
  *
- * 想加回来：把图放进 `public/assets/images/wallpaper/`，命名沿用 `wallpaper-NN.webp`
+ * 想加壁纸：把图放进 `public/assets/images/wallpaper/`，命名沿用 `wallpaper-NN.webp`
  * （2560 宽 WebP），再配一张 `thumbs/wallpaper-NN.webp`（320×180）当面板缩略图，
  * 然后把大图路径加进下面这个数组 —— 缩略图按同号自动命中，不用另配。
  */
-const wallpaperImages = ["/assets/images/wallpaper/wallpaper-06.webp"];
+const wallpaperImages = [
+	"/assets/images/wallpaper/wallpaper-06.webp",
+	"/assets/images/wallpaper/wallpaper-49.webp",
+];
 
 const desktopWallpaperImages = wallpaperImages;
 const mobileWallpaperImages = wallpaperImages;
 
-/**
- * 背景视频总清单 —— 导航栏播放按钮按这个顺序轮播。
- * **数组下标就是 `playerUrl` 的下标**，面板选片、播放器取片都靠它，别随意重排。
- *
- * 命名规范：文件名带日期版本号（CDN 强缓存，同名替换不生效）。
- */
 type PlayerVideo = {
 	src: string;
 	label?: string;
@@ -27,20 +25,19 @@ type PlayerVideo = {
 };
 
 /**
- * 2026-10-07 恢复：只留一支「夕阳花海 · 列车」。
+ * **播放按钮的片库 —— 不是壁纸。** 两者是独立概念，别把壁纸塞进来。
+ * （2026-10-07 踩过：删「动态壁纸」时误删了整个片库，又拿一支短片顶替进来，
+ *   结果播放按钮放的是壁纸、用户特意选的片子反而没了。）
  *
- * 源：Wallpaper Engine `3556986318` 的 `.mpkg`（`PKGM0019` 打包格式）——
- * 它**不是**纯 scene（着色器现算、抽不出画面），里面第 1408 字节起是一段完整 MP4
- * （ftyp/moov/free/mdat 原子链完整），可直接切出来用。详见 `.workbuddy/memory/2026-10-07.md`。
- *
- * 规格：4K/60fps/19.75s/无音轨 源片 → 1080p60 / H.264 CRF27 / 7.6MB，首尾帧差 1.7（无缝循环）。
- * 文件名带日期版本号，CDN 强缓存下同名替换不生效。
+ * 导航栏播放按钮按这个顺序轮播；**数组下标就是 `playerUrl` 的下标**，别随意重排。
+ * 命名规范：文件名带日期版本号（CDN 强缓存，同名替换不生效）。
  */
 const playerVideos: PlayerVideo[] = [
+	{ src: "/assets/videos/bg-20260928.mp4" },
 	{
-		src: "/assets/videos/bg-20261007-sunset-train.mp4",
-		label: "夕阳花海 · 列车",
-		poster: "/assets/videos/thumbs/bg-20261007-sunset-train.webp",
+		src: "/assets/videos/bg-20261006-wlop.mp4",
+		label: "WLOP · Aeolian3",
+		poster: "/assets/videos/thumbs/bg-20261006-wlop.webp",
 	},
 ];
 
@@ -50,8 +47,11 @@ const playerVideos: PlayerVideo[] = [
  * ⚠️ 下标必须**显式写死**：面板按 index 选中、播放器按同一 index 取片。
  * 曾经用「数组位置」当索引，一旦面板清单是 playerUrl 的子集就会错位，
  * 出现「选了 A 播出来的是 B」。没列进来的片子仍可由导航栏播放按钮轮播到。
+ *
+ * 2026-10-07：用户希望「播放按钮归播放按钮、壁纸归壁纸」，所以面板这一栏留空 ——
+ * 片库仍由播放按钮轮播，但不作为可选的「动态壁纸」列出来。
  */
-const selectableDynamicWallpaperIndices: number[] = [0];
+const selectableDynamicWallpaperIndices: number[] = [];
 
 export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	// 壁纸模式："banner" 横幅壁纸，"fullscreen" 全屏壁纸，"overlay" 全屏透明，"none" 纯色背景无壁纸
@@ -103,7 +103,8 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
 		// 未选中动态壁纸时**不随页面加载预加载**，只有点导航栏播放按钮才按需拉取，因此体积不影响首屏；
 		// 一旦访客在显示设置面板里选中了某支，它就等同于壁纸，会随页面加载自动静音起播。
-		// bg-20261007-sunset-train：1080p60 无音轨，7.6MB / 19.75s，首尾帧一致可无缝循环
+		// bg-20260928：720p 带音轨，42MB / 248s
+		// bg-20261006-wlop：720p 带音轨，19MB / 174s（由 1080p / 214MB 源片重压而来）
 		playerUrl: playerVideos.map((item) => item.src),
 		// 面板可选的动态壁纸清单：index 指回 playerUrl 的下标，必须是显式的
 		playerItems: selectableDynamicWallpaperIndices.map((index) => ({
