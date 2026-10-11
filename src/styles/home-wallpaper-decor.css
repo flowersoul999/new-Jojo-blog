@@ -377,6 +377,19 @@ html.is-page-transitioning #wallpaper-wrapper.homepage-fullscreen-decor {
 	transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* 首页标语：多句轮播时的淡出淡入（由 HomeWallpaperDecor 的行内脚本切换） */
+.home-wallpaper-card__slogan {
+	display: inline-block;
+	transition:
+		opacity 280ms ease,
+		transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-wallpaper-card__slogan.is-switching {
+	opacity: 0;
+	transform: translate3d(0, -0.3em, 0);
+}
+
 .home-wallpaper-card h1 {
 	position: relative;
 }
@@ -1031,6 +1044,7 @@ html.is-page-transitioning #wallpaper-wrapper.homepage-fullscreen-decor {
 	.home-wallpaper-card__subtitle,
 	.home-wallpaper-card__nav a,
 	.home-wallpaper-card__motion-text,
+	.home-wallpaper-card__slogan,
 	.home-wallpaper-card__social-link,
 	.home-wallpaper-copy-toast {
 		transition: none;

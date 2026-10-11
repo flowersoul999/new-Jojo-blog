@@ -84,7 +84,12 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			return new Response(JSON.stringify({ ok: false, error: errorText }), {
+			// 404 时不要把 GitHub 的一整包英文 JSON 直接甩给编辑器，换成能看懂的提示
+			const message =
+				response.status === 404
+					? `文件不存在：${path}（可能已被移动或删除）`
+					: errorText;
+			return new Response(JSON.stringify({ ok: false, error: message }), {
 				status: response.status,
 				headers: { "Content-Type": "application/json" },
 			});

@@ -169,7 +169,7 @@ async function deletePost(post: PostItem) {
 			<li class="flex items-center gap-4 p-3.5 transition-colors hover:bg-brand/5">
 				<!-- 封面缩略图（统一 16:10） -->
 				<a
-					href={`/write/?edit=${encodeURIComponent(post.slug)}`}
+					href={`/write/?edit=${encodeURIComponent(post.path)}`}
 					class="relative block aspect-[16/10] w-36 shrink-0 overflow-hidden rounded-lg bg-brand/10"
 					title={`编辑《${post.title}》`}
 				>
@@ -194,7 +194,7 @@ async function deletePost(post: PostItem) {
 				<div class="min-w-0 flex-1">
 					<div class="flex flex-wrap items-center gap-2">
 						<a
-							href={`/write/?edit=${encodeURIComponent(post.slug)}`}
+							href={`/write/?edit=${encodeURIComponent(post.path)}`}
 							class="truncate text-sm font-semibold hover:text-brand"
 							title={post.title}
 						>
@@ -227,7 +227,7 @@ async function deletePost(post: PostItem) {
 				<!-- 操作 -->
 				<div class="flex shrink-0 items-center gap-1.5">
 					<a
-						href={`/write/?edit=${encodeURIComponent(post.slug)}`}
+						href={`/write/?edit=${encodeURIComponent(post.path)}`}
 						class="rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-brand/10 hover:text-brand"
 					>
 						编辑

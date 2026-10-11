@@ -94,6 +94,10 @@ type JobImage =
 
 type PublishJob = {
 	slug: string;
+	/** 文章在仓库里的完整路径（含扩展名，如 src/content/posts/xxx.mdx）。
+	 *  编辑已有文章时必须原样写回同一个文件，不能按 slug 重新拼路径 ——
+	 *  否则 .mdx 文章会被拼成不存在的 .md 而 404。 */
+	path: string;
 	action: "create" | "edit";
 	title: string;
 	md: string;
@@ -273,6 +277,8 @@ export default function WritePage(): ReactElement {
 	// 模式与表单
 	const [mode, setMode] = useState<"create" | "edit">("create");
 	const [originalSlug, setOriginalSlug] = useState<string | null>(null);
+	// 编辑模式下文章的真实仓库路径（保留原扩展名 .md/.mdx），保存时写回同一文件
+	const [originalPath, setOriginalPath] = useState<string | null>(null);
 	const [form, setForm] = useState<PostForm>(emptyForm());
 	const [images, setImages] = useState<ImageItem[]>([]);
 	const [cover, setCover] = useState<ImageItem | null>(null);
@@ -363,7 +369,12 @@ export default function WritePage(): ReactElement {
 					if (!resumed) {
 						const editParam = new URLSearchParams(location.search).get("edit");
 						if (editParam) {
-							void loadPost(`src/content/posts/${editParam}.md`);
+							// 内容管理传的是完整仓库路径（含 .md/.mdx）；兼容手动输入纯 slug 的旧链接
+							const target =
+								editParam.includes("/") || /\.mdx?$/i.test(editParam)
+									? editParam
+									: `src/content/posts/${editParam}.md`;
+							void loadPost(target);
 							history.replaceState(null, "", location.pathname);
 						}
 					}
@@ -629,6 +640,7 @@ export default function WritePage(): ReactElement {
 					?.replace(/\.(md|mdx)$/i, "") || "";
 			setMode("edit");
 			setOriginalSlug(slug);
+			setOriginalPath(filePath);
 			setImages(urlImages);
 			setCover(
 				meta.image ? { id: "cover", type: "url", url: meta.image } : null,
@@ -668,6 +680,7 @@ export default function WritePage(): ReactElement {
 	const resetToCreate = () => {
 		setMode("create");
 		setOriginalSlug(null);
+		setOriginalPath(null);
 		setForm(emptyForm());
 		setImages([]);
 		setCover(null);
@@ -699,6 +712,7 @@ export default function WritePage(): ReactElement {
 	const loadDraft = (draft: Draft) => {
 		setMode("create");
 		setOriginalSlug(null);
+		setOriginalPath(null);
 		setSelectedPost("");
 		setForm(draft.form);
 		setImages([]);
@@ -732,7 +746,11 @@ export default function WritePage(): ReactElement {
 	// 用任务快照回填编辑器（续跑 / 发布成功后保持界面一致）
 	const hydrateFromJob = (job: PublishJob) => {
 		setMode(job.action === "edit" ? "edit" : "create");
-		if (job.action === "edit") setOriginalSlug(job.slug);
+		if (job.action === "edit") {
+			setOriginalSlug(job.slug);
+			// 旧版快照没有 path 字段，按老规则兜底
+			setOriginalPath(job.path || `src/content/posts/${job.slug}.md`);
+		}
 		setForm({
 			slug: job.slug,
 			title: job.title,
@@ -862,8 +880,10 @@ export default function WritePage(): ReactElement {
 			);
 
 			// 4. 远端内容已一致（刷新续跑）就视为完成，否则写入文章文件
-			const postPath = `src/content/posts/${job.slug}.md`;
+			// 编辑已有文章必须写回它自己的路径 —— .mdx 文章若被拼成 .md 会 404 / 变成新文件
+			const postPath = job.path || `src/content/posts/${job.slug}.md`;
 			let remote = "";
+			let remoteSha = "";
 			try {
 				const readRes = await fetch(
 					`/api/content/read/?path=${encodeURIComponent(postPath)}`,
@@ -871,6 +891,8 @@ export default function WritePage(): ReactElement {
 				if (readRes.ok) {
 					const data = await readRes.json();
 					remote = String(data.content ?? "").replace(/\r\n/g, "\n");
+					// 更新已存在文件必须带 sha（GitHub Contents API 要求），否则 409
+					remoteSha = typeof data.sha === "string" ? data.sha : "";
 				}
 			} catch {
 				/* 读取失败则按新写入处理 */
@@ -888,6 +910,7 @@ export default function WritePage(): ReactElement {
 					body: JSON.stringify({
 						path: postPath,
 						content: fullMd,
+						sha: remoteSha || undefined,
 						message: `${job.action === "edit" ? "更新文章" : "新增文章"}: ${job.slug}`,
 					}),
 				});
@@ -943,8 +966,15 @@ export default function WritePage(): ReactElement {
 			return toast.error("部分图片尚未完成处理，请稍后重试");
 		}
 
+		// 新建走约定路径；编辑写回原文件（保留 .md/.mdx 与所在目录），避免 .mdx 被拼成 .md
+		const targetPath =
+			mode === "edit" && originalPath
+				? originalPath
+				: `src/content/posts/${slug}.md`;
+
 		const job: PublishJob = {
 			slug,
+			path: targetPath,
 			action: mode,
 			title: form.title.trim(),
 			md: form.md,
@@ -983,6 +1013,8 @@ export default function WritePage(): ReactElement {
 	const removePost = async () => {
 		const target = originalSlug || form.slug;
 		if (!target) return toast.error("缺少 slug，无法删除");
+		// 删除同样要删原文件（.mdx 也不能被拼成 .md）
+		const targetPath = originalPath || `src/content/posts/${target}.md`;
 		if (
 			!window.confirm(`确定删除《${form.title || target}》吗？此操作不可恢复。`)
 		)
@@ -991,7 +1023,7 @@ export default function WritePage(): ReactElement {
 			const res = await fetch("/api/content/delete/", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ path: `src/content/posts/${target}.md` }),
+				body: JSON.stringify({ path: targetPath }),
 			});
 			if (!res.ok) throw new Error((await res.json()).error || "删除失败");
 			toast.success("文章已删除");

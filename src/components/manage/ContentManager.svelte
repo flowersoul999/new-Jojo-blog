@@ -9,6 +9,7 @@ import { onMount } from "svelte";
 import GalleryManager from "./GalleryManager.svelte";
 import ImageManager from "./ImageManager.svelte";
 import PostManager from "./PostManager.svelte";
+import SloganManager from "./SloganManager.svelte";
 
 interface GithubUser {
 	login: string;
@@ -46,6 +47,12 @@ const MODULES = [
 		label: "回忆",
 		desc: "管理日记回忆条目",
 		icon: "M12 21s-8-4.5-8-11a4 4 0 0 1 8-2 4 4 0 0 1 8 2c0 6.5-8 11-8 11Z",
+	},
+	{
+		id: "slogans",
+		label: "首页标语",
+		desc: "增删改首页壁纸上的那句话，多句时自动轮播",
+		icon: "M4 6h16M4 12h12M4 18h7",
 	},
 ];
 
@@ -178,6 +185,8 @@ onMount(() => {
 				<ImageManager />
 			{:else if activeModule === "gallery"}
 				<GalleryManager />
+			{:else if activeModule === "slogans"}
+				<SloganManager />
 			{:else}
 				<div class="card flex flex-col items-center gap-3 p-12 text-center">
 					<svg class="h-8 w-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

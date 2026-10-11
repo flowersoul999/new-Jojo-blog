@@ -2,6 +2,11 @@
 import { Icon } from "astro-icon/components";
 import ImageWrapper from "@/components/common/ImageWrapper.astro";
 import { profileConfig, siteConfig } from "@/config";
+import {
+	homeSlogans,
+	homeSlogansEnabled,
+	homeSlogansIntervalSeconds,
+} from "@/data/homeSlogans";
 import { url } from "@/utils/url-utils";
 
 const quickLinks = [
@@ -89,6 +94,14 @@ const floatingStickerImages = stickerImages.filter(
 	(sticker) => sticker.key !== "quote",
 );
 const mobileStickerKeys = ["coder", "blonde", "brown-lightning", "blue-witch"];
+
+// 首页标语（大标题下方那句）：内容管理「首页标语」模块读写
+// src/data/homeSlogans.data.json。关闭或列表为空时回退到 siteConfig.subtitle，
+// 保持与改造前完全一致的单行表现。
+const sloganList: string[] =
+	homeSlogansEnabled && homeSlogans.length > 0
+		? homeSlogans
+		: [siteConfig.subtitle].filter((text) => text.trim().length > 0);
 ---
 
 <div class="home-wallpaper-decor" data-home-wallpaper-decor>
@@ -153,8 +166,14 @@ const mobileStickerKeys = ["coder", "blonde", "brown-lightning", "blue-witch"];
       <span class="home-wallpaper-card__motion-text">{profileConfig.name}</span>
     </p>
     <h1><span class="home-wallpaper-card__motion-text">joestar</span></h1>
-    <p class="home-wallpaper-card__subtitle">
-      <span class="home-wallpaper-card__motion-text">{siteConfig.subtitle}</span>
+    <p
+      class="home-wallpaper-card__subtitle"
+      data-home-slogans={JSON.stringify(sloganList)}
+      data-home-slogans-interval={homeSlogansIntervalSeconds}
+    >
+      <span class="home-wallpaper-card__motion-text">
+        <span class="home-wallpaper-card__slogan" data-home-slogan-text>{sloganList[0] ?? ""}</span>
+      </span>
     </p>
 
     <nav class="home-wallpaper-card__nav" aria-label="首页快捷导航">
@@ -559,11 +578,58 @@ const mobileStickerKeys = ["coder", "blonde", "brown-lightning", "blue-witch"];
 			});
 		};
 
+		// 首页标语轮播：仅当标语多于一句时启动，按 data-home-slogans-interval（秒）
+		// 循环切换，切换瞬间淡出淡入。间隔与列表都由内容管理「首页标语」模块写入。
+		const bindHomeSloganRotation = () => {
+			const textEl = document.querySelector("[data-home-slogan-text]");
+			if (!(textEl instanceof HTMLElement)) return;
+			const host = textEl.closest("[data-home-slogans]");
+			if (!(host instanceof HTMLElement)) return;
+			if (host.dataset.sloganRotationBound === "true") return;
+			host.dataset.sloganRotationBound = "true";
+
+			let list = [];
+			try {
+				list = JSON.parse(host.getAttribute("data-home-slogans") || "[]");
+			} catch {
+				list = [];
+			}
+			if (!Array.isArray(list) || list.length < 2) return;
+			if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+			const seconds = Number(host.getAttribute("data-home-slogans-interval"));
+			const intervalMs =
+				(Number.isFinite(seconds) && seconds >= 3 ? seconds : 20) * 1000;
+			let index = Math.max(0, list.indexOf(textEl.textContent || ""));
+			let switching = false;
+
+			const timer = window.setInterval(() => {
+				// 切走页面 / 切到后台时不推进，避免回来时连着跳好几句
+				if (!textEl.isConnected) {
+					window.clearInterval(timer);
+					return;
+				}
+				if (document.hidden || switching) return;
+
+				index = (index + 1) % list.length;
+				switching = true;
+				textEl.classList.add("is-switching");
+				window.setTimeout(() => {
+					textEl.textContent = list[index];
+					textEl.classList.remove("is-switching");
+					switching = false;
+				}, 300);
+			}, intervalMs);
+		};
+
 		bindHomeWallpaperStickers();
 		bindHomeWallpaperCopyLinks();
+		bindHomeSloganRotation();
 		document.addEventListener("astro:page-load", bindHomeWallpaperStickers);
 		document.addEventListener("astro:page-load", bindHomeWallpaperCopyLinks);
+		document.addEventListener("astro:page-load", bindHomeSloganRotation);
 		document.addEventListener("swup:page:view", bindHomeWallpaperStickers);
 		document.addEventListener("swup:page:view", bindHomeWallpaperCopyLinks);
+		document.addEventListener("swup:page:view", bindHomeSloganRotation);
 	})();
 </script>
