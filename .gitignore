@@ -79,3 +79,6 @@ Firefly-master/
 # WorkBuddy 本地运行时与记忆（非业务文件，不入库）
 .workbuddy/
 .tmp-adata/
+
+# 纯参考素材：不参与构建，留在库里只会让 clone / CI / 部署白白多拉约 130MB
+/docs/

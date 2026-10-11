@@ -1262,11 +1262,24 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 		// 单张原图上限，超出直接拒绝，避免解码时把浏览器内存打爆
 		var MAX_IMAGE_SIZE = 15 * 1024 * 1024;
 
+		// ---------- 上传闸门 ----------
+		// 单文件上传的硬上限（原始字节）。服务端 src/pages/api/content/write.ts
+		// 里有同样的限制：超了就是必被拒收，而且二进制一旦入库，会永久拖慢
+		// 之后的每一次提交 / CI / 部署。这里提前拦一道，别让用户白等转码。
+		var UPLOAD_LIMIT_BYTES = 3 * 1024 * 1024;
+
+		// 体积显示：≥1MB 用 MB，否则用 KB
+		function formatSize(bytes) {
+			var mb = bytes / (1024 * 1024);
+			if (mb >= 1) return mb.toFixed(1) + " MB";
+			return Math.max(1, Math.round(bytes / 1024)) + " KB";
+		}
+
 		// ---------- 视频参数 ----------
-		// 单个原视频上限：再大就不值得推 GitHub（base64 会翻 1.33 倍）
+		// 单个原视频上限：再大基本压不到结果体积以内，没必要让用户干等
 		var MAX_VIDEO_SIZE = 60 * 1024 * 1024;
-		// 小于这个体积没必要转码，直接原样上传（保真、也不用等）
-		var VIDEO_COMPRESS_MIN_SIZE = 6 * 1024 * 1024;
+		// 超过这个体积就先转码；给上限留足余量，尽量压到结果体积以内
+		var VIDEO_COMPRESS_MIN_SIZE = 2 * 1024 * 1024;
 		// 转码是「边播边录」，耗时≈时长；超过这个长度就不压了，直接传原片
 		var VIDEO_COMPRESS_MAX_DURATION = 60;
 		// 转码目标：720p / 30fps / 2.5 Mbps
@@ -1867,6 +1880,19 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 							captureVideoPoster(file, meta.duration),
 						]).then(function (res) {
 							var blob = res[0] || file;
+							// 不管有没有转过码，最终产物都必须在上传上限内：超了就是
+							// 注定被服务端拒收，趁早说清楚，别传一半留一堆孤儿文件
+							if (blob.size > UPLOAD_LIMIT_BYTES) {
+								showToast(
+									file.name +
+										" 处理后仍有 " +
+										formatSize(blob.size) +
+										"，超过 " +
+										formatSize(UPLOAD_LIMIT_BYTES) +
+										" 上限，请缩短或降低画质"
+								);
+								return next();
+							}
 							var poster = res[1] || null;
 							pendingVideos.push({
 								id: "vid-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
@@ -2153,6 +2179,31 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 				return x.kind !== "url";
 			});
 
+			// 发表前统一过一遍体积闸门：服务端有同样上限，这里提前拦，
+			// 避免传到一半被拒，既白等又留下孤儿文件
+			var oversize = localImages
+				.concat(localVideos)
+				.map(function (x) {
+					if (!x.blob || x.blob.size <= UPLOAD_LIMIT_BYTES) return "";
+					return (
+						(x.name || "该文件") +
+						" 共 " +
+						formatSize(x.blob.size) +
+						"，超过 " +
+						formatSize(UPLOAD_LIMIT_BYTES) +
+						" 上限"
+					);
+				})
+				.filter(function (msg) {
+					return !!msg;
+				});
+
+			if (oversize.length) {
+				setComposeStatus(oversize.join("；") + "，请压缩后再发", true);
+				showToast(oversize[0] + "，请压缩后再发");
+				return;
+			}
+
 			composeSaving = true;
 			composeSubmit.disabled = true;
 
@@ -2267,12 +2318,16 @@ const description = "记录生活，碎碎念。纸片随意拖动摆放，点�
 						});
 				})
 				.catch(function (err) {
-					// 图片 / 视频可能已部分落盘，重试时靠已拿到的 url 跳过（幂等）
+					// 图片 / 视频可能已部分落盘，重试时靠已拿到的 url 跳过（幂等）。
+					// 关键是日记条目本身还没写进去，所以重试不会产生重复内容。
 					pendingImages.concat(pendingVideos).forEach(function (item) {
 						item.busy = false;
 					});
 					renderThumbs();
-					setComposeStatus(err.message || "保存失败", true);
+					setComposeStatus(
+						(err.message || "保存失败") + "，日记未保存，可直接重试",
+						true
+					);
 				})
 				.finally(function () {
 					composeSaving = false;

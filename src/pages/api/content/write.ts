@@ -9,6 +9,21 @@ import {
 
 export const prerender = false;
 
+// 单文件上传的体积上限（原始字节，非 base64 长度）
+//
+// 为什么必须是硬闸门：这些媒体最终会写进 git 仓库，一旦大对象入库，
+// 之后每一次 commit / CI checkout / Vercel 部署都要搬运它，表现就是
+// 「提交变慢、部署卡住、clone 假死」，而且历史包袱极难清掉。
+// 另外 Serverless 平台对请求体有远低于此的上限，放过去也只是换一个地方失败，
+// 不如在服务端明确拒绝并给出可读的错误。
+const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+
+// 由 base64 串反推原始字节数（base64 会让体积膨胀约 1/3）
+function approxBytesFromBase64(b64: string): number {
+	const cleaned = b64.trim().replace(/=+$/, "");
+	return Math.floor((cleaned.length * 3) / 4);
+}
+
 // GitHub Contents API PUT 返回的响应
 interface GitHubPutResponse {
 	content: {
@@ -66,6 +81,25 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 		}
 
 		const isBinary = encoding === "base64";
+
+		// 体积闸门：二进制（图片 / 视频）与文本内容一视同仁，超限一律拒绝
+		const approxBytes = approxBytesFromBase64(content);
+		if (approxBytes > MAX_UPLOAD_BYTES) {
+			// 这里不复用后面的 filename：它声明在闸门之后，提前引用会踩 TDZ
+			const shownName = path.split("/").pop() || path;
+			const sizeMb = (approxBytes / 1024 / 1024).toFixed(1);
+			const limitMb = String(MAX_UPLOAD_BYTES / 1024 / 1024);
+			return new Response(
+				JSON.stringify({
+					ok: false,
+					error:
+						`${shownName} 约 ${sizeMb} MB，` +
+						`超过单文件 ${limitMb} MB 上限，已取消上传。` +
+						"请压缩或裁剪后重试。",
+				}),
+				{ status: 413, headers: { "Content-Type": "application/json" } },
+			);
+		}
 
 		// 本地开发模式：直接写入本地文件系统
 		if (isLocalDev) {
