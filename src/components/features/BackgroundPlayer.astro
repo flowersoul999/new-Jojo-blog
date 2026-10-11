@@ -35,7 +35,22 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 				id="bg-player-overlay"
 				class="absolute inset-0 z-15 overflow-hidden pointer-events-none transition-opacity duration-500 ease-in-out opacity-0"
 			>
-				<video id="bg-player-video" preload="none" playsinline class="size-full object-cover"></video>
+				<!--
+					preload="metadata"：页面加载就把 moov（文件头索引）拉回来，点播放时不必再握手取索引。
+					两支视频都是 faststart（moov 在文件最前面），metadata 只占一两百 KB，不会常驻占带宽。
+					x5-* / webkit-playsinline：微信、QQ、UC 等腾讯 X5 内核默认会把 video 接管成原生全屏播放器，
+					页面被盖住就无法上下滑动 —— 这组属性强制它走 H5 页内播放。
+				-->
+				<video
+					id="bg-player-video"
+					preload="metadata"
+					playsinline
+					webkit-playsinline="true"
+					x5-playsinline="true"
+					x5-video-player-type="h5-page"
+					x5-video-player-fullscreen="false"
+					class="size-full object-cover"
+				></video>
 			</div>
 
 			<div id="bg-player-controls" class="absolute bottom-4 left-4 z-30 flex items-center gap-1.5 group">
@@ -101,8 +116,55 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		// 用户点导航栏播放按钮则带声音。
 		var startMuted = false;
 
-		// 未选中动态壁纸时**不预加载**任何视频（否则会持续占带宽、拖慢点击跳转）。
-		// 只有两种情况会真正拉流：点导航栏播放按钮，或面板里选中了某支动态壁纸（等同壁纸，随页面加载起播）。
+		// 「点播放就卡一下」的根因是 `preload="none"`：连 moov 都要等到点击那一刻才拉，
+		// 起播必须重走一次握手 + 索引下载。这里分两步把这段等待挪到点击之前：
+		//   1) 页面加载就把当前支挂到 video 上 —— preload="metadata" 只会拉 moov（两支都 faststart，一两百 KB）；
+		//   2) 浏览器空闲时用 Range 把开头一小段拉进 HTTP 缓存 —— 点击时首帧数据已经在本地。
+		// 没有被设为壁纸时也只是这一两百 KB + 1.5MB 的一次性预取，不会持续占带宽。
+		var PREFETCH_BYTES = 1572864;
+		var prefetched = {};
+
+		function networkAllowsPrefetch() {
+			var conn = navigator.connection;
+			if (!conn) return true;
+			if (conn.saveData) return false;
+			var type = conn.effectiveType;
+			return type !== "slow-2g" && type !== "2g";
+		}
+
+		function prefetchTrack(index) {
+			var target = urlList[index];
+			if (!target || prefetched[target]) return;
+			if (!networkAllowsPrefetch()) return;
+			prefetched[target] = true;
+			try {
+				// Range 只取开头一段；把 body 读掉是为了让这段响应真正写进 HTTP 缓存而不是被丢弃。
+				fetch(target, { headers: { Range: "bytes=0-" + (PREFETCH_BYTES - 1) } })
+					.then(function (res) {
+						return res.arrayBuffer();
+					})
+					.catch(function () {
+						// 预取失败不影响播放，静默降级即可
+					});
+			} catch (e) {
+				// 老浏览器没有 fetch：靠上面的 preload="metadata" 兜底
+			}
+		}
+
+		function schedulePrefetch(index) {
+			if (typeof window.requestIdleCallback === "function") {
+				window.requestIdleCallback(
+					function () {
+						prefetchTrack(index);
+					},
+					{ timeout: 3000 },
+				);
+			} else {
+				setTimeout(function () {
+					prefetchTrack(index);
+				}, 2000);
+			}
+		}
 
 		function showToast() {
 			if (!toast) return;
@@ -138,7 +200,7 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		}
 
 		// 确保 video 的 src 指向当前索引的视频；未设置或已切换时才赋值。
-		// 视频不再于页面加载时预加载，首次播放必须在此处设置 src 延迟加载。
+		// 页面初始化时通常已经挂好 src（见下方 schedulePrefetch 那段），所以这里绝大多数情况下是空操作。
 		function ensureSrc() {
 			var cur = video.getAttribute("src");
 			if (!cur || cur.indexOf(urlList[currentIndex]) === -1) {
@@ -273,8 +335,19 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		window.addEventListener("bg-player-toggle", toggle);
 		video.addEventListener("ended", onEnded);
 		video.addEventListener("error", onError);
-		// 播放成功时重置错误计数
-		video.addEventListener("playing", function () { errorCount = 0; });
+		// 页面加载就把目标支挂到 video 上：preload="metadata" 只拉 moov，
+		// 不会像 preload="auto" 那样一路把 42MB 整片拖下来；真正的画面数据仍要等点击 play() 才开始下载。
+		var initialStoredIndex = readStoredDynamicIndex();
+		if (initialStoredIndex !== null) currentIndex = initialStoredIndex;
+		video.src = urlList[currentIndex];
+		video.load();
+		schedulePrefetch(currentIndex);
+
+		// 播放成功时重置错误计数，并顺手把下一支的首段也拉下来（轮播切过去时不会再卡一次）
+		video.addEventListener("playing", function () {
+			errorCount = 0;
+			schedulePrefetch(pickIndex(currentIndex));
+		});
 		if (prevBtn) prevBtn.addEventListener("click", function () { switchTrack(prevIndex()); });
 		if (nextBtn) nextBtn.addEventListener("click", function () { switchTrack(pickIndex(currentIndex)); });
 
@@ -350,6 +423,27 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		transition: opacity 0.5s ease;
 	}
 
-	/* 手机端（≤767px）：不额外设置样式 —— 视频默认 object-fit: cover，
-	   铺满整个壁纸横幅（无黑边），页面内联播放、可正常下滑，不做系统全屏。 */
+	/* 手机竖屏（≤767px）：片源是横着拍的 16:9，竖着放只能压成窄窄一条。
+	   所以这里把 video 顺时针旋转 90° —— 旋转前的「宽」取遮罩的「高」、旋转前的「高」取遮罩的「宽」，
+	   旋转后画面横过来正好铺满屏幕，上下不留黑边；页面仍是普通文档流，上下滑动不受影响。
+	   尺寸先用 vh/vw 兜底，再用容器查询单位取遮罩的真实宽高（避开移动端 100vh 与可视视口的误差）。*/
+	@media (max-width: 767px) and (orientation: portrait) {
+		:global(#bg-player-overlay) {
+			container-type: size;
+		}
+
+		:global(#bg-player-video) {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 100vh;
+			height: 100vw;
+			width: 100cqh;
+			height: 100cqw;
+			max-width: none;
+			object-fit: cover;
+			transform: translate(-50%, -50%) rotate(90deg);
+			transform-origin: center center;
+		}
+	}
 </style>

@@ -94,7 +94,8 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		mobile: mobileWallpaperImages,
 		// 背景视频播放地址（由文件顶部的 playerVideos 派生，勿在此单独增删）
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
-		// 未选中动态壁纸时**不随页面加载预加载**，只有点导航栏播放按钮才按需拉取，因此体积不影响首屏；
+		// 平时不整片预载：页面加载只挂 moov（preload="metadata"），空闲时再 Range 预取开头 1.5MB，
+		// 所以点击播放按钮几乎立刻出画面，而 42MB 的整片数据要等 play() 之后才陆续下来；
 		// 一旦访客在显示设置面板里选中了某支，它就等同于壁纸，会随页面加载自动静音起播。
 		// bg-20260928：720p 带音轨，42MB / 248s
 		playerUrl: playerVideos.map((item) => item.src),
