@@ -147,6 +147,12 @@
 
 <script>
 	const welcomeSessionKey = "rain_welcome_seen_v1";
+	/** 入场延迟：先让首屏稳定，再弹卡片 */
+	const entranceDelayMs = 850;
+	/** 归属地请求超时：外部定位源最慢要几秒，超时就放弃、用通用文案 */
+	const geoRequestTimeoutMs = 6000;
+	/** 卡片出场前最多额外等归属地多久：等不到就用通用文案，文案此后不再改写 */
+	const geoWaitMs = 1500;
 
 	function getTimeGreeting(hour: number): string {
 		if (hour < 6) return "夜深了";
@@ -212,6 +218,7 @@
 		private showTimer?: number;
 		private closeTimer?: number;
 		private abortController?: AbortController;
+		private locationPromise?: Promise<string>;
 
 		connectedCallback() {
 			if (sessionStorage.getItem(welcomeSessionKey)) return;
@@ -222,13 +229,55 @@
 				once: true,
 			});
 
-			this.showTimer = window.setTimeout(() => this.show(), 850);
+			// 定位请求与入场延迟并行跑：正常几百毫秒就回来，卡片出场时文案已经定稿
+			this.locationPromise = this.fetchLocation();
+			this.showTimer = window.setTimeout(
+				() => void this.show(),
+				entranceDelayMs,
+			);
 		}
 
 		disconnectedCallback() {
 			if (this.showTimer) window.clearTimeout(this.showTimer);
 			if (this.closeTimer) window.clearTimeout(this.closeTimer);
 			this.abortController?.abort();
+		}
+
+		private async fetchLocation(): Promise<string> {
+			const controller = new AbortController();
+			this.abortController = controller;
+			const timeout = window.setTimeout(
+				() => controller.abort(),
+				geoRequestTimeoutMs,
+			);
+
+			try {
+				// 站点 trailingSlash: "always"，本站接口一律带尾斜杠（与 /api/admin/stats/ 一致）
+				const response = await fetch("/api/geo/", {
+					signal: controller.signal,
+				});
+				if (!response.ok) throw new Error("location unavailable");
+				return toCityLevel(readLocation(await response.json()));
+			} catch {
+				// 定位失败 / 超时 / 被卸载：交给通用文案
+				return "";
+			} finally {
+				window.clearTimeout(timeout);
+			}
+		}
+
+		/**
+		 * 归属地最多等 geoWaitMs（从入场延迟结束起算）。
+		 * 等不到就先出通用文案 —— 之后也不再改写，宁可少一句归属地，也不要有文案跳变。
+		 */
+		private waitForLocation(): Promise<string> {
+			return new Promise<string>((resolve) => {
+				const timer = window.setTimeout(() => resolve(""), geoWaitMs);
+				void (this.locationPromise ?? Promise.resolve("")).then((value) => {
+					window.clearTimeout(timer);
+					resolve(value);
+				});
+			});
 		}
 
 		private async show() {
@@ -242,36 +291,22 @@
 			);
 			const greeting = getTimeGreeting(new Date().getHours());
 
+			// 关键：先等文案定稿，再点亮卡片。两次 DOM 写入之间不亮卡片，
+			// 浏览器只有最终态可渲染，用户不会看到「通用文案 → 归属地」的突变。
+			const location = await this.waitForLocation();
+
+			// 等待期间组件可能已被卸载（Swup 切页），那就别再亮
+			if (!this.isConnected) return;
+
 			if (title) title.textContent = `${greeting}，欢迎来到jojo`;
+			if (message) {
+				message.textContent = location
+					? `来自 ${location}，很高兴遇见你。`
+					: "很高兴在这里遇见你。";
+			}
 			this.dataset.state = "visible";
 
-			this.abortController = new AbortController();
-			// 本站接口命中外部定位服务时最慢可能要几秒（geoip 内部 4s 超时 + 兜底源），
-			// 给到 6s；正常情况是几百毫秒
-			const timeout = window.setTimeout(
-				() => this.abortController?.abort(),
-				6000,
-			);
-
-			try {
-				// 站点 trailingSlash: "always"，本站接口一律带尾斜杠（与 /api/admin/stats/ 一致）
-				const response = await fetch("/api/geo/", {
-					signal: this.abortController.signal,
-				});
-				if (!response.ok) throw new Error("location unavailable");
-				const location = toCityLevel(readLocation(await response.json()));
-				if (message) {
-					message.textContent = location
-						? `来自 ${location}，很高兴遇见你。`
-						: "很高兴在这里遇见你。";
-				}
-			} catch {
-				if (message) message.textContent = "很高兴在这里遇见你。";
-			} finally {
-				window.clearTimeout(timeout);
-			}
-
-			// 定位最慢可能要几秒，收起时间给足，别让地址刚出来就被关掉
+			// 文案已定稿、不会再变，收起时间给足即可
 			this.closeTimer = window.setTimeout(() => this.close(), 9000);
 		}
 
