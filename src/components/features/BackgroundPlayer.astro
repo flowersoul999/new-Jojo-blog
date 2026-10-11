@@ -284,10 +284,15 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 
 		function toggle() {
 			isPlaying = !isPlaying;
-			if (isPlaying) {
-				if (currentIndex >= urlList.length) currentIndex = 0;
-				// 手动播放：用户是主动点的，带声音来。
-				startMuted = false;
+		if (isPlaying) {
+			if (currentIndex >= urlList.length) currentIndex = 0;
+			// 手动点播放：随机挑一支（避开当前这支），贴合 playerMode="random" 的语义；
+			// 被显示设置面板钉成动态壁纸时不打乱，继续播那一支。
+			if (pinnedIndex === null && playerMode === "random" && urlList.length > 1) {
+				currentIndex = pickIndex(currentIndex);
+			}
+			// 手动播放：用户是主动点的，带声音来。
+			startMuted = false;
 				syncAttr();
 				if (overlay) { overlay.classList.remove("opacity-0"); overlay.classList.add("opacity-100"); }
 				doPlay(false);
