@@ -1,6 +1,9 @@
 ---
 // 写作页独立布局：不套用主站 MainGridLayout（全屏编辑器），自带全屏背景 + 主题初始化
 // 编辑组件为 React 岛，样式依赖旧博客主题令牌（见 styles/treasure-compat.css）
+// ⚠️ variables.styl 必须显式引入：main.css 只带 treasure 兼容层，缺 --card-bg / --line-divider /
+// --text-color 等主站变量，管理台弹窗（Modal.svelte）会退化成透明背景 + 无分隔线，字全糊在遮罩上。
+import "@/styles/variables.styl";
 import "@/styles/main.css";
 import TreasureToaster from "@/components/react-treasure/toaster";
 import { siteConfig } from "@/config";

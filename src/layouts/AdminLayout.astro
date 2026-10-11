@@ -1,5 +1,8 @@
 ---
 // 后台管理独立布局：不套用主站 MainGridLayout（全屏管理台），自带主题初始化
+// ⚠️ 同 WriteLayout：AdminDashboard 用了 bg-(--card-bg) / border-(--line-divider)，
+// 不引 variables.styl 这些变量的值就是空的，卡片背景与分隔线会整体消失。
+import "@/styles/variables.styl";
 import "@/styles/main.css";
 import { siteConfig } from "@/config";
 

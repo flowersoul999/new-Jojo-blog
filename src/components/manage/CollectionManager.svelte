@@ -346,7 +346,7 @@ function badgeText(key: string, item: Item): string {
 					bind:value={formSlug}
 					disabled={!!editing}
 					placeholder={config.slugHint}
-					class="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50 disabled:opacity-60"
+					class="h-9 w-full rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50 disabled:opacity-60"
 				/>
 			</label>
 
@@ -363,27 +363,27 @@ function badgeText(key: string, item: Item): string {
 							bind:value={formValues[f.key]}
 							rows="3"
 							placeholder={f.placeholder}
-							class="w-full resize-y rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm outline-none focus:border-brand/50"
+							class="w-full resize-y rounded-lg border border-border bg-field px-2.5 py-1.5 text-sm outline-none focus:border-brand/50"
 						></textarea>
 					{:else if f.type === "date"}
 						<input
 							type="date"
 							bind:value={formValues[f.key]}
-							class="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50"
+							class="h-9 w-full rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50"
 						/>
 					{:else if f.type === "number"}
 						<input
 							type="number"
 							bind:value={formValues[f.key]}
 							placeholder={f.placeholder}
-							class="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50"
+							class="h-9 w-full rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50"
 						/>
 					{:else if f.type === "boolean"}
 						<input type="checkbox" bind:checked={formValues[f.key]} class="accent-[var(--treasure-brand)]" />
 					{:else if f.type === "select"}
 						<select
 							bind:value={formValues[f.key]}
-							class="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50"
+							class="h-9 w-full rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50"
 						>
 							<option value="">（未设置）</option>
 							{#each f.options ?? [] as opt}
@@ -396,7 +396,7 @@ function badgeText(key: string, item: Item): string {
 							value={(Array.isArray(val) ? (val as string[]) : []).join(", ")}
 							oninput={(e) => (formValues[f.key] = splitTags((e.target as HTMLInputElement).value))}
 							placeholder={f.placeholder}
-							class="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50"
+							class="h-9 w-full rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50"
 						/>
 					{:else if f.type === "objectList"}
 						{@const list = (Array.isArray(val) ? (val as Record<string, string>[]) : [])}
@@ -413,7 +413,7 @@ function badgeText(key: string, item: Item): string {
 													formValues[f.key] = [...list];
 												}}
 												placeholder={sf.label}
-												class="h-8 min-w-[8rem] flex-1 rounded-md border border-border bg-card px-2 text-xs outline-none focus:border-brand/50"
+												class="h-8 min-w-[8rem] flex-1 rounded-md border border-border bg-field px-2 text-xs outline-none focus:border-brand/50"
 											/>
 										{/each}
 										<button
@@ -442,7 +442,7 @@ function badgeText(key: string, item: Item): string {
 							type="text"
 							bind:value={formValues[f.key]}
 							placeholder={f.placeholder}
-							class="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50"
+							class="h-9 w-full rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50"
 						/>
 					{/if}
 				</label>
@@ -454,7 +454,7 @@ function badgeText(key: string, item: Item): string {
 				<textarea
 					bind:value={formBody}
 					rows="8"
-					class="w-full resize-y rounded-lg border border-border bg-card px-2.5 py-1.5 font-mono text-xs outline-none focus:border-brand/50"
+					class="w-full resize-y rounded-lg border border-border bg-field px-2.5 py-1.5 font-mono text-xs outline-none focus:border-brand/50"
 				></textarea>
 			</label>
 

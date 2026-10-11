@@ -209,7 +209,7 @@ const cleanedCount = $derived(cleanSlogans(slogans).length);
 							oninput={markDirty}
 							placeholder="输入一句标语…"
 							maxlength="80"
-							class="h-9 min-w-0 flex-1 rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-brand/50"
+							class="h-9 min-w-0 flex-1 rounded-lg border border-border bg-field px-3 text-sm outline-none focus:border-brand/50"
 						/>
 						<button
 							type="button"
@@ -244,7 +244,7 @@ const cleanedCount = $derived(cleanSlogans(slogans).length);
 					max={MAX_INTERVAL}
 					bind:value={intervalSeconds}
 					oninput={markDirty}
-					class="h-8 w-20 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50"
+					class="h-8 w-20 rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50"
 				/>
 				<span class="text-xs text-secondary">
 					秒（{MIN_INTERVAL}–{MAX_INTERVAL}，多于一句时才生效）

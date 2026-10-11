@@ -11,6 +11,7 @@
 	--color-card: var(--treasure-card);
 	--color-bg: var(--treasure-bg);
 	--color-border: var(--treasure-default-border);
+	--color-field: var(--treasure-field);
 	--font-averia: var(--treasure-font-display);
 }
 
@@ -23,6 +24,9 @@
 	--treasure-text: #334f52;
 	--treasure-font-display: "PingFang SC", -apple-system, "Microsoft YaHei", sans-serif;
 	--treasure-default-border: color-mix(in srgb, var(--treasure-secondary) 32%, transparent);
+	/* 表单控件底色：--treasure-card 是 40% 白玻璃，直接用在输入框上等于透明
+	   （在白底弹窗里和面板糊成一片），所以单独给一个带对比的实色令牌 */
+	--treasure-field: rgb(0 0 0 / 0.045);
 }
 
 :root.dark {
@@ -33,6 +37,7 @@
 	--treasure-bg: #0d1613;
 	--treasure-text: #dbe7e0;
 	--treasure-default-border: color-mix(in srgb, var(--treasure-secondary) 26%, transparent);
+	--treasure-field: rgb(255 255 255 / 0.07);
 }
 
 /* 独立全屏布局容器（写作页 WriteLayout 使用）：自带整屏背景 */

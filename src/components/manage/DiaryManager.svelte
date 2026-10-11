@@ -246,20 +246,20 @@ async function remove(entry: DiaryEntry) {
 		<div class="flex flex-col gap-3">
 			<label class="block">
 				<span class="mb-1 block text-xs font-semibold text-secondary">标题</span>
-				<input type="text" bind:value={formTitle} class="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50" />
+				<input type="text" bind:value={formTitle} class="h-9 w-full rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50" />
 			</label>
 			<label class="block">
 				<span class="mb-1 block text-xs font-semibold text-secondary">内容</span>
-				<textarea bind:value={formContent} rows="8" class="w-full resize-y rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm outline-none focus:border-brand/50"></textarea>
+				<textarea bind:value={formContent} rows="8" class="w-full resize-y rounded-lg border border-border bg-field px-2.5 py-1.5 text-sm outline-none focus:border-brand/50"></textarea>
 			</label>
 			<div class="flex flex-wrap gap-3">
 				<label class="block">
 					<span class="mb-1 block text-xs font-semibold text-secondary">日期</span>
-					<input type="datetime-local" bind:value={formDate} class="h-9 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50" />
+					<input type="datetime-local" bind:value={formDate} class="h-9 rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50" />
 				</label>
 				<label class="block">
 					<span class="mb-1 block text-xs font-semibold text-secondary">心情</span>
-					<select bind:value={formMood} class="h-9 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50">
+					<select bind:value={formMood} class="h-9 rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50">
 						{#each MOODS as m}<option value={m}>{m}</option>{/each}
 					</select>
 				</label>
@@ -270,7 +270,7 @@ async function remove(entry: DiaryEntry) {
 			</div>
 			<label class="block">
 				<span class="mb-1 block text-xs font-semibold text-secondary">标签（逗号分隔）</span>
-				<input type="text" bind:value={formTags} placeholder="国庆, 生活" class="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus:border-brand/50" />
+				<input type="text" bind:value={formTags} placeholder="国庆, 生活" class="h-9 w-full rounded-lg border border-border bg-field px-2.5 text-sm outline-none focus:border-brand/50" />
 			</label>
 			{#if formError}
 				<p class="text-xs text-red-500">{formError}</p>
