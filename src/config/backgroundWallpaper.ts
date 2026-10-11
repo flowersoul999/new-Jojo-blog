@@ -32,14 +32,7 @@ type PlayerVideo = {
  * 导航栏播放按钮按这个顺序轮播；**数组下标就是 `playerUrl` 的下标**，别随意重排。
  * 命名规范：文件名带日期版本号（CDN 强缓存，同名替换不生效）。
  */
-const playerVideos: PlayerVideo[] = [
-	{ src: "/assets/videos/bg-20260928.mp4" },
-	{
-		src: "/assets/videos/bg-20261006-wlop.mp4",
-		label: "WLOP · Aeolian3",
-		poster: "/assets/videos/thumbs/bg-20261006-wlop.webp",
-	},
-];
+const playerVideos: PlayerVideo[] = [{ src: "/assets/videos/bg-20260928.mp4" }];
 
 /**
  * 显示设置面板「动态壁纸」一栏**只列**这几支 —— 元素是上面 playerVideos 的下标。
@@ -104,7 +97,6 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 未选中动态壁纸时**不随页面加载预加载**，只有点导航栏播放按钮才按需拉取，因此体积不影响首屏；
 		// 一旦访客在显示设置面板里选中了某支，它就等同于壁纸，会随页面加载自动静音起播。
 		// bg-20260928：720p 带音轨，42MB / 248s
-		// bg-20261006-wlop：720p 带音轨，19MB / 174s（由 1080p / 214MB 源片重压而来）
 		playerUrl: playerVideos.map((item) => item.src),
 		// 面板可选的动态壁纸清单：index 指回 playerUrl 的下标，必须是显式的
 		playerItems: selectableDynamicWallpaperIndices.map((index) => ({
