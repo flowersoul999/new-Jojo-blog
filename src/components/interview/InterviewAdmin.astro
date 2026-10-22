@@ -1,0 +1,780 @@
+---
+// 面经管理入口：只在登录后出现。
+// 复用仓库既有的 /api/content/{list,read,write,delete} 四件套，
+// 本地 dev 下由 isLocalDev 分支直接读写 src/content/interviews。
+import { Icon } from "astro-icon/components";
+
+interface Props {
+	/** 目标集合目录，仓库相对路径 */
+	collection?: string;
+	label?: string;
+}
+
+const { collection = "src/content/interviews", label = "管理面经" } =
+	Astro.props;
+---
+
+<div class="iv-admin" data-iv-admin data-collection={collection} hidden>
+	<button type="button" class="iv-admin__open" data-iv-open>
+		<Icon is:inline name="material-symbols:edit-square-outline" class="iv-admin__open-icon" />
+		<span>{label}</span>
+	</button>
+
+	<dialog class="iv-admin__dialog" data-iv-dialog>
+		<div class="iv-admin__head">
+			<div>
+				<h2 class="iv-admin__title" data-iv-title>面经管理</h2>
+				<p class="iv-admin__sub" data-iv-count></p>
+			</div>
+			<button type="button" class="iv-admin__x" data-iv-close aria-label="关闭">
+				<Icon is:inline name="material-symbols:close-rounded" />
+			</button>
+		</div>
+
+		<div class="iv-admin__scroll">
+			<div class="iv-admin__list-view" data-iv-list-view>
+				<div class="iv-admin__toolbar">
+					<button type="button" class="iv-admin__btn iv-admin__btn--primary" data-iv-new>
+						<Icon is:inline name="material-symbols:add-rounded" />
+						新建面经
+					</button>
+					<button type="button" class="iv-admin__btn" data-iv-reload>
+						<Icon is:inline name="material-symbols:refresh-rounded" />
+						刷新
+					</button>
+				</div>
+				<ul class="iv-admin__list" data-iv-list></ul>
+				<p class="iv-admin__empty" data-iv-empty hidden>这个集合里还没有内容，点「新建面经」开始。</p>
+			</div>
+
+			<form class="iv-admin__form" data-iv-form hidden novalidate>
+				<div class="iv-admin__grid">
+					<label class="iv-admin__field">
+						<span>公司</span>
+						<input type="text" name="company" required placeholder="某电商中台" />
+					</label>
+					<label class="iv-admin__field">
+						<span>岗位</span>
+						<input type="text" name="position" required placeholder="前端开发实习生" />
+					</label>
+					<label class="iv-admin__field">
+						<span>日期</span>
+						<input type="date" name="date" required />
+					</label>
+					<label class="iv-admin__field">
+						<span>轮次</span>
+						<select name="stage">
+							<option value="笔试">笔试</option>
+							<option value="一面" selected>一面</option>
+							<option value="二面">二面</option>
+							<option value="三面">三面</option>
+							<option value="技术面">技术面</option>
+							<option value="HR 面">HR 面</option>
+							<option value="终面">终面</option>
+						</select>
+					</label>
+					<label class="iv-admin__field">
+						<span>结果</span>
+						<select name="result">
+							<option value="待定" selected>待定</option>
+							<option value="已约">已约</option>
+							<option value="offer">offer</option>
+							<option value="挂">挂</option>
+						</select>
+					</label>
+					<label class="iv-admin__field">
+						<span>难度 1-5</span>
+						<input type="number" name="difficulty" min="1" max="5" step="1" value="3" />
+					</label>
+					<label class="iv-admin__field iv-admin__field--wide">
+						<span>标签（逗号分隔）</span>
+						<input type="text" name="tags" placeholder="CSS, HTTP, Vue" />
+					</label>
+					<label class="iv-admin__field iv-admin__field--wide">
+						<span>一句话摘要</span>
+						<input type="text" name="summary" placeholder="节奏极快，25 分钟问了十几个问题。" />
+					</label>
+					<label class="iv-admin__field iv-admin__field--wide">
+						<span>文件名<span class="iv-admin__hint">留空则自动生成</span></span>
+						<input type="text" name="filename" placeholder="2026-10-22-company-round" />
+					</label>
+					<label class="iv-admin__field iv-admin__field--wide">
+						<span>正文（Markdown）</span>
+						<textarea name="body" rows="14" placeholder={'## 流程\n\n## 被问到的题\n\n- …'}></textarea>
+					</label>
+				</div>
+
+				<p class="iv-admin__error" data-iv-error hidden></p>
+
+				<div class="iv-admin__actions">
+					<button type="button" class="iv-admin__btn" data-iv-cancel>取消</button>
+					<button type="submit" class="iv-admin__btn iv-admin__btn--primary" data-iv-save>
+						保存
+					</button>
+				</div>
+			</form>
+		</div>
+	</dialog>
+</div>
+
+<script>
+	interface Entry {
+		name: string;
+		path: string;
+		sha: string;
+	}
+
+	interface ReadResult {
+		path: string;
+		content: string | null;
+		sha: string;
+	}
+
+	let cleanup: (() => void) | null = null;
+
+	async function request<T>(path: string, init?: RequestInit): Promise<T> {
+		const res = await fetch(path, init);
+		const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+		if (!res.ok || data.ok === false) {
+			throw new Error(data.error || `请求失败（${res.status}）`);
+		}
+		return data as T;
+	}
+
+	function yamlString(value: string): string {
+		return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+	}
+
+	function serialize(fields: {
+		company: string;
+		position: string;
+		date: string;
+		stage: string;
+		result: string;
+		difficulty: number;
+		tags: string[];
+		summary: string;
+		draft: boolean;
+	}): string {
+		const tags = fields.tags.length
+			? `[${fields.tags.map((tag) => yamlString(tag)).join(", ")}]`
+			: "[]";
+		return [
+			"---",
+			`company: ${yamlString(fields.company)}`,
+			`position: ${yamlString(fields.position)}`,
+			`date: ${fields.date}`,
+			`stage: ${yamlString(fields.stage)}`,
+			`result: ${yamlString(fields.result)}`,
+			`difficulty: ${fields.difficulty}`,
+			`tags: ${tags}`,
+			`summary: ${yamlString(fields.summary)}`,
+			`draft: ${fields.draft}`,
+			"---",
+			"",
+		].join("\n");
+	}
+
+	/** 从已有 md 里拆出 frontmatter 与正文（只处理本集合用到的简单标量） */
+	function parse(raw: string) {
+		const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+		if (!match) return { meta: {} as Record<string, string>, body: raw };
+		const meta: Record<string, string> = {};
+		for (const line of match[1].split("\n")) {
+			const at = line.indexOf(":");
+			if (at < 0) continue;
+			const key = line.slice(0, at).trim();
+			let value = line.slice(at + 1).trim();
+			value = value.replace(/^["']/, "").replace(/["']$/, "");
+			meta[key] = value;
+		}
+		return { meta, body: match[2].replace(/^\n+/, "") };
+	}
+
+	function todayInput(): string {
+		const now = new Date();
+		const pad = (n: number) => String(n).padStart(2, "0");
+		return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+	}
+
+	function initInterviewAdmin() {
+		const root = document.querySelector<HTMLElement>("[data-iv-admin]");
+		if (!root) return;
+		const dialog = root.querySelector<HTMLDialogElement>("[data-iv-dialog]");
+		const listEl = root.querySelector<HTMLUListElement>("[data-iv-list]");
+		const emptyEl = root.querySelector<HTMLElement>("[data-iv-empty]");
+		const countEl = root.querySelector<HTMLElement>("[data-iv-count]");
+		const listView = root.querySelector<HTMLElement>("[data-iv-list-view]");
+		const form = root.querySelector<HTMLFormElement>("[data-iv-form]");
+		const errorEl = root.querySelector<HTMLElement>("[data-iv-error]");
+		const titleEl = root.querySelector<HTMLElement>("[data-iv-title]");
+		const saveBtn = root.querySelector<HTMLButtonElement>("[data-iv-save]");
+		const collection = root.dataset.collection || "src/content/interviews";
+		if (!dialog || !listEl || !form) return;
+
+		let editing: { path: string; sha: string } | null = null;
+		let busy = false;
+
+		const showError = (message: string) => {
+			if (!errorEl) return;
+			errorEl.textContent = message;
+			errorEl.hidden = !message;
+		};
+
+		function field<T extends HTMLElement>(name: string): T {
+			return form?.querySelector<T>(`[name="${name}"]`) as T;
+		}
+
+		function resetForm() {
+			form?.reset();
+			field<HTMLInputElement>("date").value = todayInput();
+			field<HTMLInputElement>("difficulty").value = "3";
+			field<HTMLInputElement>("filename").value = "";
+			showError("");
+		}
+
+		async function loadList() {
+			if (!listEl) return;
+			listEl.textContent = "";
+			showError("");
+			try {
+				const entries = await request<Entry[]>(
+					`/api/content/list/?path=${encodeURIComponent(collection)}`,
+				);
+				const files = entries
+					.filter((entry) => entry.name.endsWith(".md") || entry.name.endsWith(".mdx"))
+					.sort((a, b) => b.name.localeCompare(a.name));
+
+				if (countEl) countEl.textContent = `共 ${files.length} 篇`;
+				if (emptyEl) emptyEl.hidden = files.length > 0;
+
+				for (const file of files) {
+					const li = document.createElement("li");
+					li.className = "iv-admin__item";
+
+					const name = document.createElement("span");
+					name.className = "iv-admin__item-name";
+					name.textContent = file.name.replace(/\.mdx?$/, "");
+
+					const meta = document.createElement("span");
+					meta.className = "iv-admin__item-meta";
+					meta.textContent = file.path;
+
+					const edit = document.createElement("button");
+					edit.type = "button";
+					edit.className = "iv-admin__btn iv-admin__btn--sm";
+					edit.textContent = "编辑";
+					edit.addEventListener("click", () => void openEditor(file));
+
+					const del = document.createElement("button");
+					del.type = "button";
+					del.className = "iv-admin__btn iv-admin__btn--sm iv-admin__btn--danger";
+					del.textContent = "删除";
+					del.addEventListener("click", () => void removeEntry(file));
+
+					const row = document.createElement("div");
+					row.className = "iv-admin__item-text";
+					row.append(name, meta);
+
+					const ops = document.createElement("div");
+					ops.className = "iv-admin__item-ops";
+					ops.append(edit, del);
+
+					li.append(row, ops);
+					listEl.append(li);
+				}
+			} catch (error) {
+				showError(error instanceof Error ? error.message : "列表加载失败");
+			}
+		}
+
+		async function openEditor(file?: Entry) {
+			resetForm();
+			if (file) {
+				editing = { path: file.path, sha: file.sha };
+				if (titleEl) titleEl.textContent = "编辑面经";
+				try {
+					const data = await request<ReadResult>(
+						`/api/content/read/?path=${encodeURIComponent(file.path)}`,
+					);
+					const raw = data.content ?? "";
+					const { meta, body } = parse(raw);
+					field<HTMLInputElement>("company").value = meta.company ?? "";
+					field<HTMLInputElement>("position").value = meta.position ?? "";
+					field<HTMLInputElement>("date").value = (meta.date ?? todayInput()).slice(0, 10);
+					field<HTMLSelectElement>("stage").value = meta.stage || "一面";
+					field<HTMLSelectElement>("result").value = meta.result || "待定";
+					field<HTMLInputElement>("difficulty").value = meta.difficulty || "3";
+					field<HTMLInputElement>("tags").value = (meta.tags ?? "")
+						.replace(/^\[|\]$/g, "")
+						.split(",")
+						.map((tag) => tag.trim().replace(/^["']|["']$/g, ""))
+						.filter(Boolean)
+						.join(", ");
+					field<HTMLInputElement>("summary").value = meta.summary ?? "";
+					field<HTMLInputElement>("filename").value = file.name.replace(/\.mdx?$/, "");
+					field<HTMLTextAreaElement>("body").value = body;
+					editing = { path: file.path, sha: data.sha || file.sha };
+				} catch (error) {
+					showError(error instanceof Error ? error.message : "读取失败");
+					return;
+				}
+			} else {
+				editing = null;
+				if (titleEl) titleEl.textContent = "新建面经";
+			}
+			if (listView) listView.hidden = true;
+			form.hidden = false;
+			field<HTMLInputElement>("company").focus();
+		}
+
+		function backToList() {
+			form.hidden = true;
+			if (listView) listView.hidden = false;
+			editing = null;
+			showError("");
+			void loadList();
+		}
+
+		async function removeEntry(file: Entry) {
+			const label = file.name.replace(/\.mdx?$/, "");
+			if (!window.confirm(`删除「${label}」？\n\n会直接改动仓库文件，删掉的可以从 git 历史找回。`)) {
+				return;
+			}
+			try {
+				await request("/api/content/delete/", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ path: file.path, sha: file.sha, message: `Delete ${file.name}` }),
+				});
+				await loadList();
+			} catch (error) {
+				showError(error instanceof Error ? error.message : "删除失败");
+			}
+		}
+
+		async function submit() {
+			if (busy) return;
+			const company = field<HTMLInputElement>("company").value.trim();
+			const position = field<HTMLInputElement>("position").value.trim();
+			const date = field<HTMLInputElement>("date").value;
+			if (!company || !position || !date) {
+				showError("公司、岗位、日期是必填项");
+				return;
+			}
+
+			const filenameInput = field<HTMLInputElement>("filename").value.trim();
+			const slug =
+				filenameInput ||
+				`${date}-${company.replace(/[^\w\u4e00-\u9fa5]+/g, "-").slice(0, 20) || "interview"}`;
+			const cleanSlug = slug.replace(/\.mdx?$/, "").replace(/[/\\]/g, "-");
+			const path = editing?.path ?? `${collection}/${cleanSlug}.md`;
+
+			const tags = field<HTMLInputElement>("tags")
+				.value.split(",")
+				.map((tag) => tag.trim())
+				.filter(Boolean);
+
+			const head = serialize({
+				company,
+				position,
+				date,
+				stage: field<HTMLSelectElement>("stage").value,
+				result: field<HTMLSelectElement>("result").value,
+				difficulty: Number(field<HTMLInputElement>("difficulty").value) || 3,
+				tags,
+				summary: field<HTMLInputElement>("summary").value.trim(),
+				draft: false,
+			});
+			const body = field<HTMLTextAreaElement>("body").value;
+
+			busy = true;
+			if (saveBtn) saveBtn.disabled = true;
+			showError("");
+			try {
+				await request("/api/content/write/", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						path,
+						content: `${head}\n${body.trimEnd()}\n`,
+						sha: editing?.sha,
+						message: `${editing ? "Update" : "Add"} ${cleanSlug}`,
+					}),
+				});
+				backToList();
+			} catch (error) {
+				showError(error instanceof Error ? error.message : "保存失败");
+			} finally {
+				busy = false;
+				if (saveBtn) saveBtn.disabled = false;
+			}
+		}
+
+		const onOpen = () => {
+			dialog.showModal();
+			void loadList();
+		};
+		const onClose = () => dialog.close();
+		const onDialogClick = (event: MouseEvent) => {
+			if (event.target === dialog) dialog.close();
+		};
+
+		const openBtn = root.querySelector<HTMLButtonElement>("[data-iv-open]");
+		const closeBtn = root.querySelector<HTMLButtonElement>("[data-iv-close]");
+		const newBtn = root.querySelector<HTMLButtonElement>("[data-iv-new]");
+		const reloadBtn = root.querySelector<HTMLButtonElement>("[data-iv-reload]");
+		const cancelBtn = root.querySelector<HTMLButtonElement>("[data-iv-cancel]");
+
+		openBtn?.addEventListener("click", onOpen);
+		closeBtn?.addEventListener("click", onClose);
+		newBtn?.addEventListener("click", () => void openEditor());
+		reloadBtn?.addEventListener("click", () => void loadList());
+		cancelBtn?.addEventListener("click", backToList);
+		dialog.addEventListener("click", onDialogClick);
+		form.addEventListener("submit", (event) => {
+			event.preventDefault();
+			void submit();
+		});
+
+		// 登录态：只有已登录才把入口放出来
+		void request<{ authenticated: boolean }>("/api/auth/status/")
+			.then((status) => {
+				if (status.authenticated) root.hidden = false;
+			})
+			.catch(() => {});
+
+		cleanup = () => {
+			openBtn?.removeEventListener("click", onOpen);
+			closeBtn?.removeEventListener("click", onClose);
+			dialog.removeEventListener("click", onDialogClick);
+			if (dialog.open) dialog.close();
+		};
+	}
+
+	function boot() {
+		cleanup?.();
+		cleanup = null;
+		initInterviewAdmin();
+	}
+
+	document.addEventListener("astro:page-load", boot);
+	document.addEventListener("astro:before-swap", () => {
+		cleanup?.();
+		cleanup = null;
+	});
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", boot, { once: true });
+	} else {
+		boot();
+	}
+</script>
+
+<style>
+	.iv-admin {
+		min-width: 0;
+	}
+
+	.iv-admin[hidden] {
+		display: none;
+	}
+
+	.iv-admin__open {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.35rem 0.7rem;
+		border: 1px solid color-mix(in srgb, var(--iv-accent) 48%, transparent);
+		border-radius: 999px;
+		/* 页头压在插画上，纯白底会糊掉，这里给一层半透明磨砂 + 淡色描边 */
+		background: color-mix(in srgb, var(--iv-surface) 74%, transparent);
+		backdrop-filter: blur(8px);
+		box-shadow: 0 3px 12px rgb(0 0 0 / 14%);
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: color-mix(in srgb, var(--iv-accent) 78%, var(--iv-title));
+		cursor: pointer;
+		transition:
+			border-color 0.2s ease,
+			color 0.2s ease,
+			background-color 0.2s ease;
+	}
+
+	.iv-admin__open:hover {
+		border-color: var(--iv-accent);
+		background: var(--iv-surface);
+		color: var(--iv-accent);
+	}
+
+	.iv-admin__open-icon {
+		width: 0.95rem;
+		height: 0.95rem;
+	}
+
+	.iv-admin__dialog {
+		position: fixed;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		margin: auto;
+		width: min(46rem, calc(100vw - 2rem));
+		max-height: min(88vh, 52rem);
+		height: fit-content;
+		padding: 0;
+		border: 1px solid var(--iv-line);
+		border-radius: 18px;
+		background: var(--iv-surface);
+		color: var(--iv-title);
+		overflow: hidden;
+	}
+
+	.iv-admin__dialog::backdrop {
+		background: rgb(0 0 0 / 45%);
+		backdrop-filter: blur(2px);
+	}
+
+	.iv-admin__head {
+		flex: none;
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 1.15rem 1.3rem 0.9rem;
+		border-bottom: 1px solid var(--iv-line);
+	}
+
+	.iv-admin__title {
+		margin: 0;
+		font-size: 1.05rem;
+		font-weight: 800;
+		color: var(--iv-title);
+	}
+
+	.iv-admin__sub {
+		margin: 0.2rem 0 0;
+		font-size: 0.74rem;
+		color: var(--iv-faint);
+	}
+
+	.iv-admin__x {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.9rem;
+		height: 1.9rem;
+		border: 1px solid var(--iv-line);
+		border-radius: 10px;
+		background: transparent;
+		color: var(--iv-muted);
+		cursor: pointer;
+	}
+
+	.iv-admin__x:hover {
+		color: var(--iv-accent);
+		border-color: color-mix(in srgb, var(--iv-accent) 45%, transparent);
+	}
+
+	.iv-admin__scroll {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow-y: auto;
+		padding: 1rem 1.3rem 1.3rem;
+	}
+
+	.iv-admin__toolbar {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 0.9rem;
+	}
+
+	.iv-admin__btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		padding: 0.45rem 0.85rem;
+		border: 1px solid var(--iv-line);
+		border-radius: 10px;
+		background: var(--iv-surface);
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--iv-muted);
+		cursor: pointer;
+		transition:
+			border-color 0.2s ease,
+			color 0.2s ease,
+			background-color 0.2s ease;
+	}
+
+	.iv-admin__btn:hover {
+		border-color: color-mix(in srgb, var(--iv-accent) 50%, transparent);
+		color: var(--iv-accent);
+	}
+
+	.iv-admin__btn--primary {
+		border-color: color-mix(in srgb, var(--iv-accent) 55%, transparent);
+		background: color-mix(in srgb, var(--iv-accent) 12%, transparent);
+		color: var(--iv-accent);
+	}
+
+	.iv-admin__btn--sm {
+		padding: 0.28rem 0.6rem;
+		font-size: 0.72rem;
+	}
+
+	.iv-admin__btn--danger:hover {
+		border-color: var(--iv-hard);
+		color: var(--iv-hard);
+	}
+
+	.iv-admin__btn:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+
+	.iv-admin__list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.iv-admin__item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.6rem 0.75rem;
+		border: 1px solid var(--iv-line);
+		border-radius: 12px;
+		background: var(--iv-sunken);
+	}
+
+	.iv-admin__item-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		min-width: 0;
+	}
+
+	.iv-admin__item-name {
+		font-size: 0.82rem;
+		font-weight: 700;
+		color: var(--iv-title);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.iv-admin__item-meta {
+		font-size: 0.68rem;
+		color: var(--iv-faint);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.iv-admin__item-ops {
+		display: flex;
+		flex: none;
+		gap: 0.35rem;
+	}
+
+	.iv-admin__empty {
+		margin: 0.6rem 0 0;
+		padding: 1.1rem;
+		border: 1px dashed var(--iv-line);
+		border-radius: 12px;
+		text-align: center;
+		font-size: 0.78rem;
+		color: var(--iv-faint);
+	}
+
+	.iv-admin__grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.7rem;
+	}
+
+	.iv-admin__field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.28rem;
+		min-width: 0;
+		font-size: 0.74rem;
+		color: var(--iv-muted);
+	}
+
+	.iv-admin__field--wide {
+		grid-column: 1 / -1;
+	}
+
+	.iv-admin__hint {
+		margin-left: 0.35rem;
+		font-size: 0.66rem;
+		color: var(--iv-faint);
+	}
+
+	.iv-admin__field input,
+	.iv-admin__field select,
+	.iv-admin__field textarea {
+		width: 100%;
+		padding: 0.42rem 0.6rem;
+		border: 1px solid var(--iv-line);
+		border-radius: 9px;
+		background: var(--iv-sunken);
+		font-size: 0.8rem;
+		font-family: inherit;
+		color: var(--iv-title);
+		outline: none;
+	}
+
+	.iv-admin__field textarea {
+		resize: vertical;
+		line-height: 1.7;
+		font-family: var(--font-mono, monospace);
+		font-size: 0.76rem;
+	}
+
+	.iv-admin__field input:focus,
+	.iv-admin__field select:focus,
+	.iv-admin__field textarea:focus {
+		border-color: color-mix(in srgb, var(--iv-accent) 60%, transparent);
+	}
+
+	.iv-admin__error {
+		margin: 0.7rem 0 0;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid color-mix(in srgb, var(--iv-hard) 45%, transparent);
+		border-radius: 9px;
+		background: color-mix(in srgb, var(--iv-hard) 10%, transparent);
+		font-size: 0.76rem;
+		line-height: 1.6;
+		color: var(--iv-hard);
+	}
+
+	/** 表单底部操作条：滚动时钉在弹窗底边，长表单也随时能点到「保存」 */
+	.iv-admin__actions {
+		position: sticky;
+		bottom: 0;
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		margin: 0.9rem -1.3rem -1.3rem;
+		padding: 0.75rem 1.3rem 0.9rem;
+		border-top: 1px solid var(--iv-line);
+		background: var(--iv-surface);
+	}
+
+	@media (max-width: 640px) {
+		.iv-admin__grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.iv-admin__dialog {
+			width: calc(100vw - 1.2rem);
+			max-height: 90vh;
+		}
+	}
+</style>
