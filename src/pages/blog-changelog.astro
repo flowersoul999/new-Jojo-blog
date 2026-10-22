@@ -13,6 +13,7 @@ type ChangelogCard = {
 	kind: string;
 	text: string;
 	type: CardType;
+	tags: string[];
 };
 
 const TYPE_LABELS: Record<CardType, string> = {
@@ -30,17 +31,32 @@ function inferType(text: string): CardType {
 	return "improve";
 }
 
+/** 一条改动归属哪些主题：拿条目 tags 去命中正文文字，命中的才保留 */
+function tagsOf(text: string, pool: string[]): string[] {
+	return pool.filter((tag) => text.includes(tag));
+}
+
 const cards: ChangelogCard[] = blogChangelogEntries.flatMap((entry) =>
 	entry.details.map((text, index) => ({
 		id: `${entry.version}-${index}`,
 		date: entry.date,
-		shortDate: entry.date.slice(5).replace("-", "."),
+		shortDate: entry.date.slice(4).replace("-", "."),
 		version: entry.version,
 		kind: entry.kind,
 		text,
 		type: inferType(text),
+		tags: tagsOf(text, entry.tags),
 	})),
 );
+
+const COLUMNS = 4;
+
+/** 蛇形排序：偶数行左→右，奇数行右→左，让静态行箭头能从行尾绕回下一行行首 */
+const snakeOrder = cards.map((_, index) => {
+	const row = Math.floor(index / COLUMNS);
+	const col = index % COLUMNS;
+	return row % 2 === 0 ? index : row * COLUMNS + (COLUMNS - 1 - col);
+});
 
 const versionCount = blogChangelogEntries.length;
 const oldest =
@@ -56,6 +72,8 @@ const typeCounts = typeOrder
 		count: cards.filter((card) => card.type === type).length,
 	}))
 	.filter((item) => item.count > 0);
+
+const sharedTagCount = new Set(cards.flatMap((card) => card.tags)).size;
 ---
 
 <MainGridLayout title="更新日志" description="jojo 博客的每一次改动">
@@ -84,42 +102,76 @@ const typeCounts = typeOrder
 			</ul>
 		</header>
 
-		<section class="changelog-board card-base" aria-labelledby="changelog-board-title">
+		<section
+			class="changelog-board card-base"
+			aria-labelledby="changelog-board-title"
+			data-changelog
+		>
 			<div class="changelog-board__head">
 				<span class="changelog-board__bar" aria-hidden="true"></span>
 				<h2 class="changelog-board__title" id="changelog-board-title">更新日志</h2>
-				<span class="changelog-board__hint">按时间倒序</span>
+				<span class="changelog-board__hint">按时间倒序 · 悬停看关联</span>
 			</div>
 
-			<ol class="changelog-grid">
-				{
-					cards.map((card, index) => (
-						<li class="changelog-card" data-type={card.type}>
-							<div class="changelog-card__top">
-								<span class="changelog-card__type">{TYPE_LABELS[card.type]}</span>
-								<time class="changelog-card__date" datetime={card.date}>
-									{card.shortDate}
-								</time>
-							</div>
-							<p class="changelog-card__text">{card.text}</p>
-							<div class="changelog-card__foot">
-								<span class="changelog-card__version">{card.version}</span>
-								<span class="changelog-card__kind">{card.kind}</span>
-								<span class="changelog-card__num" aria-hidden="true">
-									{String(cards.length - index).padStart(2, "0")}
-								</span>
-							</div>
-						</li>
-					))
-				}
-			</ol>
+			<div class="changelog-stage">
+				<svg class="changelog-wires" data-changelog-wires aria-hidden="true">
+					<defs>
+						<marker
+							id="changelog-arrow"
+							viewBox="0 0 10 10"
+							refX="8"
+							refY="5"
+							markerWidth="6"
+							markerHeight="6"
+							orient="auto-start-reverse"
+						>
+							<path
+								d="M2 1L8 5L2 9"
+								fill="none"
+								stroke="context-stroke"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"></path>
+						</marker>
+					</defs>
+				</svg>
+
+				<ol class="changelog-grid" data-changelog-grid>
+					{
+						cards.map((card, index) => (
+							<li
+								class="changelog-card"
+								data-type={card.type}
+								data-changelog-card
+								data-tags={JSON.stringify(card.tags)}
+								style={`--seq:${index};--snake:${snakeOrder[index]}`}
+							>
+								<div class="changelog-card__top">
+									<span class="changelog-card__type">{TYPE_LABELS[card.type]}</span>
+									<time class="changelog-card__date" datetime={card.date}>
+										{card.shortDate}
+									</time>
+								</div>
+								<p class="changelog-card__text">{card.text}</p>
+								<div class="changelog-card__foot">
+									<span class="changelog-card__version">{card.version}</span>
+									<span class="changelog-card__kind">{card.kind}</span>
+									<span class="changelog-card__num" aria-hidden="true">
+										{String(cards.length - index).padStart(2, "0")}
+									</span>
+								</div>
+							</li>
+						))
+					}
+				</ol>
+			</div>
 		</section>
 
 		<footer class="changelog-foot">
 			<Icon name="material-symbols:history" class="changelog-foot__icon" />
 			<p>
-				每一次改动都记在这里，按仓库真实提交整理。想看向导，可以回到
-				<a href="/about/">关于页</a>。
+				每一次改动都记在这里，按仓库真实提交整理；共 {sharedTagCount} 个主题线索，
+				悬停任意卡片可以看到同主题的其他改动。
 			</p>
 		</footer>
 	</div>
@@ -134,28 +186,28 @@ const typeCounts = typeOrder
 	}
 
 	.changelog-hero {
-		padding: 2.2rem 2rem 1.8rem;
+		padding: 2rem 1.8rem 1.6rem;
 	}
 
 	.changelog-hero__eyebrow {
-		margin: 0 0 0.6rem;
-		font-size: 0.72rem;
+		margin: 0 0 0.55rem;
+		font-size: 0.7rem;
 		font-weight: 500;
 		letter-spacing: 0.36em;
 		color: var(--primary);
 	}
 
 	.changelog-hero__title {
-		margin: 0 0 0.5rem;
-		font-size: clamp(2rem, 3.4vw, 2.75rem);
+		margin: 0 0 0.45rem;
+		font-size: clamp(1.85rem, 3.2vw, 2.5rem);
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		color: var(--text-color);
 	}
 
 	.changelog-hero__quote {
-		margin: 0 0 1.3rem;
-		font-size: 0.94rem;
+		margin: 0 0 1.15rem;
+		font-size: 0.9rem;
 		letter-spacing: 0.02em;
 		color: color-mix(in srgb, var(--text-color) 58%, transparent);
 	}
@@ -164,8 +216,8 @@ const typeCounts = typeOrder
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.6rem;
-		font-size: 0.8rem;
+		gap: 0.55rem;
+		font-size: 0.78rem;
 		letter-spacing: 0.06em;
 		color: color-mix(in srgb, var(--text-color) 52%, transparent);
 	}
@@ -180,8 +232,8 @@ const typeCounts = typeOrder
 	.changelog-hero__legend {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem;
-		margin: 1.2rem 0 0;
+		gap: 0.45rem;
+		margin: 1.05rem 0 0;
 		padding: 0;
 		list-style: none;
 	}
@@ -191,12 +243,12 @@ const typeCounts = typeOrder
 
 		display: inline-flex;
 		align-items: center;
-		gap: 0.4rem;
-		padding: 0.3rem 0.7rem;
+		gap: 0.38rem;
+		padding: 0.26rem 0.65rem;
 		border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
 		border-radius: 999px;
 		background: color-mix(in srgb, var(--tone) 14%, transparent);
-		font-size: 0.74rem;
+		font-size: 0.72rem;
 		letter-spacing: 0.04em;
 		color: color-mix(in srgb, var(--tone) 55%, var(--text-color));
 	}
@@ -214,26 +266,27 @@ const typeCounts = typeOrder
 	}
 
 	.changelog-board {
-		padding: 1.6rem 1.5rem 1.9rem;
+		position: relative;
+		padding: 1.5rem 1.4rem 1.7rem;
 	}
 
 	.changelog-board__head {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
-		margin-bottom: 1.4rem;
+		gap: 0.55rem;
+		margin-bottom: 1.3rem;
 	}
 
 	.changelog-board__bar {
 		width: 3px;
-		height: 1.15rem;
+		height: 1.1rem;
 		border-radius: 999px;
 		background: var(--primary);
 	}
 
 	.changelog-board__title {
 		margin: 0;
-		font-size: 1.22rem;
+		font-size: 1.16rem;
 		font-weight: 700;
 		letter-spacing: 0.05em;
 		color: var(--text-color);
@@ -241,14 +294,31 @@ const typeCounts = typeOrder
 
 	.changelog-board__hint {
 		margin-left: auto;
-		font-size: 0.72rem;
-		letter-spacing: 0.1em;
+		font-size: 0.7rem;
+		letter-spacing: 0.08em;
 		color: color-mix(in srgb, var(--text-color) 38%, transparent);
 	}
 
+	.changelog-stage {
+		position: relative;
+	}
+
+	.changelog-wires {
+		position: absolute;
+		inset: -20px;
+		z-index: 0;
+		width: calc(100% + 40px);
+		height: calc(100% + 40px);
+		overflow: visible;
+		pointer-events: none;
+	}
+
 	.changelog-grid {
-		columns: 2;
-		column-gap: 0.9rem;
+		position: relative;
+		z-index: 1;
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.85rem;
 		margin: 0;
 		padding: 0;
 		list-style: none;
@@ -259,114 +329,174 @@ const typeCounts = typeOrder
 
 		display: flex;
 		flex-direction: column;
-		gap: 0.7rem;
-		break-inside: avoid;
-		margin-bottom: 0.9rem;
-		padding: 1rem 1.05rem 0.9rem;
+		gap: 0.55rem;
+		order: var(--snake);
+		min-height: 10.5rem;
+		padding: 0.85rem 0.9rem 0.7rem;
 		border: 1px solid var(--line-divider);
-		border-left: 2px solid color-mix(in srgb, var(--tone) 55%, transparent);
-		border-radius: 0.85rem;
-		background: color-mix(in srgb, var(--tone) 4%, var(--card-bg));
+		border-radius: 0.8rem;
+		background: var(--card-bg);
 		transition:
-			transform 0.28s ease,
-			border-color 0.28s ease,
-			box-shadow 0.28s ease;
+			transform 0.26s ease,
+			border-color 0.26s ease,
+			box-shadow 0.26s ease,
+			opacity 0.26s ease;
 	}
 
 	.changelog-card:hover {
+		z-index: 2;
 		transform: translateY(-2px);
-		border-left-color: var(--tone);
-		box-shadow: 0 8px 22px -14px color-mix(in srgb, var(--tone) 60%, transparent);
+		border-color: color-mix(in srgb, var(--tone) 55%, var(--line-divider));
+		box-shadow: 0 10px 24px -16px color-mix(in srgb, var(--tone) 65%, transparent);
+	}
+
+	.changelog-card.is-active {
+		border-color: color-mix(in srgb, var(--tone) 70%, var(--line-divider));
+	}
+
+	.changelog-card.is-linked {
+		border-color: color-mix(in srgb, var(--tone) 40%, var(--line-divider));
+	}
+
+	.changelog-card.is-dimmed {
+		opacity: 0.45;
 	}
 
 	.changelog-card__top {
 		display: flex;
 		align-items: baseline;
 		justify-content: space-between;
-		gap: 0.6rem;
+		gap: 0.4rem;
 	}
 
 	.changelog-card__type {
-		font-size: 0.74rem;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.7rem;
 		font-weight: 500;
-		letter-spacing: 0.08em;
+		letter-spacing: 0.06em;
 		color: var(--tone);
+	}
+
+	.changelog-card__type::before {
+		content: "";
+		width: 5px;
+		height: 5px;
+		flex: 0 0 5px;
+		border-radius: 999px;
+		background: var(--tone);
 	}
 
 	.changelog-card__date {
 		font-family: var(--font-mono, monospace);
-		font-size: 0.72rem;
-		letter-spacing: 0.04em;
-		color: color-mix(in srgb, var(--text-color) 38%, transparent);
+		font-size: 0.68rem;
+		letter-spacing: 0.02em;
+		color: color-mix(in srgb, var(--text-color) 36%, transparent);
 	}
 
 	.changelog-card__text {
+		flex: 1;
 		margin: 0;
-		font-size: 0.88rem;
-		line-height: 1.72;
-		color: color-mix(in srgb, var(--text-color) 88%, transparent);
+		font-size: 0.8rem;
+		line-height: 1.66;
+		color: color-mix(in srgb, var(--text-color) 86%, transparent);
 	}
 
 	.changelog-card__foot {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding-top: 0.55rem;
+		gap: 0.4rem;
+		padding-top: 0.5rem;
 		border-top: 1px dashed color-mix(in srgb, var(--line-divider) 85%, transparent);
-		font-size: 0.7rem;
-		letter-spacing: 0.05em;
-		color: color-mix(in srgb, var(--text-color) 34%, transparent);
+		font-size: 0.66rem;
+		letter-spacing: 0.04em;
+		color: color-mix(in srgb, var(--text-color) 32%, transparent);
 	}
 
 	.changelog-card__version {
 		font-weight: 500;
-		color: color-mix(in srgb, var(--tone) 75%, var(--text-color));
+		color: color-mix(in srgb, var(--tone) 72%, var(--text-color));
+	}
+
+	.changelog-card__kind {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.changelog-card__num {
 		margin-left: auto;
 		font-family: var(--font-mono, monospace);
-		opacity: 0.62;
+		opacity: 0.6;
 	}
 
-	.changelog-card[data-type="feature"] {
-		--tone: #16a06b;
-	}
-
-	.changelog-card[data-type="improve"] {
-		--tone: #3b7ef0;
-	}
-
-	.changelog-card[data-type="fix"] {
-		--tone: #e0555a;
-	}
-
-	.changelog-card[data-type="remove"] {
-		--tone: #8d8a99;
-	}
-
+	.changelog-card[data-type="feature"],
 	.changelog-legend[data-type="feature"] {
 		--tone: #16a06b;
 	}
 
+	.changelog-card[data-type="improve"],
 	.changelog-legend[data-type="improve"] {
 		--tone: #3b7ef0;
 	}
 
+	.changelog-card[data-type="fix"],
 	.changelog-legend[data-type="fix"] {
 		--tone: #e0555a;
 	}
 
+	.changelog-card[data-type="remove"],
 	.changelog-legend[data-type="remove"] {
 		--tone: #8d8a99;
+	}
+
+	/* 连线统一用青绿标注色：粉色主色在樱花背景上几乎看不见 */
+	:global(.changelog-wire) {
+		fill: none;
+		stroke-width: 1.4;
+		stroke: #14b8a6;
+	}
+
+	:global(.changelog-wire--row) {
+		stroke-dasharray: 5 5;
+		opacity: 0.55;
+	}
+
+	:global(.changelog-wire--hover) {
+		stroke-width: 1.7;
+		stroke-dasharray: 6 5;
+		opacity: 0.9;
+		animation: changelog-dash 0.75s linear infinite;
+	}
+
+	:global(.changelog-wire-label) {
+		position: absolute;
+		z-index: 3;
+		padding: 0.18rem 0.5rem;
+		border: 1px solid color-mix(in srgb, #14b8a6 55%, transparent);
+		border-radius: 999px;
+		background: var(--card-bg);
+		font-size: 0.66rem;
+		letter-spacing: 0.04em;
+		color: color-mix(in srgb, #0f766e 80%, var(--text-color));
+		white-space: nowrap;
+		transform: translate(-50%, -50%);
+		pointer-events: none;
+	}
+
+	@keyframes changelog-dash {
+		to {
+			stroke-dashoffset: -22;
+		}
 	}
 
 	.changelog-foot {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
+		gap: 0.55rem;
 		padding: 0.2rem 0.4rem 0;
-		font-size: 0.78rem;
+		font-size: 0.76rem;
 		line-height: 1.7;
 		color: color-mix(in srgb, var(--text-color) 46%, transparent);
 	}
@@ -378,26 +508,269 @@ const typeCounts = typeOrder
 		opacity: 0.6;
 	}
 
-	.changelog-foot a {
-		color: var(--primary);
-		text-decoration: none;
-	}
+	@media (max-width: 1200px) {
+		.changelog-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
 
-	.changelog-foot a:hover {
-		text-decoration: underline;
+		.changelog-card {
+			order: var(--seq);
+		}
 	}
 
 	@media (max-width: 900px) {
 		.changelog-hero {
-			padding: 1.7rem 1.3rem 1.4rem;
+			padding: 1.6rem 1.25rem 1.35rem;
 		}
 
 		.changelog-board {
-			padding: 1.3rem 1.1rem 1.5rem;
+			padding: 1.25rem 1.05rem 1.4rem;
 		}
 
 		.changelog-grid {
-			columns: 1;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	@media (max-width: 640px) {
+		.changelog-grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.changelog-card {
+			min-height: 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:global(.changelog-wire--hover) {
+			animation: none;
 		}
 	}
 </style>
+
+<script>
+	type Cleanup = () => void;
+
+	let cleanup: Cleanup | null = null;
+
+	function initChangelogGraph() {
+		const root = document.querySelector<HTMLElement>("[data-changelog]");
+		if (!root) return;
+		const grid = root.querySelector<HTMLElement>("[data-changelog-grid]");
+		const wires = root.querySelector<SVGSVGElement>("[data-changelog-wires]");
+		const stage = root.querySelector<HTMLElement>(".changelog-stage");
+		if (!grid || !wires || !stage) return;
+
+		const NS = "http://www.w3.org/2000/svg";
+		const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		const cardEls = () =>
+			Array.from(grid.querySelectorAll<HTMLElement>("[data-changelog-card]"));
+		const stageRect = () => stage.getBoundingClientRect();
+
+		let hoverCard: HTMLElement | null = null;
+
+		function clearLayer(selector: string) {
+			for (const node of Array.from(wires?.querySelectorAll(selector) ?? [])) node.remove();
+			for (const node of Array.from(stage?.querySelectorAll(selector) ?? [])) node.remove();
+		}
+
+		function makePath(d: string, cls: string, withArrow = true) {
+			const path = document.createElementNS(NS, "path");
+			path.setAttribute("d", d);
+			path.setAttribute("class", cls);
+			if (withArrow) path.setAttribute("marker-end", "url(#changelog-arrow)");
+			return path;
+		}
+
+		function sizeSvg() {
+			const r = stageRect();
+			// 元素四周各外扩 20px，viewBox 也同步扩 20，保证 1:1 无缩放
+			wires?.setAttribute("viewBox", `-20 -20 ${r.width + 40} ${r.height + 40}`);
+			wires?.setAttribute("preserveAspectRatio", "none");
+		}
+
+		/** 把卡片按视觉位置聚成行，行内按 left 排序 */
+		function groupRows() {
+			const rows: { top: number; items: HTMLElement[] }[] = [];
+			for (const card of cardEls()) {
+				const rect = card.getBoundingClientRect();
+				const hit = rows.find((row) => Math.abs(row.top - rect.top) < 24);
+				if (hit) {
+					hit.items.push(card);
+				} else {
+					rows.push({ top: rect.top, items: [card] });
+				}
+			}
+			rows.sort((a, b) => a.top - b.top);
+			for (const row of rows) {
+				row.items.sort(
+					(a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left,
+				);
+			}
+			return rows;
+		}
+
+		/** 静态行箭头：行尾绕外侧回到下一行行首，形成蛇形阅读路径 */
+		function drawRowArrows() {
+			clearLayer("[data-row-arrow]");
+			sizeSvg();
+			const rows = groupRows();
+			// 单列时每张卡自成一「行」，画出来是十几条杂线，直接放弃
+			if (rows.length < 2 || rows[0].items.length < 2) return;
+			const sr = stageRect();
+
+			for (let i = 0; i < rows.length - 1; i += 1) {
+				// 偶数行左→右（行尾在右），奇数行右→左（行尾在左）
+				const goRight = i % 2 === 0;
+				const from = (goRight ? rows[i].items.at(-1) : rows[i].items[0])?.getBoundingClientRect();
+				const to = (goRight ? rows[i + 1].items.at(-1) : rows[i + 1].items[0])?.getBoundingClientRect();
+				if (!from || !to) continue;
+
+				const fy = from.top - sr.top + from.height / 2;
+				const ty = to.top - sr.top + to.height / 2;
+				const x1 = (goRight ? from.right : from.left) - sr.left;
+				const x2 = (goRight ? to.right : to.left) - sr.left;
+				const out = goRight ? Math.max(x1, x2) + 14 : Math.min(x1, x2) - 14;
+
+				const path = makePath(
+					`M ${x1} ${fy} H ${out} V ${ty} H ${x2}`,
+					"changelog-wire changelog-wire--row",
+				);
+				path.setAttribute("data-row-arrow", "");
+				wires?.appendChild(path);
+			}
+		}
+
+		function clearHover() {
+			clearLayer("[data-hover-wire]");
+			for (const card of cardEls()) {
+				card.classList.remove("is-active", "is-linked", "is-dimmed");
+			}
+			hoverCard = null;
+		}
+
+		/** 悬停关联：把共享主题标签的卡片用虚线连起来，中点标出目标卡的类型 */
+		function drawHover(card: HTMLElement) {
+			if (hoverCard === card) return;
+			clearHover();
+			hoverCard = card;
+
+			const mine = JSON.parse(card.dataset.tags || "[]") as string[];
+			const all = cardEls();
+			const linked =
+				mine.length === 0
+					? []
+					: all
+							.filter((other) => {
+								if (other === card) return false;
+								const theirs = JSON.parse(other.dataset.tags || "[]") as string[];
+								return theirs.some((tag) => mine.includes(tag));
+							})
+							.slice(0, 3);
+
+			card.classList.add("is-active");
+			if (linked.length === 0) return;
+
+			sizeSvg();
+			const sr = stageRect();
+			const from = card.getBoundingClientRect();
+			const fx = from.left - sr.left + from.width / 2;
+			const fy = from.top - sr.top + from.height / 2;
+
+			for (const other of linked) {
+				other.classList.add("is-linked");
+				const rect = other.getBoundingClientRect();
+				const tx = rect.left - sr.left + rect.width / 2;
+				const ty = rect.top - sr.top + rect.height / 2;
+
+				// 二次贝塞尔，控制点沿法线推开，避免直线穿过中间的卡片
+				const mx = (fx + tx) / 2;
+				const my = (fy + ty) / 2;
+				const nx = -(ty - fy);
+				const ny = tx - fx;
+				const len = Math.hypot(nx, ny) || 1;
+				const bend = Math.min(64, len * 0.18);
+				const cx = mx + (nx / len) * bend;
+				const cy = my + (ny / len) * bend;
+
+				const path = makePath(
+					`M ${fx} ${fy} Q ${cx} ${cy} ${tx} ${ty}`,
+					"changelog-wire changelog-wire--hover",
+				);
+				path.setAttribute("data-hover-wire", "");
+				wires?.appendChild(path);
+
+				const label = document.createElement("span");
+				label.className = "changelog-wire-label";
+				label.textContent = other.querySelector(".changelog-card__type")?.textContent ?? "";
+				label.setAttribute("data-hover-wire", "");
+				label.style.left = `${cx}px`;
+				label.style.top = `${cy}px`;
+				stage.appendChild(label);
+			}
+
+			if (!reduce) {
+				for (const other of all) {
+					if (other !== card && !linked.includes(other)) other.classList.add("is-dimmed");
+				}
+			}
+		}
+
+		const onEnter = (event: Event) => {
+			const target = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+				"[data-changelog-card]",
+			);
+			if (target) drawHover(target);
+		};
+
+		const onLeave = (event: Event) => {
+			const target = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+				"[data-changelog-card]",
+			);
+			if (!target) return;
+			const to = (event as MouseEvent).relatedTarget as HTMLElement | null;
+			if (to?.closest("[data-changelog-card]")) return;
+			clearHover();
+			drawRowArrows();
+		};
+
+		const onResize = () => {
+			clearHover();
+			drawRowArrows();
+		};
+
+		grid.addEventListener("pointerover", onEnter);
+		grid.addEventListener("pointerout", onLeave);
+		window.addEventListener("resize", onResize);
+
+		drawRowArrows();
+
+		cleanup = () => {
+			grid.removeEventListener("pointerover", onEnter);
+			grid.removeEventListener("pointerout", onLeave);
+			window.removeEventListener("resize", onResize);
+			clearHover();
+			clearLayer("[data-row-arrow]");
+		};
+	}
+
+	function boot() {
+		cleanup?.();
+		cleanup = null;
+		initChangelogGraph();
+	}
+
+	document.addEventListener("astro:page-load", boot);
+	document.addEventListener("astro:before-swap", () => {
+		cleanup?.();
+		cleanup = null;
+	});
+
+	// 首次直接进入本页时不会派发 astro:page-load（路由由 Swup 接管），需要自己兜底
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", boot, { once: true });
+	} else {
+		boot();
+	}
+</script>
