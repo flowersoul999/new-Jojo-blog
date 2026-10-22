@@ -2,7 +2,9 @@
 // 面试板块外壳：页头 + 模块切换条 + 设计令牌
 // 令牌集中在 .iv-shell 上，所有子页面与子组件都从这里继承，浅色/深色自动跟随主题
 import { Icon } from "astro-icon/components";
+import InterviewAdmin from "@/components/interview/InterviewAdmin.astro";
 import { INTERVIEW_MODULES } from "@/data/interview";
+import type { AdminCollectionKey } from "@/data/interview-admin";
 
 interface Stat {
 	label: string;
@@ -16,6 +18,8 @@ interface Props {
 	/** 当前模块 key；传 "home"（默认）时不渲染模块切换条 */
 	current?: string;
 	stats?: Stat[];
+	/** 传集合 key 就在页头右上角显示「管理X」入口（登录后可见）；不传则不渲染 */
+	admin?: AdminCollectionKey;
 }
 
 const {
@@ -24,6 +28,7 @@ const {
 	desc = "",
 	current = "home",
 	stats = [],
+	admin,
 } = Astro.props;
 
 const showTabs = current !== "home";
@@ -34,6 +39,7 @@ const showTabs = current !== "home";
 		<div class="iv-hero__top">
 			<p class="iv-hero__kicker">{kicker}</p>
 			<div class="iv-hero__actions">
+				{admin && <InterviewAdmin collection={admin} />}
 				<slot name="actions" />
 			</div>
 		</div>

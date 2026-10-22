@@ -1,29 +1,32 @@
 ---
-// 面经管理入口：只在登录后出现。
-// 复用仓库既有的 /api/content/{list,read,write,delete} 四件套，
-// 本地 dev 下由 isLocalDev 分支直接读写 src/content/interviews。
+// 面试板块的编辑入口：登录后才出现，所有面试页面共用（放在 InterviewShell 的页头里）。
+// 字段由 src/data/interview-admin.ts 声明，这个组件只负责渲染表单 + 拼 frontmatter。
+// 写入走仓库既有的 /api/content/{list,read,write,delete} 四件套。
 import { Icon } from "astro-icon/components";
+import {
+	ADMIN_COLLECTIONS,
+	type AdminCollectionKey,
+} from "@/data/interview-admin";
 
 interface Props {
-	/** 目标集合目录，仓库相对路径 */
-	collection?: string;
-	label?: string;
+	/** 要管理哪个集合，对应 ADMIN_COLLECTIONS 的 key */
+	collection?: AdminCollectionKey;
 }
 
-const { collection = "src/content/interviews", label = "管理面经" } =
-	Astro.props;
+const { collection = "interviews" } = Astro.props;
+const spec = ADMIN_COLLECTIONS[collection];
 ---
 
-<div class="iv-admin" data-iv-admin data-collection={collection} hidden>
+<div class="iv-admin" data-iv-admin data-key={collection} hidden>
 	<button type="button" class="iv-admin__open" data-iv-open>
 		<Icon is:inline name="material-symbols:edit-square-outline" class="iv-admin__open-icon" />
-		<span>{label}</span>
+		<span>管理{spec.label}</span>
 	</button>
 
 	<dialog class="iv-admin__dialog" data-iv-dialog>
 		<div class="iv-admin__head">
 			<div>
-				<h2 class="iv-admin__title" data-iv-title>面经管理</h2>
+				<h2 class="iv-admin__title" data-iv-title>{spec.label}管理</h2>
 				<p class="iv-admin__sub" data-iv-count></p>
 			</div>
 			<button type="button" class="iv-admin__x" data-iv-close aria-label="关闭">
@@ -36,7 +39,7 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 				<div class="iv-admin__toolbar">
 					<button type="button" class="iv-admin__btn iv-admin__btn--primary" data-iv-new>
 						<Icon is:inline name="material-symbols:add-rounded" />
-						新建面经
+						新建{spec.label}
 					</button>
 					<button type="button" class="iv-admin__btn" data-iv-reload>
 						<Icon is:inline name="material-symbols:refresh-rounded" />
@@ -44,64 +47,53 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 					</button>
 				</div>
 				<ul class="iv-admin__list" data-iv-list></ul>
-				<p class="iv-admin__empty" data-iv-empty hidden>这个集合里还没有内容，点「新建面经」开始。</p>
+				<p class="iv-admin__empty" data-iv-empty hidden>这个集合里还没有内容，点「新建{spec.label}」开始。</p>
 			</div>
 
 			<form class="iv-admin__form" data-iv-form hidden novalidate>
 				<div class="iv-admin__grid">
-					<label class="iv-admin__field">
-						<span>公司</span>
-						<input type="text" name="company" required placeholder="某电商中台" />
-					</label>
-					<label class="iv-admin__field">
-						<span>岗位</span>
-						<input type="text" name="position" required placeholder="前端开发实习生" />
-					</label>
-					<label class="iv-admin__field">
-						<span>日期</span>
-						<input type="date" name="date" required />
-					</label>
-					<label class="iv-admin__field">
-						<span>轮次</span>
-						<select name="stage">
-							<option value="笔试">笔试</option>
-							<option value="一面" selected>一面</option>
-							<option value="二面">二面</option>
-							<option value="三面">三面</option>
-							<option value="技术面">技术面</option>
-							<option value="HR 面">HR 面</option>
-							<option value="终面">终面</option>
-						</select>
-					</label>
-					<label class="iv-admin__field">
-						<span>结果</span>
-						<select name="result">
-							<option value="待定" selected>待定</option>
-							<option value="已约">已约</option>
-							<option value="offer">offer</option>
-							<option value="挂">挂</option>
-						</select>
-					</label>
-					<label class="iv-admin__field">
-						<span>难度 1-5</span>
-						<input type="number" name="difficulty" min="1" max="5" step="1" value="3" />
-					</label>
-					<label class="iv-admin__field iv-admin__field--wide">
-						<span>标签（逗号分隔）</span>
-						<input type="text" name="tags" placeholder="CSS, HTTP, Vue" />
-					</label>
-					<label class="iv-admin__field iv-admin__field--wide">
-						<span>一句话摘要</span>
-						<input type="text" name="summary" placeholder="节奏极快，25 分钟问了十几个问题。" />
-					</label>
-					<label class="iv-admin__field iv-admin__field--wide">
-						<span>文件名<span class="iv-admin__hint">留空则自动生成</span></span>
-						<input type="text" name="filename" placeholder="2026-10-22-company-round" />
-					</label>
-					<label class="iv-admin__field iv-admin__field--wide">
-						<span>正文（Markdown）</span>
-						<textarea name="body" rows="14" placeholder={'## 流程\n\n## 被问到的题\n\n- …'}></textarea>
-					</label>
+					{
+						spec.fields.map((f) => (
+							<label
+								class:list={["iv-admin__field", { "iv-admin__field--wide": f.wide }]}
+							>
+								<span>
+									{f.label}
+									{f.hint && <span class="iv-admin__hint">{f.hint}</span>}
+								</span>
+								{f.type === "select" ? (
+									<select name={f.name}>
+										{f.options?.map((opt) => (
+											<option value={opt} selected={opt === f.value}>
+												{opt}
+											</option>
+										))}
+									</select>
+								) : f.type === "textarea" ? (
+									<textarea
+										name={f.name}
+										rows={f.rows ?? 12}
+										placeholder={f.placeholder}
+									/>
+								) : (
+									<input
+										type={
+											f.type === "date"
+												? "date"
+												: f.type === "number"
+													? "number"
+													: "text"
+										}
+										name={f.name}
+										value={f.value}
+										placeholder={f.placeholder}
+										min={f.min}
+										max={f.max}
+									/>
+								)}
+							</label>
+						))
+					}
 				</div>
 
 				<p class="iv-admin__error" data-iv-error hidden></p>
@@ -118,6 +110,8 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 </div>
 
 <script>
+	import { ADMIN_COLLECTIONS, type AdminField } from "@/data/interview-admin";
+
 	interface Entry {
 		name: string;
 		path: string;
@@ -130,11 +124,17 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 		sha: string;
 	}
 
+	/** 表单里所有值都按字符串收，拼 YAML 时再按字段类型转换 */
+	type Values = Record<string, string>;
+
 	let cleanup: (() => void) | null = null;
 
 	async function request<T>(path: string, init?: RequestInit): Promise<T> {
 		const res = await fetch(path, init);
-		const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+		const data = (await res.json().catch(() => ({}))) as {
+			ok?: boolean;
+			error?: string;
+		};
 		if (!res.ok || data.ok === false) {
 			throw new Error(data.error || `请求失败（${res.status}）`);
 		}
@@ -145,61 +145,88 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 		return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 	}
 
-	function serialize(fields: {
-		company: string;
-		position: string;
-		date: string;
-		stage: string;
-		result: string;
-		difficulty: number;
-		tags: string[];
-		summary: string;
-		draft: boolean;
-	}): string {
-		const tags = fields.tags.length
-			? `[${fields.tags.map((tag) => yamlString(tag)).join(", ")}]`
-			: "[]";
-		return [
-			"---",
-			`company: ${yamlString(fields.company)}`,
-			`position: ${yamlString(fields.position)}`,
-			`date: ${fields.date}`,
-			`stage: ${yamlString(fields.stage)}`,
-			`result: ${yamlString(fields.result)}`,
-			`difficulty: ${fields.difficulty}`,
-			`tags: ${tags}`,
-			`summary: ${yamlString(fields.summary)}`,
-			`draft: ${fields.draft}`,
-			"---",
-			"",
-		].join("\n");
+	function splitList(raw: string, separator: RegExp): string[] {
+		return raw
+			.split(separator)
+			.map((item) => item.trim())
+			.filter(Boolean);
 	}
 
-	/** 从已有 md 里拆出 frontmatter 与正文（只处理本集合用到的简单标量） */
-	function parse(raw: string) {
-		const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+	function toFrontmatter(values: Values, fields: AdminField[]): string {
+		const lines = ["---"];
+		for (const field of fields) {
+			if (field.virtual) continue;
+			const raw = values[field.name] ?? "";
+			if (field.type === "tags") {
+				const tags = splitList(raw, /[,，]/);
+				lines.push(`${field.name}: [${tags.map(yamlString).join(", ")}]`);
+			} else if (field.type === "nums") {
+				const nums = splitList(raw, /[,，\s]+/)
+					.map(Number)
+					.filter((n) => Number.isFinite(n));
+				lines.push(`${field.name}: [${nums.join(", ")}]`);
+			} else if (field.type === "number") {
+				const num = Number(raw);
+				lines.push(`${field.name}: ${raw !== "" && Number.isFinite(num) ? num : (field.min ?? 0)}`);
+			} else if (field.type === "date") {
+				lines.push(`${field.name}: ${raw}`);
+			} else {
+				lines.push(`${field.name}: ${yamlString(raw)}`);
+			}
+		}
+		lines.push("draft: false", "---");
+		return lines.join("\n");
+	}
+
+	/** 从已有 md 里拆出 frontmatter（只处理这几个集合用到的简单标量 / 行内数组） */
+	function parseFrontmatter(raw: string) {
+		const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
 		if (!match) return { meta: {} as Record<string, string>, body: raw };
 		const meta: Record<string, string> = {};
-		for (const line of match[1].split("\n")) {
+		for (const line of match[1].split(/\r?\n/)) {
 			const at = line.indexOf(":");
 			if (at < 0) continue;
-			const key = line.slice(0, at).trim();
-			let value = line.slice(at + 1).trim();
-			value = value.replace(/^["']/, "").replace(/["']$/, "");
-			meta[key] = value;
+			meta[line.slice(0, at).trim()] = line.slice(at + 1).trim();
 		}
 		return { meta, body: match[2].replace(/^\n+/, "") };
 	}
 
-	function todayInput(): string {
+	function valueFromMeta(field: AdminField, raw: string | undefined): string {
+		if (field.virtual) return "";
+		if (!raw) return field.value ?? "";
+		if (field.type === "tags" || field.type === "nums") {
+			return raw
+				.replace(/^\[|\]$/g, "")
+				.split(",")
+				.map((item) => item.trim().replace(/^["']|["']$/g, ""))
+				.filter(Boolean)
+				.join(", ");
+		}
+		return raw.replace(/^["']|["']$/g, "");
+	}
+
+	function today(): string {
 		const now = new Date();
 		const pad = (n: number) => String(n).padStart(2, "0");
 		return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 	}
 
+	/** 文件名只留字母数字汉字和连字符，避免出现空格 / 斜杠 / 冒号 */
+	function sanitize(slug: string): string {
+		return slug
+			.replace(/\.mdx?$/i, "")
+			.replace(/[^\w\u4e00-\u9fa5-]+/g, "-")
+			.replace(/-+/g, "-")
+			.replace(/^-|-$/g, "")
+			.slice(0, 60);
+	}
+
 	function initInterviewAdmin() {
 		const root = document.querySelector<HTMLElement>("[data-iv-admin]");
 		if (!root) return;
+		const spec = ADMIN_COLLECTIONS[(root.dataset.key ?? "interviews") as keyof typeof ADMIN_COLLECTIONS];
+		if (!spec) return;
+
 		const dialog = root.querySelector<HTMLDialogElement>("[data-iv-dialog]");
 		const listEl = root.querySelector<HTMLUListElement>("[data-iv-list]");
 		const emptyEl = root.querySelector<HTMLElement>("[data-iv-empty]");
@@ -209,7 +236,6 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 		const errorEl = root.querySelector<HTMLElement>("[data-iv-error]");
 		const titleEl = root.querySelector<HTMLElement>("[data-iv-title]");
 		const saveBtn = root.querySelector<HTMLButtonElement>("[data-iv-save]");
-		const collection = root.dataset.collection || "src/content/interviews";
 		if (!dialog || !listEl || !form) return;
 
 		let editing: { path: string; sha: string } | null = null;
@@ -221,25 +247,35 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 			errorEl.hidden = !message;
 		};
 
-		function field<T extends HTMLElement>(name: string): T {
-			return form?.querySelector<T>(`[name="${name}"]`) as T;
-		}
+		const input = (name: string) =>
+			form?.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+				`[name="${name}"]`,
+			) ?? null;
 
 		function resetForm() {
 			form?.reset();
-			field<HTMLInputElement>("date").value = todayInput();
-			field<HTMLInputElement>("difficulty").value = "3";
-			field<HTMLInputElement>("filename").value = "";
+			for (const field of spec.fields) {
+				const el = input(field.name);
+				if (!el) continue;
+				el.value = field.type === "date" ? today() : (field.value ?? "");
+			}
 			showError("");
 		}
 
+		function readValues(): Values {
+			const values: Values = {};
+			for (const field of spec.fields) {
+				values[field.name] = (input(field.name)?.value ?? "").trim();
+			}
+			return values;
+		}
+
 		async function loadList() {
-			if (!listEl) return;
 			listEl.textContent = "";
 			showError("");
 			try {
 				const entries = await request<Entry[]>(
-					`/api/content/list/?path=${encodeURIComponent(collection)}`,
+					`/api/content/list/?path=${encodeURIComponent(spec.dir)}`,
 				);
 				const files = entries
 					.filter((entry) => entry.name.endsWith(".md") || entry.name.endsWith(".mdx"))
@@ -291,29 +327,24 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 		async function openEditor(file?: Entry) {
 			resetForm();
 			if (file) {
-				editing = { path: file.path, sha: file.sha };
-				if (titleEl) titleEl.textContent = "编辑面经";
+				if (titleEl) titleEl.textContent = `编辑${spec.label}`;
 				try {
 					const data = await request<ReadResult>(
 						`/api/content/read/?path=${encodeURIComponent(file.path)}`,
 					);
-					const raw = data.content ?? "";
-					const { meta, body } = parse(raw);
-					field<HTMLInputElement>("company").value = meta.company ?? "";
-					field<HTMLInputElement>("position").value = meta.position ?? "";
-					field<HTMLInputElement>("date").value = (meta.date ?? todayInput()).slice(0, 10);
-					field<HTMLSelectElement>("stage").value = meta.stage || "一面";
-					field<HTMLSelectElement>("result").value = meta.result || "待定";
-					field<HTMLInputElement>("difficulty").value = meta.difficulty || "3";
-					field<HTMLInputElement>("tags").value = (meta.tags ?? "")
-						.replace(/^\[|\]$/g, "")
-						.split(",")
-						.map((tag) => tag.trim().replace(/^["']|["']$/g, ""))
-						.filter(Boolean)
-						.join(", ");
-					field<HTMLInputElement>("summary").value = meta.summary ?? "";
-					field<HTMLInputElement>("filename").value = file.name.replace(/\.mdx?$/, "");
-					field<HTMLTextAreaElement>("body").value = body;
+					const { meta, body } = parseFrontmatter(data.content ?? "");
+					for (const field of spec.fields) {
+						const el = input(field.name);
+						if (el) el.value = valueFromMeta(field, meta[field.name]);
+					}
+					const bodyEl = input("body");
+					if (bodyEl) bodyEl.value = body;
+					const nameEl = input("filename");
+					if (nameEl) {
+						nameEl.value = file.name.replace(/\.mdx?$/, "");
+						// 改名 = 删旧文件 + 建新文件，走 GitHub Contents API 时容易留残骸，编辑时先锁住
+						nameEl.readOnly = true;
+					}
 					editing = { path: file.path, sha: data.sha || file.sha };
 				} catch (error) {
 					showError(error instanceof Error ? error.message : "读取失败");
@@ -321,11 +352,15 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 				}
 			} else {
 				editing = null;
-				if (titleEl) titleEl.textContent = "新建面经";
+				if (titleEl) titleEl.textContent = `新建${spec.label}`;
+				const nameEl = input("filename");
+				if (nameEl) nameEl.readOnly = false;
 			}
 			if (listView) listView.hidden = true;
 			form.hidden = false;
-			field<HTMLInputElement>("company").focus();
+			(form.querySelector('[name="company"], [name="category"], [name="title"]') as
+				| HTMLInputElement
+				| null)?.focus();
 		}
 
 		function backToList() {
@@ -338,14 +373,22 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 
 		async function removeEntry(file: Entry) {
 			const label = file.name.replace(/\.mdx?$/, "");
-			if (!window.confirm(`删除「${label}」？\n\n会直接改动仓库文件，删掉的可以从 git 历史找回。`)) {
+			if (
+				!window.confirm(
+					`删除「${label}」？\n\n会直接改动仓库文件，删掉的可以从 git 历史找回。`,
+				)
+			) {
 				return;
 			}
 			try {
 				await request("/api/content/delete/", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ path: file.path, sha: file.sha, message: `Delete ${file.name}` }),
+					body: JSON.stringify({
+						path: file.path,
+						sha: file.sha,
+						message: `Delete ${file.name}`,
+					}),
 				});
 				await loadList();
 			} catch (error) {
@@ -353,40 +396,28 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 			}
 		}
 
+		function buildSlug(values: Values): string {
+			const custom = sanitize(values.filename ?? "");
+			if (custom) return custom;
+			const parts = [
+				spec.fields.some((field) => field.name === "date") ? values.date?.slice(0, 10) : "",
+				...spec.slugFrom.map((key) => values[key]),
+			].filter(Boolean);
+			return sanitize(parts.join("-")) || `entry-${Date.now().toString(36)}`;
+		}
+
 		async function submit() {
 			if (busy) return;
-			const company = field<HTMLInputElement>("company").value.trim();
-			const position = field<HTMLInputElement>("position").value.trim();
-			const date = field<HTMLInputElement>("date").value;
-			if (!company || !position || !date) {
-				showError("公司、岗位、日期是必填项");
+			const values = readValues();
+			const missing = spec.fields.filter((field) => field.required && !values[field.name]);
+			if (missing.length) {
+				showError(`必填：${missing.map((field) => field.label).join("、")}`);
 				return;
 			}
 
-			const filenameInput = field<HTMLInputElement>("filename").value.trim();
-			const slug =
-				filenameInput ||
-				`${date}-${company.replace(/[^\w\u4e00-\u9fa5]+/g, "-").slice(0, 20) || "interview"}`;
-			const cleanSlug = slug.replace(/\.mdx?$/, "").replace(/[/\\]/g, "-");
-			const path = editing?.path ?? `${collection}/${cleanSlug}.md`;
-
-			const tags = field<HTMLInputElement>("tags")
-				.value.split(",")
-				.map((tag) => tag.trim())
-				.filter(Boolean);
-
-			const head = serialize({
-				company,
-				position,
-				date,
-				stage: field<HTMLSelectElement>("stage").value,
-				result: field<HTMLSelectElement>("result").value,
-				difficulty: Number(field<HTMLInputElement>("difficulty").value) || 3,
-				tags,
-				summary: field<HTMLInputElement>("summary").value.trim(),
-				draft: false,
-			});
-			const body = field<HTMLTextAreaElement>("body").value;
+			const cleanSlug = buildSlug(values);
+			const path = editing?.path ?? `${spec.dir}/${cleanSlug}.md`;
+			const body = input("body") ? (input("body") as HTMLTextAreaElement).value : "";
 
 			busy = true;
 			if (saveBtn) saveBtn.disabled = true;
@@ -397,7 +428,7 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						path,
-						content: `${head}\n${body.trimEnd()}\n`,
+						content: `${toFrontmatter(values, spec.fields)}\n\n${body.trimEnd()}\n`,
 						sha: editing?.sha,
 						message: `${editing ? "Update" : "Add"} ${cleanSlug}`,
 					}),
@@ -470,7 +501,12 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 	}
 </script>
 
-<style>
+<!--
+	必须 is:global：列表项和「编辑 / 删除」按钮是 JS 里 document.createElement 出来的，
+	拿不到 Astro 给模板节点加的作用域属性，scoped 样式对它们完全无效。
+	所有类名都带 iv-admin__ 前缀，不会外溢。
+-->
+<style is:global>
 	.iv-admin {
 		min-width: 0;
 	}
@@ -741,6 +777,11 @@ const { collection = "src/content/interviews", label = "管理面经" } =
 	.iv-admin__field select:focus,
 	.iv-admin__field textarea:focus {
 		border-color: color-mix(in srgb, var(--iv-accent) 60%, transparent);
+	}
+
+	.iv-admin__field input[readonly] {
+		opacity: 0.6;
+		cursor: not-allowed;
 	}
 
 	.iv-admin__error {

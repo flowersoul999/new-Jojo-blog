@@ -1,7 +1,6 @@
 ---
 // 面试板块首页：只做入口和概览，不放具体内容
 import { getCollection } from "astro:content";
-import InterviewAdmin from "@/components/interview/InterviewAdmin.astro";
 import InterviewShell from "@/components/interview/InterviewShell.astro";
 import ModuleGrid from "@/components/interview/ModuleGrid.astro";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
@@ -46,9 +45,8 @@ const description =
 		title="面试"
 		desc="面完不写下来，就等于白面了一场。这里存着每一次的真题目、按领域归档的八股、Hot100 的刷题进度，还有白板上手写过的那些题。"
 		stats={stats}
+		admin="interviews"
 	>
-		<InterviewAdmin slot="actions" />
-
 		<ModuleGrid counts={counts} />
 
 		{
